@@ -2,10 +2,9 @@
 ///
 /// All endpoints are placeholders pending the final backend API contract
 /// (PRD section 15). Replace paths and payload shapes once agreed.
-import 'dart:convert';
 
-import '../core/errors/app_exception.dart';
-import '../core/network/api_client.dart';
+import '../../core/errors/app_exception.dart';
+import '../../core/network/api_client.dart';
 
 class ApiService {
   ApiService();
@@ -20,7 +19,7 @@ class ApiService {
     } on AppException {
       rethrow;
     } catch (e) {
-      throw AppException('Gagal memuat data: $e', originalError: e);
+      throw NetworkException('Gagal memuat data: $e', originalError: e);
     }
   }
 
@@ -32,7 +31,7 @@ class ApiService {
     } on AppException {
       rethrow;
     } catch (e) {
-      throw AppException('Gagal mengirim data: $e', originalError: e);
+      throw NetworkException('Gagal mengirim data: $e', originalError: e);
     }
   }
 
@@ -43,7 +42,7 @@ class ApiService {
     } on AppException {
       rethrow;
     } catch (e) {
-      throw AppException('Gagal memperbarui data: $e', originalError: e);
+      throw NetworkException('Gagal memperbarui data: $e', originalError: e);
     }
   }
 
@@ -54,7 +53,7 @@ class ApiService {
     } on AppException {
       rethrow;
     } catch (e) {
-      throw AppException('Gagal menghapus data: $e', originalError: e);
+      throw NetworkException('Gagal menghapus data: $e', originalError: e);
     }
   }
 }

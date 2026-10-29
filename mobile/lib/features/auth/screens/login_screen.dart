@@ -4,7 +4,6 @@
 /// setelah paket `provider` ditambahkan dan kontrak API final (PRD 15).
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_theme.dart';
 import '../../../core/validators/input_validator.dart';
 
 class LoginScreen extends StatelessWidget {

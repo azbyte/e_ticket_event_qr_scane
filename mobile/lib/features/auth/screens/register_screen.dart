@@ -3,7 +3,6 @@
 /// Stub fondasi. Admin tidak dapat didaftarkan melalui formulir umum (FR-06).
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_theme.dart';
 import '../../../core/validators/input_validator.dart';
 
 class RegisterScreen extends StatelessWidget {
