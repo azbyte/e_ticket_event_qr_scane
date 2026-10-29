@@ -1,15 +1,15 @@
 /// Payment state provider for simulated Virtual Account (PRD section 4.7).
-///
-/// Requires package `provider` added to pubspec.yaml (PRD section 8.1).
 import 'package:flutter/foundation.dart';
-// ignore: unused_import
-import 'package:provider/provider.dart';
 
+import '../core/constants/app_constants.dart';
 import '../models/payment/payment_model.dart';
 import '../services/payment/payment_service.dart';
 
 class PaymentProvider extends ChangeNotifier {
-  PaymentProvider(this._paymentService);
+  PaymentProvider([PaymentService? paymentService])
+      : _paymentService = paymentService ?? PaymentService();
+
+  static final PaymentProvider instance = PaymentProvider();
 
   final PaymentService _paymentService;
 
@@ -20,12 +20,13 @@ class PaymentProvider extends ChangeNotifier {
   PaymentModel? get payment => _payment;
   bool get isLoading => _isLoading;
   String? get error => _error;
-  bool get isPaid => _payment?.status == 'paid';
-  bool get isPending => _payment?.status == 'pending';
+  bool get isPaid => _payment?.status == AppConstants.paymentStatusPaid;
+  bool get isPending => _payment?.status == AppConstants.paymentStatusPending;
 
   Future<bool> simulatePayment({
     required String orderId,
     required String virtualAccountNumber,
+    bool simulateSuccess = true,
   }) async {
     _setLoading(true);
     _error = null;
@@ -33,10 +34,11 @@ class PaymentProvider extends ChangeNotifier {
       final data = await _paymentService.simulatePayment(
         orderId: orderId,
         virtualAccountNumber: virtualAccountNumber,
+        simulateSuccess: simulateSuccess,
       );
       _payment = PaymentModel.fromJson(data);
       notifyListeners();
-      return true;
+      return _payment?.status == AppConstants.paymentStatusPaid;
     } catch (e) {
       _error = e.toString();
       return false;
@@ -59,6 +61,12 @@ class PaymentProvider extends ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+
+  void clearPayment() {
+    _payment = null;
+    _error = null;
+    notifyListeners();
   }
 
   void _setLoading(bool value) {
