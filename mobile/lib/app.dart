@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'core/config/app_config.dart';
 import 'core/theme/app_theme.dart';
 import 'routes/app_routes.dart';
+import 'routes/app_router.dart';
 
 // TODO: import providers once `provider` package is added to pubspec.yaml
 // import 'providers/auth_provider.dart';

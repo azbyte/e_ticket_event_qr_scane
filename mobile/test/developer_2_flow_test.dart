@@ -10,7 +10,6 @@ import 'package:e_ticket_event_qr_scane/providers/order_provider.dart';
 import 'package:e_ticket_event_qr_scane/providers/payment_provider.dart';
 import 'package:e_ticket_event_qr_scane/providers/ticket_provider.dart';
 import 'package:e_ticket_event_qr_scane/services/event/event_service.dart';
-import 'package:e_ticket_event_qr_scane/services/mock/mock_attendee_repository.dart';
 import 'package:e_ticket_event_qr_scane/services/order/order_service.dart';
 import 'package:e_ticket_event_qr_scane/services/payment/payment_service.dart';
 import 'package:e_ticket_event_qr_scane/services/ticket/ticket_service.dart';
@@ -18,7 +17,6 @@ import 'package:e_ticket_event_qr_scane/services/ticket/ticket_type_service.dart
 
 void main() {
   group('Developer 2 - Repository & Service Unit Tests', () {
-    late MockAttendeeRepository repo;
     late EventService eventService;
     late TicketTypeService ticketTypeService;
     late OrderService orderService;
@@ -26,7 +24,6 @@ void main() {
     late TicketService ticketService;
 
     setUp(() {
-      repo = MockAttendeeRepository.instance;
       eventService = EventService();
       ticketTypeService = TicketTypeService();
       orderService = OrderService();
