@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_drawer.dart';
 import '../../../providers/event_provider.dart';
 import '../../orders/screens/order_list_screen.dart';
 import '../../tickets/screens/ticket_list_screen.dart';
@@ -58,6 +59,7 @@ class _EventListScreenState extends State<EventListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: AppBar(
         title: const Text(
           'Jelajahi Event',

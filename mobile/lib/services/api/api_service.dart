@@ -2,7 +2,6 @@
 ///
 /// All endpoints are placeholders pending the final backend API contract
 /// (PRD section 15). Replace paths and payload shapes once agreed.
-import 'dart:convert';
 
 import '../../core/errors/app_exception.dart';
 import '../../core/network/api_client.dart';
