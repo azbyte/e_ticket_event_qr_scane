@@ -1,15 +1,14 @@
 /// Ticket state provider (PRD sections 4.6, 6.3).
-///
-/// Requires package `provider` added to pubspec.yaml (PRD section 8.1).
 import 'package:flutter/foundation.dart';
-// ignore: unused_import
-import 'package:provider/provider.dart';
 
 import '../models/ticket/ticket_model.dart';
 import '../services/ticket/ticket_service.dart';
 
 class TicketProvider extends ChangeNotifier {
-  TicketProvider(this._ticketService);
+  TicketProvider([TicketService? ticketService])
+      : _ticketService = ticketService ?? TicketService();
+
+  static final TicketProvider instance = TicketProvider();
 
   final TicketService _ticketService;
 
@@ -53,6 +52,11 @@ class TicketProvider extends ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+
+  void clearSelectedTicket() {
+    _selectedTicket = null;
+    notifyListeners();
   }
 
   void _setLoading(bool value) {

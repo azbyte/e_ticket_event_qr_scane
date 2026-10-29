@@ -1,4 +1,6 @@
 /// Order model (PRD sections 4.4, 4.7, 6.2).
+import 'order_item_model.dart';
+
 class OrderModel {
   final String id;
   final String? userId; // null for guest orders
