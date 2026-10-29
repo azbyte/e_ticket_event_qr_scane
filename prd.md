@@ -558,7 +558,7 @@ Hanya menampilkan event yang aksesnya dimiliki staf.
 
 ## 8. Arsitektur Teknis
 
-### 8.1 Frontend
+### 8.1 Mobile
 
 Teknologi:
 - Flutter dan Dart.
@@ -645,7 +645,7 @@ Contoh endpoint yang diperkirakan:
 - `GET /admin/support/reports`
 - `PATCH /admin/support/reports/:id`
 
-Endpoint di atas adalah rancangan awal, bukan kontrak API final. Payload, autentikasi, otorisasi, format error, dan validasi harus ditentukan sebelum frontend dan backend dikerjakan secara paralel.
+Endpoint di atas adalah rancangan awal, bukan kontrak API final. Payload, autentikasi, otorisasi, format error, dan validasi harus ditentukan sebelum mobile dan backend dikerjakan secara paralel.
 
 ---
 
@@ -728,7 +728,7 @@ Endpoint di atas adalah rancangan awal, bukan kontrak API final. Payload, autent
 
 Pembagian berikut adalah usulan berdasarkan tiga orang yang mengembangkan satu sistem bersama.
 
-### Anggota 1 — Frontend dan Pengalaman Pengguna
+### Anggota 1 — mobile dan Pengalaman Pengguna
 - Struktur Flutter dan routing.
 - Halaman publik.
 - Detail event dan registrasi.
@@ -752,7 +752,7 @@ Pembagian berikut adalah usulan berdasarkan tiga orang yang mengembangkan satu s
 - Manajemen staf dan izin scanner.
 - Riwayat pemindaian.
 - Pengujian integrasi serta alur end-to-end.
-- Bantuan integrasi frontend dan backend.
+- Bantuan integrasi mobile dan backend.
 
 ### Aturan Kerja Bersama
 - Semua anggota menyepakati skema database dan kontrak API sebelum integrasi.
@@ -793,7 +793,7 @@ Bagian ini harus ditinjau sebelum PRD dinyatakan final.
 7. **Undangan staf:** mekanisme tautan/email, masa berlaku, dan proses penerimaan harus dirinci.
 8. **Ekspor peserta:** CSV diprioritaskan; ekspor Excel menyesuaikan waktu.
 9. **PDF e-ticket:** dipertimbangkan setelah halaman tiket dan email berjalan baik.
-10. **Hosting:** lokasi deployment frontend, backend, database, dan konfigurasi domain belum ditentukan.
+10. **Hosting:** lokasi deployment mobile, backend, database, dan konfigurasi domain belum ditentukan.
 11. **Target waktu:** belum ditetapkan sehingga estimasi sprint baru dapat dibuat setelah prioritas fitur disepakati.
 12. **Kebijakan privasi dan layanan:** harus disiapkan sebelum produk digunakan secara publik.
 
