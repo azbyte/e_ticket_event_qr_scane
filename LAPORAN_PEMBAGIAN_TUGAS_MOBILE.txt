@@ -1,433 +1,277 @@
 ================================================================================
-                    LAPORAN PEMBAGIAN TUGAS MOBILE FLUTTER
-              E-Ticket Event QR Scanner - Untuk 3 Developer
-================================================================================
-Tanggal: 29 Oktober 2026
-Lokasi: root proyek (e_ticket_event_qr_scane/LAPORAN_PEMBAGIAN_TUGAS_MOBILE.txt)
-Proyek: e_ticket_event_qr_scane / mobile/
-Flutter SDK: 3.13.2+ | State Management: Provider (belum di pubspec.yaml)
-
-================================================================================
-A. RINGKASAN PROYEK
+A. RINGKASAN PROYEK DAN PRD
 ================================================================================
 
-Aplikasi E-Ticket Event QR Scanner adalah platform pengelolaan dan penjualan
-tiket acara dengan verifikasi QR Code. 4 peran: attendee, organizer, staff,
-admin. Fitur MVP: autentikasi, daftar/detail event, pemesanan tiket dengan
-simulasi pembayaran VA, e-ticket QR, check-in via scan QR, manajemen event
-organizer, moderasi dan laporan admin, notifikasi.
+1. Latar Belakang
+   E-Ticket Event QR Scanner adalah platform pengelolaan dan penjualan tiket acara
+   dengan verifikasi QR Code. Aplikasi mendukung 4 peran: attendee (peserta),
+   organizer (penyelenggara), staff (staf event), dan admin (admin platform).
 
-Backend: Node.js + Express + Supabase, API contract masih DRAFT (PRD s15),
-belum running. Frontend mockMode=true (AppConfig), siap dikembangkan dengan
-mock repository tanpa backend.
+2. Sumber PRD
+   Dokumen utama: prd.md (versi 0.1 — draf untuk validasi)
+   Status: Belum final, masih dalam tahap validasi awal
+   Tim pengembang: 3 orang
 
+3. Versi dan Platform
+   - Versi: 0.1 — draf untuk validasi
+   - Platform: Flutter Android dan Flutter Web
+   - Backend: Node.js + Express
+   - Database: PostgreSQL + Prisma ORM (via Supabase)
+   - Target pasar: Indonesia
+
+4. Fitur MVP (Minimum Viable Product)
+   - Penyelenggara membuat event dan mengajukannya untuk moderasi
+   - Admin dapat menyetujui atau menolak event
+   - Peserta dapat mendaftar melalui browser (tanpa wajib membuat akun)
+   - Sistem dapat memproses pesanan dan simulasi pembayaran
+   - Tiket diterbitkan hanya setelah pembayaran terkonfirmasi
+   - QR Code tiket dapat divalidasi
+   - Check-in ganda dapat dicegah dalam kondisi online
+   - Mode offline memiliki mekanisme sinkronisasi dan penanganan konflik
+   - Peserta dapat membuat laporan kendala dan admin dapat menindaklanjutinya
+   - Aplikasi dapat dijalankan pada Android dan browser
+
+5. Indikator Keberhasilan MVP
+   - Penyelenggara dapat membuat event dan mengajukannya untuk moderasi
+   - Admin dapat menyetujui atau menolak event
+   - Peserta dapat mendaftar melalui browser
+   - Sistem dapat memproses pesanan dan simulasi pembayaran
+   - Tiket diterbitkan hanya setelah pembayaran terkonfirmasi
+   - QR Code tiket dapat divalidasi
+   - Check-in ganda dapat dicegah dalam kondisi online
+   - Peserta dapat membuat laporan kendala dan admin dapat menindaklanjutinya
+   - Aplikasi dapat dijalankan pada Android dan browser
+
+6. Struktur Pengguna (PRD section 2)
+   - Peserta: dapat melihat daftar event, mendaftar tanpa akun, memilih kategori/jumlah tiket,
+     mengisi data peserta, simulasi pembayaran, melihat status pesanan, mengakses e-ticket,
+     menerima tiket melalui email, melaporkan kendala
+   - Penyelenggara: membuat dan mengedit event, mengatur lokasi/jadwal/deskripsi,
+     membuat kategori tiket, mengatur harga/kuota/periode penjualan, menayangkan event untuk
+     moderasi, melihat daftar peserta dan status pembayaran, mencari/filter peserta,
+     mengexpor data peserta ke CSV/Excel, mengundang/mencabut staf, melihat statistik
+     penjualan dan check-in, melihat riwayat aktivitas
+   - Staf Event: melakukan check-in peserta, meninjau laporan kendala peserta, mengelola
+     status laporan
+
+7. Fitur yang Diharuskan Minimum (Section 3)
+   - Peserta: melihat daftar event, membuka detail event, mendaftar tanpa membuat akun,
+     memasukkan email, menyelesaikan pembayara simulasi, melihat status pesanan, mengakses
+     e-ticket, menerima tiket melalui email, melaporkan kendala
+   - Penyelenggara: menambahkan event, event dapat disimpan dan ditampilkan kembali,
+     event dapat dipilih peserta untuk registrasi, menambahkan panitia, data panitia tersimpan
+   - Panitia: membuka fungsi pemindaian QR, aplikasi meminta izin kamera jika diperlukan,
+     QR code pada tiket dapat dipindai, tiket divalidasi terhadap data tersimpan, tiket tidak
+     valid ditolak, tiket yang telah digunakan ditolak ketika dipindai ulang, status check-in
+     tersimpan
+
+8. Analisis PRD Konflik
+   - Registrasi tanpa akun (FR-04) vs pembuatan akun opsional: Registrasi tanpa akun adalah
+     fitur minimum; akun opsional untuk fitur tambahan seperti riwayat pesanan
+   - Mode offline vs online: Mode offline memiliki mekanisme sinkronisasi dan penanganan
+     konflik, namun aplikasi didesain untuk kondisi online utama
+   - Biaya layanan: belum jelas di PRD, akan ditentukan sebelum demo atau peluncuran publik
 ================================================================================
-B. STRUKTUR FOLDER DAN FUNGSI FILE
-================================================================================
-
-Root: mobile/ | Entry: mobile/lib/main.dart (template default Flutter, SALAH)
-Root widget: mobile/lib/app.dart (MyApp, belum dipakai main.dart)
-
-FILE YANG BENAR-BENAR ADA DI DISK (terverifikasi):
-
-CORE (lengkap, minimal perubahan):
-- lib/core/config/app_config.dart (nama, baseUrl, mockMode=true)
-- lib/core/constants/app_constants.dart (role, status event/order/ticket/payment/report)
-- lib/core/errors/app_exception.dart (Auth, NotFound, Validation, Network exception)
-- lib/core/network/api_client.dart (singleton, SEMUA method throw UnimplementedError)
-- lib/core/theme/app_theme.dart (Material3 tema)
-- lib/core/utils/date_utils.dart (format tanggal Indonesia)
-- lib/core/validators/input_validator.dart (required, email, password, positiveInteger)
-
-MODELS (lengkap, fromJson/toJson siap):
-- models/user/user_model.dart, user_role.dart (Enum: attendee, organizer, staff, admin)
-- models/event/event_model.dart, ticket_type_model.dart
-- models/order/order_model.dart, order_item_model.dart
-- models/payment/payment_model.dart
-- models/ticket/ticket_model.dart
-- models/check_in/check_in_model.dart (synced, syncStatus)
-- models/report/support_report_model.dart, report_activity_model.dart
-
-SERVICES (stub, endpoint path didefinisikan, ApiClient belum bekerja):
-- services/api/api_service.dart, auth/auth_service.dart, event/event_service.dart
-- order/order_service.dart, payment/payment_service.dart, ticket/ticket_service.dart
-- check_in/check_in_service.dart (syncPendingCheckIns = UnimplementedError)
-- scanner/scanner_service.dart, report/report_service.dart, notification/notification_service.dart
-
-PROVIDERS (stub, perlu paket `provider`, ChangeNotifier):
-- providers/auth_provider.dart, user_provider.dart, event_provider.dart, order_provider.dart
-- payment_provider.dart, ticket_provider.dart, check_in_provider.dart, report_provider.dart
-- notification_provider.dart
-
-ROUTES:
-- routes/app_routes.dart (konstanta semua nama route, lengkap)
-- routes/app_router.dart (HANYA 3 route: initial, login, register; sisanya placeholder)
-
-SCREENS (semua STUB fondasi, belum terintegrasi provider):
-- auth: login_screen.dart, register_screen.dart, widgets/auth_divider.dart
-- home: home_screen.dart
-- events: event_list_screen.dart, event_detail_screen.dart, widgets/event_card.dart
-- orders: order_list_screen.dart, order_detail_screen.dart
-- payments: payment_screen.dart
-================================================================================
-C. HUBUNGAN ANTARFITUR DAN KETERGANTUNGAN
-================================================================================
-
-DATA FLOW: Screen -> Provider (ChangeNotifier) -> Service -> ApiService -> ApiClient -> Backend API
-
-KETERGANTUNGAN KRITIS:
-1. provider package HARUS ditambahkan ke pubspec.yaml sebelum provider bisa dipakai
-   (semua provider saat ini unused import karena paket belum terpasang)
-2. http package diperlukan untuk implementasi ApiClient (saat ini UnimplementedError)
-3. main.dart HARUS diubah untuk menggunakan MyApp dari app.dart (template default saat ini)
-4. app.dart HARUS diubah untuk menambahkan MultiProvider (belum ada provider)
-5. app_router.dart HARUS diimplementasi untuk semua route (saat ini hanya 3 route)
-6. Semua provider bergantung pada service -> ApiClient
-7. Model data sudah lengkap, bisa digunakan semua developer tanpa perubahan
-
-BATAS MODUL:
-- Auth/User: mandiri, bergantung core + auth service
-- Event/TicketType: bergantung event service + models event/ticket_type
-- Order/Payment: bergantung order service + payment service + models order/payment
-- Ticket: bergantung ticket service + models ticket/ticket_type
-- Check-in/Scanner: bergantung check_in service + scanner service + models check_in/ticket
-- Organizer: bergantung event service + organizer provider (belum ada, perlu dibuat)
-- Admin: bergantung event service + report service + models support_report
-- Notification: bergantung notification service
-
-KETERGANTUNGAN ANTAR MODUL (harus disepakati):
-- Semua modul pakai UserModel yang sama (models/user/)
-- Semua modul pakai AppConstants yang sama (core/constants/)
-- Semua modul pakai route dari app_routes.dart yang sama
-- Semua modul pakai AppException untuk error handling
-- Route navigasi antar modul (contoh: dari event detail ke ticket selection)
-
-================================================================================
-D. PEMBAGIAN TUGAS DEVELOPER 1
+B. ANALISIS KEBUTUHAN FUNGSI MINIMUM
 ================================================================================
 
-A. Identitas tugas
-- Developer: Developer 1
-- Modul: Fondasi, Infrastruktur Inti, dan Autentikasi
-- Tujuan utama: Menyediakan fondasi aplikasi (entry point, tema, konfigurasi,
-  routing, HTTP client, state management setup) dan modul autentikasi dan profil
-  pengguna, sehingga developer lain bisa mengembangkan fitur secara independen
-  dengan mock data.
-- Hasil akhir: main.dart menjalankan MyApp dari app.dart; app.dart dengan
-  MultiProvider; pubspec.yaml dengan provider dan http; ApiClient diimplementasi
-  dengan http; app_router.dart semua route terdaftar; layar login/register
-  terintegrasi AuthProvider; AuthProvider, AuthService, UserProvider; layar home.
+1. Alur Minimum Peserta
+   1.1. Penyelenggara membuat event
+   1.2. Event muncul pada daftar event peserta
+   1.3. Peserta membuka detail event
+   1.4. Peserta mendaftar tanpa membuat akun
+   1.5. Peserta memasukkan email yang valid
+   1.6. Peserta menyelesaikan pembayaran simulasi
+   1.6.1. Sistem menyimpan registrasi
+   1.6.2. Sistem menerbitkan tiketunik
+   1.6.3. Tiket dikirim ke alamat email peserta
+   1.6.4. Tiket memuat QR code yang dapat dibaca
+   1.7. Panitia memindai QR pada tiket tersebut
+   1.8. Sistem memverifikasi tiket dan menampilkan hasilnya
+   1.9. Tiket ditandai telah digunakan setelah check-in berhasil
+   1.10. Pemindaian ulang terhadap tiket yang sama ditolak sebagai tiket yang sudah digunakan
 
-B. Ruang lingkup pekerjaan
-TERMASUK: main.dart, app.dart, pubspec.yaml, app_routes.dart, app_router.dart,
-api_client.dart, app_config.dart; AuthProvider, AuthService, UserProvider;
-login_screen.dart, register_screen.dart, home_screen.dart; auth_divider.dart;
-mock data auth; dokumentasi route untuk Dev 2 dan 3.
-TIDAK TERMASUK: layar event/order/payment/ticket (Dev 2); check-in/organizer/
-admin/notification (Dev 3); implementasi backend.
+2. Alur Minimum Penyelenggara
+   2.1. Penyelenggara mengakses fungsi pengelolaan event
+   2.2. Penyelenggara menambahkan event
+   2.3. Event dapat disimpan dan ditampilkan kembali
+   2.3.1. Event muncul pada daftar event peserta
+   2.3.2. Event berisi informasi: nama, jadwal, lokasi/platform, harga simulasi
+   2.4. Penyelenggara menambahkan panitia ke event
+   2.4.1. Informasi atau identitas panitia sesuai model akses yang dirancang
+   2.5. Data perubahan tersimpan sesuai mekanisme akses
 
-C. Daftar file terperinci
-| No | Path file | Status | Tujuan file | Pekerjaan spesifik | Dependensi |
-| 1 | lib/main.dart | Ada, diubah | Entry point Flutter | Ganti isi: void main() => runApp(const MyApp()); impor MyApp dari 'app.dart'. Hapus MyHomePage dan _MyHomePageState (template default) | app.dart |
-| 2 | lib/app.dart | Ada, diubah | Root widget, atur MaterialApp, tema, routing, provider | Uncomment import provider. Tambahkan MultiProvider daftarkan semua provider. Set initialRoute dan onGenerateRoute ke AppRouter | pubspec (provider), app_routes, app_router, semua provider |
-| 3 | lib/pubspec.yaml | Ada, diubah | Manajemen dependensi | Tambahkan provider: ^6.0.0 dan http: ^1.1.0 di dependencies. Jangan hapus dependensi yang ada | Tidak ada |
-| 4 | lib/routes/app_routes.dart | Ada | Konstanta nama route | Pertahankan semua konstanta. Tambahkan konstanta route yang kurang jika diperlukan | Tidak ada |
-| 5 | lib/routes/app_router.dart | Ada, diubah | Route generator | Ganti _placeholder untuk SEMUA route di app_routes.dart dengan MaterialPageRoute ke layar konkret. Implementasi route Dev 1 (initial, login, register, home). Route Dev 2 dan 3 arahkan ke placeholder sementara | app_routes.dart, semua layar |
-| 6 | lib/core/network/api_client.dart | Ada, diubah | HTTP client wrapper (singleton) | Implementasi get/post/put/delete dengan paket http. Tambahkan baseUrl dari AppConfig, timeout, header Authorization Bearer, konversi error ke AppException. Support mockMode | app_config.dart, app_exception.dart, paket http |
-| 7 | lib/core/config/app_config.dart | Ada | Konfigurasi app global | Pertahankan. mockMode sudah true. Sesuaikan apiBaseUrl jika diperlukan | Tidak ada |
-| 8 | lib/core/errors/app_exception.dart | Ada | Exception error handling | Pertahankan tanpa perubahan | Tidak ada |
-| 9 | lib/core/theme/app_theme.dart | Ada | Tema app global | Pertahankan tanpa perubahan | Tidak ada |
-| 13 | lib/providers/auth_provider.dart | Ada, diubah | State management autentikasi | Pertahankan struktur. Konstruktor terima AuthService. Implementasi logout membersihkan token. Simpanan token lokal (shared_preferences, bisa ditunda) | auth_service.dart, user_model.dart |
-| 14 | lib/services/auth/auth_service.dart | Ada, diubah | Logika autentikasi, endpoint /auth/* | Pertahankan register, login, logout, me. Pakai ApiClient. Tangani response, lempar AppException pada error | api_service.dart, api_client.dart |
-| 15 | lib/providers/user_provider.dart | Ada, diubah | State management profil login | Pertahankan loadMe, setUser. Digunakan memuat profil setelah login | auth_service.dart, user_model.dart |
-| 16 | lib/models/user/user_model.dart | Ada | Model data pengguna | Pertahankan tanpa perubahan (sudah lengkap) | user_role.dart |
-| 17 | lib/models/user/user_role.dart | Ada | Enum peran pengguna | Pertahankan tanpa perubahan | Tidak ada |
-| 18 | lib/features/auth/screens/login_screen.dart | Ada, diubah | Layar login organizer/staff/admin | Hubungkan form dengan AuthProvider.login. Tambah loading, error message, navigasi ke home setelah sukses | auth_provider.dart, input_validator.dart, app_routes.dart |
-| 19 | lib/features/auth/screens/register_screen.dart | Ada, diubah | Layar registrasi organizer | Hubungkan form dengan AuthProvider.register. Tambah loading, error message, navigasi ke login setelah sukses. Admin tidak bisa daftar via formulir ini | auth_provider.dart, input_validator.dart, app_routes.dart |
-| 20 | lib/features/home/screens/home_screen.dart | Ada, diubah | Halaman beranda publik | Implementasi daftar event pilihan dengan EventProvider (mock data). Pencarian sederhana. Navigasi ke event detail | event_provider.dart, event_model.dart, app_routes.dart |
+3. Alur Minimum Panitia
+   3.1. Panitia membuka fungsi pemindaian tiket
+   3.2. Aplikasi meminta izin kamera jika diperlukan
+   3.3. QR code pada tiket elektronik dapat dipindai
+   3.4. Tiket divalidasi terhadap data registrasi yang tersimpan
+   3.5. Hasil validasi ditampilkan dengan status yang jelas
+   3.6. Tiket tidak valid ditolak
+   3.7. Tiket yang telah digunakan ditolak ketika dipindai ulang
+   3.8. Status check-in tersimpan
 
-Catatan: File baris 8-12 "Sudah ada" tapi tidak perlu diubah (Dipertahankan), tidak dimasukkan daftar perubahan.
-Dev 1 pemilik utama semua file shared: main.dart, app.dart, pubspec.yaml, app_routes.dart, app_router.dart, api_client.dart.
+4. Kriteria Alur End-to-End (Section 4)
+   1. Penyelenggara membuat event
+   2. Penyelenggara menambahkan panitia
+   3. Event muncul pada daftar event peserta
+   4. Peserta mendaftar tanpa membuat akun
+   5. Peserta menyelesaikan pembayaran simulasi
+   6. Sistem menyimpan registrasi dan menerbitkan tiketunik
+   7. Tiket dikirim ke alamat email peserta
+   8. Panitia memindai QR pada tiket tersebut
+   9. Sistem memverifikasi tiket dan menampilkan hasilnya
+   10. Tiket ditandai telah digunakan setelah check-in berhasil
+   11. Pemindaian ulang terhadap tiket yang sama ditolak sebagai tiket yang sudah digunakan
 
-D. Alur kerja modul
-1. Pengguka buka aplikasi -> main.dart jalankan MyApp dari app.dart
-2. app.dart tampilkan MaterialApp dengan MultiProvider dan AppRouter.generateRoute
-3. initialRoute '/' tampilkan HomeScreen (Dev 1) atau LoginScreen (belum login)
-4. Pengguka pilih "Masuk" di LoginScreen
-5. LoginScreen panggil AuthProvider.login(email, password)
-6. AuthProvider panggil AuthService.login() -> ApiService -> ApiClient (POST /auth/login)
-7. ApiClient kembalikan data (mock atau real), AuthProvider simpan UserModel dan notifyListeners
-8. UI tampilkan HomeScreen atau navigasi berdasarkan role
-9. Belum punya akun -> tekan "Daftar" -> RegisterScreen -> AuthProvider.register
+5. Database Sementara (Section 4)
+   5.1. Kebutuhan
+      - Data event, registrasi, pembayaran simulasi, tiket, dan check-in dapat disimpan
+      - Data dapat dibaca kembali oleh modul yang membutuhkan
+      - Data yang dibuat oleh satu bagian aplikasi dapat digunakan bagian lainnya
+      - Tiket mempunyai identifier unik
+      - Status pembayaran, penerbitan tiket, dan check-in dapat dibedakan
+      - Tiket yang sudah digunakan tidak dapat digunakan kembali
+      - Data tetap konsisten ketika fitur diuji secara berurutan
+      - Data pengujian dapat direset dengan prosedur yang jelas
+      - Data sementara tidak boleh disamakan dengan data produksi
 
-E. Kontrak dengan developer lain
-File shared yang dipakai bersama:
-- app_routes.dart (pemilik Dev 1): Dev 2 dan 3 HANYA MENGGUNAKAN konstanta, tidak boleh tambah/ubah tanpa persetujuan Dev 1
-- app_router.dart (pemilik Dev 1): Dev 2 dan 3 bisa meminta penambahan route via pull request
-- api_client.dart (pemilik Dev 1): semua dev pakai instance ApiClient() untuk panggilan data
-- app_exception.dart: semua dev pakai AppException dan subclass untuk error handling
-- app_constants.dart: semua dev pakai konstanta status dan role
-- user_model.dart, user_role.dart: semua dev pakai model pengguna yang sama
+   5.2. Pendekatan
+      - Karena backend dan database produksi belum pasti tersedia, akan digunakan
+        database pengujian sementara (sembilan lokal atau mock repository)
+      - Setiap modul akan memiliki penyimpanan sementara yang terisolasi namun
+        dapat diintegrasikan selama pengujian berurutan
+      - Setiap data uji akan diberi prefix "test_" atau marker serupa untuk
+        membedakan dari data produksi
+      - Solusi database sementara: Hive/localStorage untuk pengembangan mobile,
+        atau in-memory database untuk unit testing, dengan seeding data yang
+        telah ditentukan untuk memulai pengujian
 
-Interface yang disepakati:
-- AuthProvider.login(email, password) -> Future<bool>, properti user, isLoading, error
-- AuthProvider.register(name, email, password) -> Future<bool>
-- UserProvider.loadMe() -> Future<bool>
-F. Batas tanggung jawab
-BOLEH diubah/dibuat: main.dart, app.dart, pubspec.yaml, app_routes.dart, app_router.dart,
-api_client.dart, app_config.dart; semua file features/auth/, features/home/;
-semua file providers/ dan services/auth/; user_model.dart, user_role.dart (tambahan field harus disepakati)
-TIDAK BOLEH diubah: semua file features/events/, features/orders/, features/payments/, features/tickets/ (Dev 2);
-semua file features/check_in/, features/organizer/, features/admin/, features/notifications/ (Dev 3)
-File shared hanya boleh diubah oleh pemilik (Dev 1): main.dart, app.dart, pubspec.yaml, app_router.dart, api_client.dart
-Perlu persetujuan dev lain: penambahan route di app_routes.dart yang dipakai Dev 2 atau 3;
-perubahan UserModel yang mempengaruhi provider Dev 2 atau 3; perubahan AppConstants yang dipakai modul lain
+6. Email Tiket (Section 5)
+   6.1. Status layanan email
+      - Proyek belum memiliki layanan email yang terintegrasi ke backend
+      - Backend Node.js + Express belum memiliki implementasi pengiriman email
 
-G. Pengujian mandiri
-Normal:
-1. Aplikasi dibuka tanpa crash, tampilkan HomeScreen atau LoginScreen
-2. Pengguka buka halaman login, isi email dan kata sandi, tekan Masuk
-3. AuthProvider.login true, user tersedia, isLoading false
-4. Pengguka daftar organizer, AuthProvider.register true
-5. Route /events, /orders, /tickers diakses via AppRouter (placeholder atau layar konkret)
-Gagal:
-1. Login salah -> error message, isLoading false, user null
-2. Jaringan mati -> NetworkException ditangkap, error message ke pengguna
-3. Token kadaluarsa -> AuthException, arahkan ke login
-4. Input kosong -> InputValidator pesan error
-Cara uji mandiri: flutter run di emulator Android atau Chrome Web; buka layar login, coba masuk (mock mode);
-periksa tidak ada error kompilasi provider/http; periksa semua route via AppRouter.generateRoute
+   6.2. Pendekatan pengujian
+      - Gunakan email sandbox atau layanan email pengujian yang terdampak
+      - Email tujuan berasal dari email yang diberikan saat registrasi
+      - Email memuat informasi event dan detail tiket
+      - Tiket memuat QR code yang dapat dipindai
+      - QR code mewakili identifier atau token tiket yang dapat diverifikasi
+      - Format tiket mudah dibaca pada perangkat mobile
+      - Pengiriman email memiliki status yang dapat ditangani (pending, sent, failed)
+      - Kegagalan pengiriman email tidak boleh membuat sistem mengklaim email berhasil dikirim
 
-H. Definisi selesai
-[ ] main.dart jalankan MyApp dari app.dart (bukan template counter default)
-[ ] pubspec.yaml punya paket provider dan http
-[ ] app.dart pakai MultiProvider semua provider terdaftar
-[ ] ApiClient bisa GET/POST/PUT/DELETE tanpa UnimplementedError
-[ ] app_router.dart map semua konstanta route ke widget layar
-[ ] Layar login tampil via route /login
-[ ] Layar register tampil via route /register
-[ ] AuthProvider.login atur _user dan notifyListeners
-[ ] AuthProvider.register atur _user
-[ ] Error dan loading state ditampilkan benar di UI
+   6.3. Komponen yang diperlukan
+      - Jika layanan email tersedia di kemudian hari: integrasi dengan SMTP server
+      - Untuk pengujian saat ini: mock email service yang merekam data pengiriman
+        tanpa mengirim email nyata, atau menggunakan layanan email pengujian
+        seperti Mailtrap, Ethereal, atau konfigurasi Firebase Auth dengan email
+        mock template
+
+7. Penyimpanan Sementara vs Backend
 ================================================================================
-E. PEMBAGIAN TUGAS DEVELOPER 2
+================================================================================
+D. RANCANGAN ALUR END-TO-END
 ================================================================================
 
-A. Identitas tugas
-- Developer: Developer 2
-- Modul: Fitur Peserta/Attendee (Event, Pesanan, Pembayaran, Tiket)
-- Tujuan utama: Mengembangkan alur pengalaman peserta dari penemuan event,
-  pemilihan tiket, pemesanan, simulasi pembayaran, hingga akses e-ticket dengan
-  QR Code, menggunakan mock data sehingga tidak tergantung backend.
-- Hasil akhir: layar daftar event, detail event, kartu event; layar daftar
-  pesanan dan detail pesanan; layar simulasi pembayaran VA; layar daftar tiket
-  dan detail e-ticket dengan widget tampilan QR; EventProvider, OrderProvider,
-  PaymentProvider, TicketProvider terintegrasi; EventService, OrderService,
-  PaymentService, TicketService menggunakan mock data; semua route attendee
-  terdaftar di app_router.dart (koordinasi dengan Dev 1)
+1. Alur Lengkap (disesuaikan dengan kriteria Section 4)
+   1. Penyelenggara membuat event → event tersimpan di database sementara
+   2. Penyelenggara menambahkan panitia → data panitia tersimpan
+   3. Event muncul pada daftar event peserta → EventProvider memuat event
+   4. Peserta mendaftar tanpa membuat akun → AuthProvider.register (tanpa role wajib)
+   5. Peserta memasukkan email yang valid → InputValidator.email
+   6. Peserta menyelesaikan pembayaran simulasi → PaymentProvider.simulatePayment
+   7. Sistem menyimpan registrasi → Registrasi disimpan ke database sementara
+   7.1. Sistem menerbitkan tiketunik → TicketModel dibuat dengan tokenunik
+   7.2. Tiket dikirim ke alamat email peserta → EmailService merekam/mentransmisikan
+   7.3. Tiket memuat QR code yang dapat dibaca → QrTicketDisplay menampilkan QR
 
-B. Ruang lingkup pekerjaan
-TERMASUK: semua file features/events/, features/orders/, features/payments/,
-features/tickets/; event_provider.dart, order_provider.dart, payment_provider.dart,
-ticket_provider.dart; event_service.dart, order_service.dart, payment_service.dart,
-ticket_service.dart; membuat ticket_type_service.dart (belum ada); mock data untuk
-event, order, payment, ticket; integrasi InputValidator untuk form pesanan dan pembayaran
-TIDAK TERMASUK: autentikasi dan profil pengguna (Dev 1); check-in, organizer, admin,
-notification (Dev 3); file shared (pubspec, main, app, router, api_client) - hanya dipakai
+   8. Panitia memindai QR pada tiket tersebut → ScannerService.validateToken
+   8.1. Tiket divalidasi terhadap data registrasi → dicek di database sementara
+   8.2. Hasil validasi ditampilkan dengan status jelas → status valid/invalid/gagal
 
-C. Daftar file terperinci
-| No | Path file | Status | Tujuan file | Pekerjaan spesifik | Dependensi |
-| 4 | lib/features/orders/screens/order_list_screen.dart | Ada, diubah | Layar riwayat pesanan peserta | Tampilkan daftar pesanan dari OrderProvider. Setiap item tampilkan nomor pesanan, event, total, status, tanggal. Navigasi ke detail pesanan | order_provider.dart, order_model.dart, order_detail_screen.dart, app_routes.dart |
-| 5 | lib/features/orders/screens/order_detail_screen.dart | Ada, diubah | Layar detail pesanan | Terima orderId via route parameter. Tampilkan ringkasan pesanan, daftar item tiket, status pembayaran, tombol pembayaran jika belum dibayar | order_provider.dart, order_model.dart, order_item_model.dart, payment_screen.dart, app_routes.dart |
-| 6 | lib/features/payments/screens/payment_screen.dart | Ada, diubah | Layar simulasi pembayaran VA | Terima orderId via route parameter. Tampilkan nomor VA simulasi, nominal, batas waktu. Tombol "Bayar" panggil PaymentProvider.simulatePayment. Setelah sukses, navigasi ke status pembayaran | payment_provider.dart, payment_model.dart, app_routes.dart |
-| 7 | lib/features/tickets/screens/ticket_list_screen.dart | Ada, diubah | Layar daftar tiket milik peserta | Tampilkan daftar tiket dari TicketProvider. Setiap tiket tampilkan event, kategori, status, tombol lihat detail | ticket_provider.dart, ticket_model.dart, ticket_detail_screen.dart, app_routes.dart |
-| 8 | lib/features/tickets/screens/ticket_detail_screen.dart | Ada, diubah | Layar detail e-ticket dengan QR | Terima ticketId via route parameter. Tampilkan data peserta, kategori tiket, QR code data, status tiket. Gunakan QrTicketDisplay widget | ticket_provider.dart, ticket_model.dart, qr_ticket_display.dart, app_routes.dart |
-| 9 | lib/features/tickets/widgets/qr_ticket_display.dart | Ada, diubah | Widget tampilan QR code pada tiket | Terima ticketData (String). Saat paket qr_flutter belum tersedia, tampilkan placeholder. Siapkan untuk integrasi qr_flutter ketika paket ditambahkan | Tidak ada (terima parameter String ticketData) |
-| 10 | lib/providers/event_provider.dart | Ada, diubah | State management event | Pertahankan loadEvents, loadEvent. Implementasi mock data untuk daftar event. Tambah method getTicketTypes(eventId) jika diperlukan | event_service.dart, event_model.dart |
-| 11 | lib/providers/order_provider.dart | Ada, diubah | State management pesanan | Pertahankan loadOrders, loadOrder. Implementasi mock data untuk daftar pesanan | order_service.dart, order_model.dart |
-| 12 | lib/providers/payment_provider.dart | Ada, diubah | State management pembayaran simulasi VA | Pertahankan simulatePayment, loadPayment. Implementasi mock payment dengan status pending -> paid | payment_service.dart, payment_model.dart |
-| 13 | lib/providers/ticket_provider.dart | Ada, diubah | State management tiket | Pertahankan loadTickets, loadTicket. Implementasi mock data untuk daftar tiket | ticket_service.dart, ticket_model.dart |
-E. Kontrak dengan developer lain
-File shared yang dipakai bersama:
-- app_routes.dart (pemilik Dev 1): Dev 2 hanya MENGGUNAKAN konstanta route yang sudah ada. Jika butuh route baru, minta Dev 1 menambahkannya.
-- api_client.dart (pemilik Dev 1): Dev 2 pakai ApiClient untuk panggilan data. Dalam mock mode, pakai mock data tanpa menunggu implementasi asli.
-- user_model.dart, user_role.dart (pemilik Dev 1): dipakai untuk mengetahui role dan user login.
-- app_constants.dart: dipakai untuk konstanta status order, ticket, payment.
+   9. Tiket ditandai telah digunakan setelah check-in berhasil → CheckInModel disimpan
+   9.1. Status check-in tersimpan (checked_in vs valid)
 
-Interface dan model yang disepakati:
-- EventModel, TicketTypeModel, OrderModel, OrderItemModel, PaymentModel, TicketModel (sudah ada di models/)
-- EventProvider: List<EventModel> events, EventModel? selectedEvent, Future<bool> loadEvents(String?), Future<bool> loadEvent(String)
-- OrderProvider: List<OrderModel> orders, Future<bool> loadOrders(), Future<bool> loadOrder(String)
-- PaymentProvider: PaymentModel? payment, Future<bool> simulatePayment({orderId, virtualAccountNumber})
-- TicketProvider: List<TicketModel> tickets, Future<bool> loadTickets(), Future<bool> loadTicket(String)
-
-Route yang dipakai:
-- /events, /events/:id, /orders, /orders/:id, /payment/:orderId, /payment/:orderId/status, /tickets, /tickets/:id
-
-Jika modul lain belum selesai:
-- Dev 2 pakai mock data dalam semua provider dan service tanpa menunggu ApiClient asli Dev 1
-- Dev 2 tidak perlu menunggu Dev 3 untuk apa pun
-
-F. Batas tanggung jawab
-BOLEH diubah/dibuat: semua file features/events/, features/orders/, features/payments/, features/tickets/;
-lib/providers/event_provider.dart, order_provider.dart, payment_provider.dart, ticket_provider.dart;
-lib/services/event/event_service.dart, order_service.dart, payment_service.dart, ticket_service.dart;
-lib/services/ticket/ticket_type_service.dart (baru)
-TIDAK BOLEH diubah: main.dart, app.dart, pubspec.yaml, app_router.dart, app_routes.dart, api_client.dart (Dev 1);
-semua file features/auth/, features/home/ (Dev 1); semua file features/check_in/, features/organizer/, features/admin/, features/notifications/ (Dev 3);
-semua file di models/ (sudah lengkap, tidak perlu diubah)
-File shared hanya boleh diubah oleh pemiliknya: app_routes.dart, app_router.dart, api_client.dart (Dev 1)
-Perlu persetujuan dev lain: penambahan field pada model data yang dipakai Dev 1 atau 3;
-penambahan route baru di app_routes.dart
-
-G. Pengujian mandiri
-Normal:
-1. Layar daftar event dibuka, tampilkan dummy data event (minimal 3 item)
-2. Pengguka tekan event, layar detail event tampilkan informasi lengkap dan jenis tiket
-3. Pengguka pesan tiket, membuat pesanan, dialihkan ke layar pembayaran
-4. Simulasi pembayaran berhasil, status berubah menjadi "paid"
-5. Setelah pembayaran, tiket muncul di daftar tiket
-6. Pengguka buka detail tiket, tampilkan data tiket dan placeholder QR code
-Gagal:
-1. Tidak ada event tersedia -> tampilkan estado kosong (empty state)
-2. Gagal memuat event -> tampilkan error message dengan tombol coba lagi
-3. Kuota tiket habis -> tombol pesan dinonaktifkan, tampilkan pesan "Habis"
-4. Simulasi pembayaran gagal -> tampilkan error message, status tetap pending
-Cara uji mandiri: jalankan aplikasi, navigasi ke /events; periksa daftar event muncul dengan dummy data;
-coba pesan tiket, lakukan simulasi pembayaran, periksa tiket muncul di /tickets;
-periksa error handling saat data kosong atau gagal dimuat; tidak perlu backend running (mock mode)
-
-H. Definisi selesai
-[ ] Layar daftar event tampilkan dummy data minimal 3 event
-[ ] Layar detail event tampilkan informasi lengkap dan jenis tiket dengan kuota
-[ ] Pengguka dapat membuat pesanan dan dialihkan ke pembayaran
-[ ] Simulasi pembayaran mengubah status menjadi paid
-================================================================================
-F. PEMBAGIAN TUGAS DEVELOPER 3
+   10. Pemindaian ulang terhadap tiket yang sama ditolak → CheckInModel status
+       already_checked_in atau similar; pengecekan pada database sebelum menyimpan
+C. ANALISIS STRUKTUR PROYEK DAN IMPLEMENTASI YANG SUDAH ADA
 ================================================================================
 
-A. Identitas tugas
-- Developer: Developer 3
-- Modul: Fitur Staf, Penyelenggara, dan Admin (Check-in, Manajemen Event, Moderasi, Laporan)
-- Tujuan utama: Mengembangkan fitur operasional untuk staf event (scan QR
-  check-in), organizer (manajemen event dan peserta), dan admin (moderasi event
-  dan laporan kendala), menggunakan mock data sehingga tidak tergantung backend.
-- Hasil akhir: layar check-in, riwayat check-in, layar hasil scan; layar dashboard
-  organizer, manajemen event, form event, daftar peserta, manajemen staf; layar
-  dashboard admin, moderasi event, manajemen laporan; layar notifikasi;
-  CheckInProvider, ScannerService, ReportProvider, NotificationProvider;
-  organizer_provider.dart dan organizer_service.dart (baru); mock data untuk
-  check-in, organizer, admin, notifikasi
-TIDAK TERMASUK: autentikasi dan profil pengguna (Dev 1); event browsing, pesanan,
-pembayaran, tiket (Dev 2); file shared (pubspec, main, app, router, api_client) - hanya dipakai
+1. Struktur Project
+   - Root: e_ticket_event_qr_scane/
+   - mobile/: Frontend Flutter
+   - backend/: Node.js + Express + Supabase (belum sepenuhnya diimplementasikan)
 
-B. Ruang lingkup pekerjaan
-TERMASUK: semua file features/check_in/, features/organizer/, features/admin/,
-features/notifications/; check_in_provider.dart, check_in_service.dart,
-scanner_service.dart; report_provider.dart, report_service.dart,
-notification_provider.dart, notification_service.dart; membuat organizer_provider.dart
-dan organizer_service.dart (belum ada); membuat layar laporan di features/report/screens/
-(belum ada); mock data untuk check-in, organizer, admin, notifikasi;
-integrasi QR scanner (siap untuk paket mobile_scanner)
-TIDAK TERMASUK: autentikasi dan profil pengguna (Dev 1); event browsing, pesanan,
-pembayaran, tiket (Dev 2); file shared (pubspec, main, app, router, api_client) - hanya dipakai
+2. Struktur mobile/lib/
+   - main.dart: Masih menggunakan template default Flutter Counter (harus diganti)
+   - app.dart: Root widget, belum terintegrasi dengan provider
+   - core/: Konfigurasi shared (theme, constants, errors, validators, utils)
+   - features/: Modul fitur (auth, events, orders, tickets, check-in, organizer, admin, notifications)
+   - models/: Model data yang sudah lengkap (user_model, event_model, dll.)
+   - providers/: State management menggunakan ChangeNotifier (belum paket provider)
+   - routes/: app_routes.dart (konstanta route) dan app_router.dart (generator route)
+   - services: service layer yang mengarah ke API (belum diimplementasikan Http)
 
-C. Daftar file terperinci
-| 3 | lib/providers/check_in_provider.dart | Ada, diubah | State management check-in | Pertahankan loadCheckIns, syncPendingCheckIns. Implementasi mock data untuk daftar check-in. Tambah method recordCheckIn(ticketId, eventId, staffId) | check_in_service.dart, check_in_model.dart |
-| 4 | lib/services/check_in/check_in_service.dart | Ada, diubah | Logika check-in, endpoint | Pertahankan listCheckIns. Implementasi mock repository. syncPendingCheckIns diimplementasi (tidak UnimplementedError) dengan antrean lokal sederhana | api_service.dart, check_in_model.dart |
-| 5 | lib/services/scanner/scanner_service.dart | Ada, diubah | Logika QR scanner dan verifikasi tiket | Pertahankan validateTicket(token) dan recordCheckIn. Implementasi mock validasi: cek token terhadap daftar tiket dummy. Kembalikan hasil validasi dengan status | api_service.dart, ticket_model.dart |
+3. File yang Benar-benar Ada (verifikasi disk)
+   - 65 file di mobile/lib/ terverifikasi
+   - File tidak ada di disk meskipu tercantum dokumentasi:
+     * features/profile/screens/profile_screen.dart
+     * features/report/screens/report_list_screen.dart
 
-| 6 | lib/features/organizer/screens/organizer_dashboard_screen.dart | Ada, diubah | Dashboard organizer | Tampilkan ringkasan: jumlah event, tiket terjual, pesanan menunggu, total check-in. Gunakan data mock | organizer_provider.dart (baru) |
-| 7 | lib/features/organizer/screens/event_management_screen.dart | Ada | Daftar event organizer | Implementasi tampilan daftar event yang dikelola organizer, dengan status dan opsi edit | organizer_provider.dart, event_model.dart |
-| 9 | lib/features/organizer/screens/attendee_list_screen.dart | Ada | Daftar peserta event | Tampilkan daftar peserta untuk event organizer, dengan status check-in | organizer_provider.dart, ticket_model.dart |
-| 10 | lib/features/organizer/screens/staff_management_screen.dart | Ada | Manajemen staf event | Tampilkan daftar staf yang diundang untuk event, dengan opsi tambah/hapus staf | organizer_provider.dart, user_model.dart |
-| 11 | lib/features/organizer/tabs/organizer_tab_controller.dart | Ada | Controller tab organizer | Pertahankan atau perbaiki untuk navigasi tab antar layar organizer | Tidak ada |
-| 12 | lib/features/admin/screens/admin_dashboard_screen.dart | Ada, diubah | Dashboard admin platform | Tampilkan ringkasan: jumlah event menunggu moderasi, jumlah laporan kendala, statistik pengguna | report_provider.dart, event_provider.dart |
-| 13 | lib/features/admin/screens/event_moderation_screen.dart | Ada, diubah | Moderasi event (setujui/tolak) | Tampilkan daftar event menunggu moderasi. Setiap item punya tombol Setujui, Tolak, Minta Revisi. Update status event via admin service | report_provider.dart, event_model.dart |
-| 14 | lib/features/admin/screens/report_management_screen.dart | Ada, diubah | Manajemen laporan kendala admin | Tampilkan daftar laporan, filter by status, ubah status laporan (open, in_progress, resolved, closed) | report_provider.dart, support_report_model.dart |
-| 15 | lib/features/admin/tabs/admin_tab_controller.dart | Ada | Controller tab admin | Pertahankan atau perbaiki untuk navigasi tab antar layar admin | Tidak ada |
-| 16 | lib/features/notifications/screens/notification_list_screen.dart | Ada, diubah | Layar daftar notifikasi | Tampilkan daftar notifikasi dari NotificationProvider. Tandai sebagai dibaca saat ditekan | notification_provider.dart, app_routes.dart |
-| 17 | lib/providers/notification_provider.dart | Ada, diubah | State management notifikasi | Pertahankan loadNotifications, markAsRead. Implementasi mock data untuk daftar notifikasi | notification_service.dart |
-| 18 | lib/providers/report_provider.dart | Ada, diubah | State management laporan kendala | Pertahankan loadReports, loadReport, updateStatus. Implementasi mock data untuk daftar laporan | report_service.dart, support_report_model.dart |
-| 19 | lib/services/report/report_service.dart | Ada, diubah | Logika laporan, endpoint | Pertahankan createReport, listReports, getReport, updateReportStatus. Implementasi mock repository | api_service.dart |
-| 20 | lib/services/notification/notification_service.dart | Ada, diubah | Logika notifikasi | Pertahankan listNotifications, markAsRead. Implementasi mock repository | api_service.dart |
-| 21 | lib/providers/organizer_provider.dart | Perlu dibuat | State management organizer (event yang dikelola) | Buat file baru. Kelola daftar event organizer, createEvent, updateEvent, submitForReview. Digunakan oleh layar organizer | organizer_service.dart, event_model.dart |
-| 22 | lib/services/organizer_service.dart | Perlu dibuat | Logika organizer, belum ada file | Buat file baru. Method: createEvent, updateEvent, submitForReview, listMyEvents. Implementasi mock repository | api_service.dart, event_model.dart |
-| 23 | lib/features/report/screens/report_list_screen.dart | Perlu dibuat | Layar daftar laporan (peserta) | Buat file baru. Peserta dapat membuat laporan kendala dan melihat statusnya. Digunakan untuk fitur support report | report_provider.dart, support_report_model.dart |
-| 24 | lib/features/report/screens/report_form_screen.dart | Perlu dibuat | Layar formulir laporan kendala | Buat file baru. Form untuk melaporkan masalah (kategori, deskripsi, email kontak) | report_provider.dart, input_validator.dart |
-| 25 | lib/features/check_in/screens/staff_scan_result_screen.dart | Perlu dibuat | Layar hasil scan QR untuk staf | Buat file baru. Tampilkan hasil validasi tiket: valid/dapat check-in, sudah check-in, tidak valid. Tombol konfirmasi check-in | scanner_service.dart, check_in_provider.dart, ticket_model.dart |
-E. Kontrak dengan developer lain
-File shared yang dipakai bersama:
-- app_routes.dart (pemilik Dev 1): Dev 3 hanya MENGGUNAKAN konstanta route. Route baru harus diminta ke Dev 1.
-- api_client.dart (pemilik Dev 1): Dev 3 pakai ApiClient. Dalam mock mode, pakai mock data.
-- user_model.dart, user_role.dart (pemilik Dev 1): dipakai untuk mengetahui role staff, organizer, admin.
-- app_constants.dart: dipakai untuk konstanta status check-in, ticket, report.
-- auth_provider.dart (pemilik Dev 1): dipakai untuk memeriksa role login sebelum membuka layar staff/organizer/admin.
+4. Implementasi yang Sudah Ada
+   - Models: user_model.dart, event_model.dart, ticket_type_model.dart,
+     order_model.dart, order_item_model.dart, payment_model.dart,
+     ticket_model.dart, check_in_model.dart, support_report_model.dart,
+     report_activity_model.dart - semua sudah memiliki fromJson/toJson
+   - Constants: app_constants.dart (role, status event/order/ticket/payment/report)
+   - Validators: input_validator.dart (required, email, password, positiveInteger)
+   - Theme: app_theme.dart (Material3 tema)
+   - Errors: app_exception.dart (Auth, NotFound, Validation, Network)
+   - Date Utils: date_utils.dart (format tanggal Indonesia)
+   - Routes: app_routes.dart (konstanta route lengkap)
+   - App Router: app_router.dart (HANYA 3 route: initial, login, register;
+     sisanya placeholder)
+   - Services: api_service.dart, auth_service.dart, event_service.dart,
+     order_service.dart, payment_service.dart, ticket_service.dart,
+     check_in_service.dart (syncPendingCheckIns = UnimplementedError),
+     scanner_service.dart, report_service.dart, notification_service.dart
+   - Providers: auth_provider.dart, user_provider.dart, event_provider.dart,
+     order_provider.dart, payment_provider.dart, ticket_provider.dart,
+     check_in_provider.dart, report_provider.dart, notification_provider.dart
+   - Screens: login_screen.dart, register_screen.dart, home_screen.dart,
+     event_list_screen.dart, event_detail_screen.dart, order_list_screen.dart,
+     order_detail_screen.dart, payment_screen.dart, ticket_list_screen.dart,
+     ticket_detail_screen.dart, qr_ticket_display.dart, check_in_screen.dart,
+     check_in_history_screen.dart, organizer_dashboard_screen.dart,
+     event_management_screen.dart, event_form_screen.dart,
+     attendee_list_screen.dart, staff_management_screen.dart,
+     admin_dashboard_screen.dart, event_moderation_screen.dart,
+     report_management_screen.dart, notification_list_screen.dart
 
-Interface dan model yang disepakati:
-- CheckInModel, TicketModel, EventModel, SupportReportModel (sudah ada di models/)
-- CheckInProvider: List<CheckInModel> checkIns, Future<bool> loadCheckIns({eventId}), Future<void> syncPendingCheckIns(), Future<void> recordCheckIn(...)
-- ScannerService: Future<Map> validateTicket(String token), Future<Map> recordCheckIn({ticketId, eventId, staffId})
-- OrganizerProvider: List<EventModel> events, Future<bool> createEvent(Map), Future<bool> updateEvent(String, Map)
-- ReportProvider: List<SupportReportModel> reports, Future<bool> loadReports(), Future<bool> updateStatus({reportId, status, note})
+5. File yang Belum Tersedia tapi Diharuskan
+   - ticket_type_service.dart (baru)
+   - organizer_provider.dart (baru)
+   - organizer_service.dart (baru)
+   - report_list_screen.dart (baru)
+   - report_form_screen.dart (baru)
+   - staff_scan_result_screen.dart (baru)
 
-Route yang dipakai:
-- /staff, /staff/scanner, /staff/scanner/result, /staff/check-ins
-- /organizer, /organizer/events, /organizer/events/:id/edit, /organizer/events/:id/attendees, /organizer/events/:id/staff
-- /admin, /admin/events, /admin/reports
-- /reports, /reports/new, /reports/:ticketNumber/status
-- /notifications
+6. Dependensi
+   - pubspec.yaml: Hanya flutter, cupertino_icons, flutter_test, flutter_lints
+   - BELUM ada: provider, http, qr_flutter, mobile_scanner
 
-Jika modul lain belum selesai:
-- Dev 3 pakai mock data dalam semua provider dan service tanpa menunggu Dev 1
-- Dev 3 tidak perlu menunggu Dev 2 untuk apa pun
-- Dev 3 memerlukan user_model.dart dan user_role.dart dari Dev 1 (sudah ada dan tidak akan berubah)
+7. Routing Status
+   - app_routes.dart: Sudah lengkap dengan konstanta route
+   - app_router.dart: HANYA 3 route yang diimplementasikan (initial, login, register)
+   - Route lainnya (events, orders, tickets, staff, organizer, admin) masih placeholder
 
-F. Batas tanggung jawab
-BOLEH diubah/dibuat: semua file features/check_in/, features/organizer/, features/admin/, features/notifications/;
-semua file features/report/screens/ (baru);
-lib/providers/check_in_provider.dart, notification_provider.dart, report_provider.dart;
-lib/providers/organizer_provider.dart (baru);
-lib/services/check_in/check_in_service.dart, scanner_service.dart, report_service.dart, notification_service.dart;
-lib/services/organizer_service.dart (baru)
-TIDAK BOLEH diubah: main.dart, app.dart, pubspec.yaml, app_router.dart, app_routes.dart, api_client.dart (Dev 1);
-semua file features/auth/, features/home/ (Dev 1);
-semua file features/events/, features/orders/, features/payments/, features/tickets/ (Dev 2);
-semua file di models/ (sudah lengkap)
-File shared hanya boleh diubah oleh pemiliknya: app_routes.dart, app_router.dart, api_client.dart (Dev 1)
-Perlu persetujuan dev lain: penambahan route baru di app_routes.dart;
-perubahan pada UserModel atau UserRole yang mempengaruhi otorisasi role
-
-G. Pengujian mandiri
-Normal:
-1. Staf dapat buka layar check-in, memindai QR (placeholder), dan mencatat check-in
-2. Hasil scan menunjukkan: tiket valid, sudah check-in, atau tidak valid
-3. Riwayat check-in menampilkan daftar check-in dengan waktu dan status sinkronisasi
-4. Organizer dapat melihat dashboard dengan ringkasan event
-5. Organizer dapat membuat event baru melalui form (semua field terisi)
-6. Admin dapat melihat daftar event menunggu moderasi dan menyetujui/tolak
-7. Admin dapat mengubah status laporan kendala
-8. Daftar notifikasi dapat dimuat dan ditandai sebagai dibaca
-Gagal:
-1. QR tidak valid -> tampilkan pesan "Tiket tidak valid"
-2. Tiket sudah check-in -> tampilkan pesan "Telah check-in"
-3. Jaringan mati -> check-in disimpan ke antrean lokal, status synced = false
-4. Tidak ada laporan -> tampilkan stato kosong
-5. Gagal memuat data -> tampilkan error message
-Cara uji mandiri: jalankan aplikasi, navigasi ke /staff/scanner; coba scan QR code dummy, periksa hasil validasi;
-buka /staff/check-ins, periksa riwayat check-in; buka /organizer, periksa dashboard dan buat event dummy;
-buka /admin/events, coba setujui atau tolak event; tidak perlu backend running (mock mode)
-
-H. Definisi selesai
-[ ] Layar check-in dapat ditampilkan dan memproses scan QR (placeholder atau nyata)
-[ ] Hasil scan menunjukkan valid / sudah check-in / tidak valid
-[ ] Riwayat check-in menampilkan daftar check-in dengan status sinkronisasi
-[ ] Check-in offline disimpan dan dapat disinkronkan (mock)
-[ ] Organizer dashboard menampilkan ringkasan event dan statistik
-[ ] Organizer dapat membuat dan mengedit event melalui form
-[ ] Admin dapat melihat dan memoderasi event (setujui/tolak/revisi)
+8. Status Backend
+   - Ada di folder backend/ (Node.js + Express + Supabase)
+   - API endpoint didefinisikan di backend/README.md
 ================================================================================
-I. STRATEGI BACKEND ATAU MOCK DATA
+I. STRATEGI BACKEND DAN MOCK DATA
 ================================================================================
 
 STATUS BACKEND:
@@ -436,16 +280,6 @@ STATUS BACKEND:
 - API contract masih DRAFT (PRD section 15)
 - Backend belum running, belum dapat dipastikan tersedia untuk pengembangan
 - Tidak ada file .env (hanya .env.example)
-
-STRATEGI:
-1. Frontend dikembangkan dengan mockMode = true (sudah diatur di AppConfig)
-2. Semua provider dan service menggunakan data dummy/mock
-3. Tidak ada ketergantungan langsung UI pada endpoint yang belum diketahui
-4. ApiClient saat ini melempar UnimplementedError; Developer 1 akan mengimplementasi menggunakan package http
-5. Ketika backend tersedia, hanya ApiClient dan service layer yang perlu disesuaikan, UI dan provider tidak perlu berubah besar
-6. Titik integrasi API di dokumentasikan untuk dilakukan setelah backend siap (Developer 1 bertanggung jawab)
-
-DATA MOCK YANG DIGUNAKAN:
 ================================================================================
 J. STRATEGI GIT DAN INTEGRASI
 ================================================================================
@@ -460,7 +294,7 @@ NAMA BRANCH:
 - feature/mobile-developer-3 (Fitur staf/organizer/admin: check-in, organizer, admin, report)
 
 ATURAN KEPOMILIKAN FILE:
-- Setiap file memiliki satu pemilik utama (lihat matriks bagian G)
+- Setiap file memiliki satu pemilik utama (lihat matriks bagian H)
 - Developer hanya boleh mengubah file yang menjadi tanggung jawabnya
 - File shared (main.dart, app.dart, pubspec.yaml, app_routes.dart, app_router.dart, api_client.dart) hanya boleh diubah oleh Developer 1
 
@@ -486,84 +320,10 @@ CARA MENGANANGI KONFLIK MERGE:
 2. Jika konflik pada file shared, Developer 1 bertanggung jawab menyelesaikannya
 3. Jika Konflik logis (model tidak cocok, route tidak sesuai), tetapilah sebelum merge
 
-CARA MENGUJI HASIL SETELAH MERGE:
-1. Jalankan aplikasi dari awal hingga akhir (alur MVP lengkap)
-2. Periksa semua route dapat diakses tanpa crash
-3. Periksa error handling dan loading state
-4. Periksa mock data ditampilkan dengan benar
-5. Lakukan pengujian bersama sebelum demo
-
-CATATAN: Branch berbeda tidak otomatis mencegah konflik logis. Ketidakcocokan model, route, fungsi, dan konfigurasi juga harus diperiksa sebelum integrasi.
-- Developer 1: mock login/register response (UserModel)
-- Developer 2: mock daftar event, pesanan, pembayaran, tiket
-- Developer 3: mock daftar check-in, event organizer, laporan, notifikasi
 ================================================================================
-K. CHECKLIST PENGUJIAN SETIAP DEVELOPER
 ================================================================================
-
-Developer 1:
-[ ] Aplikasi dapat dibuka tanpa crash, menampilkan MyApp dari app.dart
-[ ] provider dan http terpasang di pubspec.yaml
-[ ] Semua provider terdaftar di MultiProvider di app.dart
-[ ] ApiClient dapat melakukan GET/POST/PUT/DELETE tanpa UnimplementedError
-[ ] Semua route di app_routes.dart memiliki entri di app_router.dart
-[ ] Layar login dan register berfungsi dengan AuthProvider
-[ ] Error dan loading state ditampilkan dengan benar
-[ ] Aplikasi berjalan di Android emulator atau Web
-[ ] Tidak ada file milik Developer 2 atau 3 yang diubah
-
-Developer 2:
-[ ] Layar daftar event menampilkan minimal 3 dummy event
-[ ] Layar detail event menampilkan informasi lengkap dan jenis tiket
-[ ] Pengguka dapat membuat pesanan dan dialihkan ke pembayaran
-[ ] Simulasi pembayaran mengubah status ke paid
-[ ] Tiket muncul di daftar tiket setelah pembayaran
-[ ] Layar detail tiket menampilkan data dan placeholder QR
-[ ] Loading, error, empty state ditampilkan dengan benar
-[ ] Semua route attendee dapat diakses via AppRouter
-[ ] Tidak ada file milik Developer 1 atau 3 yang diubah
 ================================================================================
-L. CHECKLIST PENGUJIAN APLIKASI SETELAH INTEGRASI
-================================================================================
-
-[ ] Semua branch telah di-merge ke main tanpa conflict
-[ ] `flutter pub get` berhasil tanpa error
-[ ] `flutter analyze` tidak menemukan error atau warning kritis
-[ ] Aplikasi dapat dibuka dari splash/awalan
-[ ] Alur login dan register berfungsi
-[ ] Alur pembelian tiket (event -> pesanan -> pembayaran -> tiket) berfungsi
-[ ] Alur check-in staf (scan -> validasi -> catat) berfungsi
-[ ] Alur organizer (buat event -> kelola peserta) berfungsi
-[ ] Alur admin (moderasi event -> kelola laporan) berfungsi
-[ ] Semua route dapat diakses tanpa crash
-[ ] Error handling ditampilkan dengan benar pada semua layar
-[ ] Loading state ditampilkan selama operasi data
-[ ] Empty state ditampilkan ketika tidak ada data
-[ ] Mock data konsisten di semua modul
-[ ] Navigasi antar fitur menggunakan route yang benar
-[ ] Tidak ada unused import atau variabel yang menyebabkan error kompilasi
-================================================================================
-M. RISIKO, MITIGASI, DAN INFORMASI YANG BELUM Diketahui
-================================================================================
-
-| Risiko | Dampak | Mitigasi |
-| Backend belum tersedia / API contract masih draft | Tidak dapat menguji integrasi API nyata | Gunakan mock data dan mock repository. Developer 1 menyiapkan abstraksi ApiClient sehingga migrasi ke backend nyata mudah |
-| Package provider belum terpasang | Provider tidak dapat digunakan (unused import) | Developer 1 menambahkan provider dan http ke pubspec.yaml sebagai prioritas pertama |
-| Package qr_flutter belum terpasang | QR code pada tiket tidak dapat ditampilkan | QrTicketDisplay menggunakan placeholder. Integrasi qr_flutter dilakukan setelah paket ditambahkan |
-| Package mobile_scanner belum terpasang | Scan QR tidak dapat dilakukan kamera nyata | Check-in screen menggunakan placeholder input manual atau tombol simulasi |
-| main.dart masih template default | Aplikasi menampilkan counter Flutter bukan MyApp | Developer 1 mengubah main.dart sebagai prioritas pertama |
-| app_router hanya 3 route | Navigasi ke fitur lain tidak berfungsi | Developer 1 mengimplementasi semua route setelah layar Dev 2 dan 3 siap |
-| Konflik model data antar developer | Data tidak konsisten antar modul | Semua model sudah ada di models/. Perubahan field memerlukan persetujuan pemilik model |
-| Perbedaan implementasi route | Navigasi antar fitur error | Dev 1 sebagai pemilik app_routes.dart dan app_router.dart memastikan konsistensi |
-| Offline check-in strategy belum final | Logika sinkronisasi check-in mungkin berubah | Dev 3 mengimplementasi antrean lokal sederhana yang dapat disesuaikan nanti |
-| File yang tercantum dokumentasi tapi tidak ada di disk | Layar laporan dan profile tidak tersedia | Dev 3 membuat file baru sesuai kebutuhan (dilaporkan dalam daftar file) |
-
-INFORMASI BELUM DIKETAHUI (perlu dikonfirmasi tim):
-1. Base URL backend yang sebenarnya (saat ini https://api.example.com sebagai placeholder)
-2. Apakah paket http atau dio akan digunakan untuk API client
-3. Apakah paket qr_flutter dan mobile_scanner akan ditambahkan ke pubspec.yaml
-4. Strategi offline check-in yang final (antrean lokal, cache, sinkronisasi)
-5. Apakah shared preferences akan digunakan untuk menyimpan token auth
+M. RISIKO, ASUMSI, DAN HAL YANG PERLU DIKONFIRMASI
 ================================================================================
 N. KESIMPULAN DAN LANGLANGGANG SEBELUM IMPLEMENTASI
 ================================================================================
@@ -604,11 +364,75 @@ File laporan: LAPORAN_PEMBAGIAN_TUGAS_MOBILE.txt (root proyek)
 Jangan mengubah file ini tanpa diskusi tim.
 
 ================================================================================
-                    AKHIR LAPORAN
+Q. AKHIR LAPORAN
 ================================================================================
+================================================================================
+
+| Risiko | Dampak | Mitigasi |
+|--------|--------|----------|
+| Backend belum tersedia / API contract masih draft | Tidak dapat menguji integrasi API nyata | Gunakan mock data dan mock repository. Developer 1 menyiapkan abstraksi ApiClient sehingga migrasi ke backend nyata mudah |
+| Package provider belum terpasang | Provider tidak dapat digunakan (unused import) | Developer 1 menambahkan provider dan http ke pubspec.yaml sebagai prioritas pertama |
+| Package qr_flutter belum terpasang | QR code pada tiket tidak dapat ditampilkan | QrTicketDisplay menggunakan placeholder. Integrasi qr_flutter dilakukan setelah paket ditambahkan |
+| Package mobile_scanner belum terpasang | Scan QR tidak dapat dilakukan kamera nyata | Check-in screen menggunakan placeholder input manual atau tombol simulasi |
+| main.dart masih template default | Aplikasi menampilkan counter Flutter bukan MyApp | Developer 1 mengubah main.dart sebagai prioritas pertama |
+| app_router hanya 3 route | Navigasi ke fitur lain tidak berfungsi | Developer 1 mengimplementasi semua route setelah layar Dev 2 dan 3 siap |
+| Konflik model data antar developer | Data tidak konsisten antar modul | Semua model sudah ada di models/. Perubahan field memerlukan persetujuan pemilik model |
+| Perbedaan implementasi route | Navigasi antar fitur error | Dev 1 sebagai pemilik app_routes.dart dan app_router.dart memastikan konsistensi |
+| Offline check-in strategy belum final | Logika sinkronisasi check-in mungkin berubah | Dev 3 mengimplementasi antrean lokal sederhana yang dapat disesuaikan nanti |
+| File yang tercantum dokumentasi tapi tidak ada di disk | Layar laporan dan profile tidak tersedia | Dev 3 membuat file baru sesuai kebutuhan (dilaporkan dalam daftar file) |
+
+INFORMASI BELUM DIKETAHUI (perlu dikonfirmasi tim):
+1. Base URL backend yang sebenarnya (saat ini https://api.example.com sebagai placeholder)
+2. Apakah paket http atau dio akan digunakan untuk API client
+3. Apakah paket qr_flutter dan mobile_scanner akan ditambahkan ke pubspec.yaml
+4. Strategi offline check-in yang final (antrean lokal, cache, sinkronisasi)
+5. Apakah shared preferences akan digunakan untuk menyimpan token auth
 6. Struktur database backend yang final (untuk memastikan model cocok)
 7. Warna dan tema desain akhir (saatini menggunakan palet default)
+L. CHECKLIST PENGUJIAN APLIKASI SETELAH INTEGRASI
+================================================================================
+
+[ ] Semua branch telah di-merge ke main tanpa conflict
+[ ] `flutter pub get` berhasil tanpa error
+[ ] `flutter analyze` tidak menemukan error atau warning kritis
+[ ] Aplikasi dapat dibuka dari splash/awalan
+[ ] Alur login dan register berfungsi
+[ ] Alur pembelian tiket (event -> pesanan -> pembayaran -> tiket) berfungsi
+[ ] Alur check-in staf (scan -> validasi -> catat) berfungsi
+[ ] Alur organizer (buat event -> kelola peserta) berfungsi
+[ ] Alur admin (moderasi event -> kelola laporan) berfungsi
+[ ] Semua route dapat diakses tanpa crash
+[ ] Error handling ditampilkan dengan benar pada semua layar
+[ ] Loading state ditampilkan selama operasi data
+[ ] Empty state ditampilkan ketika tidak ada data
+[ ] Mock data konsisten di semua modul
+[ ] Navigasi antar fitur menggunakan route yang benar
+[ ] Tidak ada unused import atau variabel yang menyebabkan error kompilasi
 [ ] Dokumentasi route dan API contract diperbarui jika diperlukan
+K. CHECKLIST PENGUJIAN SETIAP DEVELOPER
+================================================================================
+
+Developer 1:
+[ ] Aplikasi dapat dibuka tanpa crash, menampilkan MyApp dari app.dart
+[ ] provider dan http terpasang di pubspec.yaml
+[ ] Semua provider terdaftar di MultiProvider di app.dart
+[ ] ApiClient dapat melakukan GET/POST/PUT/DELETE tanpa UnimplementedError
+[ ] Semua route di app_routes.dart memiliki entri di app_router.dart
+[ ] Layar login dan register berfungsi dengan AuthProvider
+[ ] Error dan loading state ditampilkan dengan benar
+[ ] Aplikasi berjalan di Android emulator atau Web
+[ ] Tidak ada file milik Developer 2 atau 3 yang diubah
+
+Developer 2:
+[ ] Layar daftar event menampilkan minimal 3 dummy event
+[ ] Layar detail event menampilkan informasi lengkap dan jenis tiket
+[ ] Pengguna dapat membuat pesanan dan dialihkan ke pembayaran
+[ ] Simulasi pembayaran mengubah status ke paid
+[ ] Tiket muncul di daftar tiket setelah pembayaran
+[ ] Layar detail tiket menampilkan data dan placeholder QR
+[ ] Loading, error, empty state ditampilkan dengan benar
+[ ] Semua route attendee dapat diakses via AppRouter
+[ ] Tidak ada file milik Dev 1 atau 3 yang diubah
 [ ] Aplikasi berjalan di Android emulator atau Web
 
 Developer 3:
@@ -622,59 +446,38 @@ Developer 3:
 [ ] Admin dapat mengelola laporan kendala
 [ ] Daftar notifikasi dapat dimuat dan ditandai dibaca
 [ ] Semua route staf/organizer/admin dapat diakses via AppRouter
-[ ] Tidak ada file milik Developer 1 atau 2 yang diubah
-[ ] Aplikasi berjalan di Android emulator atau Web
-[ ] Admin dapat mengelola laporan kendala (ubah status)
-[ ] Daftar notifikasi dapat dimuat dan ditandai dibaca
-[ ] Layar laporan peserta dapat diakses dan formulir laporan berfungsi
-[ ] Semua route staf/organizer/admin dapat diakses via AppRouter
 [ ] Tidak ada file milik Dev 1 atau 2 yang diubah
-[ ] Aplikasi dapat berjalan di Android emulator atau Web tanpa crash
-| 8 | lib/features/organizer/screens/event_form_screen.dart | Ada, diubah | Form buat/edit event | Perluas form untuk mencakup jadwal, lokasi, deskripsi, kategori tiket, kuota, periode penjualan. Simpan draf atau ajukan moderasi via organizer service | organizer_provider.dart, event_model.dart, ticket_type_model.dart, input_validator.dart |
-| No | Path file | Status | Tujuan file | Pekerjaan spesifik | Dependensi |
-| 1 | lib/features/check_in/screens/check_in_screen.dart | Ada, diubah | Layar check-in peserta via scan QR | Terima eventId via parameter. Implementasi antarmuka scan QR (placeholder jika paket mobile_scanner belum ada). Tombol "Scan" panggil ScannerService.validateToken. Hasil scan ditampilkan: valid, sudah check-in, atau tidak valid. Catat check-in via CheckInProvider | check_in_provider.dart, scanner_service.dart, check_in_model.dart, ticket_model.dart, app_routes.dart |
-| 2 | lib/features/check_in/screens/check_in_history_screen.dart | Ada, diubah | Layar riwayat check-in | Tampilkan daftar check-in dari CheckInProvider. Setiap item tampilkan nama peserta, waktu check-in, status sinkronisasi. Tambah tombol sinkronisasi pending check-in | check_in_provider.dart, check_in_model.dart, app_routes.dart |
-[ ] Tiket muncul di daftar tiket setelah pembayaran berhasil
-[ ] Layar detail tiket tampilkan data tiket dan placeholder QR
-[ ] Loading, error, dan empty state ditampilkan dengan benar
-[ ] Semua route attendee dapat diakses via AppRouter
-[ ] Tidak ada file milik Dev 1 atau 3 yang diubah
-[ ] Aplikasi dapat berjalan di Android emulator atau Web tanpa crash
+[ ] Aplikasi berjalan di Android emulator atau Web
+CARA MENGUJI HASIL SETELAH MERGE:
+1. Jalankan aplikasi dari awal hingga akhir (alur MVP lengkap)
+2. Periksa semua route dapat diakses tanpa crash
+3. Periksa error handling dan loading state
+4. Periksa mock data ditampilkan dengan benar
+5. Lakukan pengujian bersama sebelum demo
 
-| 1 | lib/features/events/screens/event_list_screen.dart | Ada, diubah | Layar daftar event semua pengguna | Implementasi tampilan daftar event dengan EventProvider. Tampilkan EventCard untuk setiap event. Tambah loading indicator, error message, estado kosong. Navigasi ke event detail saat kartu ditekan | event_provider.dart, event_card.dart, event_detail_screen.dart, app_routes.dart |
-| 2 | lib/features/events/screens/event_detail_screen.dart | Ada, diubah | Layar detail satu event | Terima eventId via route parameter. Tampilkan poster, judul, jadwal, lokasi, deskripsi, daftar jenis tiket dengan kuota tersedia. Tombol "Pilih Tiket" navigasi ke ticket selection | event_provider.dart, event_model.dart, ticket_type_model.dart, app_routes.dart |
-| 3 | lib/features/events/widgets/event_card.dart | Ada | Widget kartu event untuk daftar | Pertahankan atau perbaiki agar terima EventModel dan tampilkan informasi ringkas (judul, tanggal, lokasi, poster) | event_model.dart |
+CATATAN: Branch berbeda tidak otomatis mencegah konflik logis. Ketidakcocokan model, route, fungsi, dan konfigurasi juga harus diperiksa sebelum integrasi.
 
-[ ] Aplikasi jalan di Android emulator atau Web tanpa crash
-[ ] Tidak ada file milik Dev 2 atau 3 yang diubah
+STRATEGI:
+1. Frontend dikembangkan dengan mockMode = true (sudah diatur di AppConfig)
+2. Semua provider dan service menggunakan data dummy/mock
+3. Tidak ada ketergantungan langsung UI pada endpoint yang belum diketahui
+4. ApiClient saat ini melempar UnimplementedError; Developer 1 akan mengimplementasi menggunakan package http
+5. Ketika backend tersedia, hanya ApiClient dan service layer yang perlu disesuaikan, UI dan provider tidak perlu berubah besar
+6. Titik integrasi API di dokumentasikan untuk dilakukan setelah backend siap (Developer 1 bertanggung jawab)
 
-- Route nama: /login, /register, /home, /events, /events/:id, /orders, /tickets, /staff/scanner, /organizer, /admin
-
-Jika modul lain belum selesai:
-- Dev 2 dan 3 pakai mock data dalam provider mereka tanpa menunggu ApiClient asli Dev 1
-- Mereka hanya perlu tahu nama route dari app_routes.dart (sudah ada)
-
-| 10 | lib/core/constants/app_constants.dart | Ada | Konstanta role dan status | Pertahankan tanpa perubahan | Tidak ada |
-| 11 | lib/core/utils/date_utils.dart | Ada | Utilitas format tanggal | Pertahankan tanpa perubahan | Tidak ada |
-| 12 | lib/core/validators/input_validator.dart | Ada | Validator input form | Pertahankan tanpa perubahan | Tidak ada |
-
-STRATEJI PARALEL:
-- Models sudah lengkap dan mockMode=true, jadi Dev 2 dan 3 bisa implementasi
-  provider+service+UI dengan MOCK DATA tanpa menunggu Dev 1 selesaikan ApiClient asli.
-- Dev 1 pemilik file shared (pubspec, main, app, router, api_client).
-- Dev 2 dan 3 hanya pakai mock repository, tidak mengubah file milik Dev 1.
-
-- tickets: ticket_list_screen.dart, ticket_detail_screen.dart, widgets/qr_ticket_display.dart
-- check_in: check_in_screen.dart, check_in_history_screen.dart
-- organizer: organizer_dashboard_screen.dart, event_management_screen.dart, event_form_screen.dart
-- organizer: attendee_list_screen.dart, staff_management_screen.dart, tabs/organizer_tab_controller.dart
-- admin: admin_dashboard_screen.dart, event_moderation_screen.dart, report_management_screen.dart
-- admin: tabs/admin_tab_controller.dart
-- notifications: notification_list_screen.dart
-
-FILE YANG TERCANTUM DOKUMENTASI TAPI TIDAK ADA DI DISK:
-- features/profile/screens/profile_screen.dart
-- features/report/screens/report_list_screen.dart (dan lain-lain)
-
-pubspec.yaml: Hanya flutter, cupertino_icons, flutter_test, flutter_lints.
-BELUM ada: provider, http, qr_flutter, mobile_scanner.
+DATA MOCK YANG DIGUNAKAN:
+- Developer 1: mock login/register response (UserModel)
+- Developer 2: mock daftar event, pesanan, pembayaran, tiket
+- Developer 3: mock daftar check-in, event organizer, laporan, notifikasi
+   - API contract masih DRAFT (PRD section 15)
+   - Belum running, belum dapat dipastikan tersedia untuk pengembangan
+   - Tidak ada file .env (hanya .env.example)
+   - Solusi database sementara dipilih karena:
+     * Backend Node.js + Express + Supabase belum diimplementasi sepenuhnya
+     * Pengujian end-to-end membutuhkan data yang dapat diakses secara berurutan
+     * Tiga developer bekerja secara paralel di perangkat berbeda
+     * Database lokal tidak cukup untuk pengujian berkelanjutan antar fitur
+   - Rekomendasi: Gunakan SQLite lokal melalui paket flutter_sqlite atau
+     sembuhkan data ke backend pengujian yang terisolasi (bukan production)
+   - Batasan: Data pengujian hilang saat aplikasi dihapus/di-reset;
+     tidak cocok untuk jangka panjang tetapi cukup untuk validasi alur MVP
