@@ -93,6 +93,33 @@ npm run dev
 npm start
 ```
 
+## Roles, demo accounts, and event staff
+
+1. Configure `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+   and a strong `JWT_SECRET` in `backend/.env`. The service-role key must never
+   be included in the mobile application.
+2. Apply `supabase/migrations/202611040001_role_access_and_event_members.sql`
+   to the Supabase project using its SQL editor.
+3. Set `SEED_DEMO_ACCOUNTS=true` in the server `.env` and run `npm start` once.
+   Startup creates or updates the demo Supabase Auth users and bcrypt-hashed
+   profiles idempotently. Set it back to `false` afterwards if preferred.
+4. Point Flutter at the running API using
+   `--dart-define=API_BASE_URL=http://10.0.2.2:5000/api` for Android emulator
+   (use the reachable backend hostname for physical devices/other targets).
+
+Demo credentials:
+
+| Role | Username | Email | Password |
+|---|---|---|---|
+| Admin | `admin` | `admin@event.com` | `Admin123!` |
+| Organizer | `organizer` | `organizer@event.com` | `Organizer123!` |
+
+The legacy `/api/auth/register` endpoint intentionally creates an organizer;
+the requested role is never accepted from public input. Event CRUD uses server-
+validated JWT roles and filters organizer updates/deletes by `created_by`.
+Membership operations require event ownership and store separate staff
+relationships in `event_members`.
+
 ## Variabel Environment (.env)
 
 | Variabel | Deskripsi | Contoh |
