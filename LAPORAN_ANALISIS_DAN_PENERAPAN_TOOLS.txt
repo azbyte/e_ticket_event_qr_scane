@@ -1,0 +1,257 @@
+LAPORAN ANALISIS DAN PENERAPAN TOOLS
+====================================
+
+Tanggal pemeriksaan: 2026-11-05
+Proyek referensi: proyek pembanding yang dianalisis
+Proyek target: management_ticket/e_ticket_event_qr_scane
+
+1. RINGKASAN
+------------
+Referensi adalah workspace Flutter + NestJS/TypeScript yang terstruktur,
+dengan delapan skills Markdown, instruksi agent, aturan kerja/domain/UI/quality,
+CI, validasi kontrak dan dokumentasi. Target adalah aplikasi Flutter Android/Web
+(Dart 3.13.2) dan backend Express 4 CommonJS/JavaScript dengan Supabase/PostgreSQL,
+JWT serta role. Target sudah memiliki Flutter lints dan 5 widget tests, tetapi
+sebelum audit belum memiliki test backend yang berfungsi (script npm test adalah
+placeholder).
+
+Tools dan panduan yang kompatibel diterapkan secara selektif. Tidak ada
+dependency baru, perubahan schema/database/API/flow bisnis, atau konfigurasi
+NestJS/MySQL dari referensi yang disalin.
+
+2. INVENTARIS PROYEK REFERENSI
+------------------------------
+Pemindaian mencakup file project kecuali direktori build, Git internals dan
+dependency vendor node_modules/. Daftar skill yang ditemukan:
+
+1. Backend — pola API, transaksi, worker, data dan adapter.
+2. Debug — reproduksi dan diagnosis masalah.
+3. Flutter — implementasi alur aplikasi dan state.
+4. Requirements — requirement, keputusan dan traceability.
+5. Review — review berbasis risiko dan temuan.
+6. UI — desain, ikon dan accessibility.
+7. Verification — rencana tes, regresi dan batas bukti.
+8. Workspace — struktur instruksi, skills dan dokumentasi kerja.
+
+Lokasi skill sumber: skills/<nama>/SKILL.md; katalog root: SKILL.md.
+Instruksi: AGENTS.md, CLAUDE.md dan aturan khusus assistant;
+rules bersama: rules/{documentation,domain,portability,quality,research,ui,
+workflow}.md. Skill berupa Markdown dengan metadata name/description;
+instruksi AGENTS mengingatkan bahwa auto-discovery bergantung pada assistant.
+
+Development/tooling yang teridentifikasi:
+- Flutter/Dart dengan analysis_options.yaml/flutter_lints dan widget tests;
+- NestJS, TypeScript, ESLint flat config, Prettier, pnpm workspace/lock;
+- PostgreSQL/MySQL tooling, migrations dan Docker Compose (spesifik backend);
+- Markdownlint, EditorConfig, OpenAPI lint Redocly, validator Python untuk link,
+  kontrak, skill, PR policy dan release notes;
+- GitHub Actions CI untuk validasi dokumen, kontrak, PR dan format; workflow
+  release berbasis tag; PR/issue templates, security/contribution guidance;
+- dokumentasi BRD/PRD/FRD/SRS, DESIGN, API OpenAPI, decision log, traceability,
+  testing, git/workspace, versioning dan handoff;
+- VS Code settings/extensions, .gitignore/.dockerignore, changelog dan license.
+
+Tidak ditemukan bukti konfigurasi MCP server, custom subagent definitions,
+Playwright/Cypress, visual regression, automated coverage, atau dependabot
+sebagai workflow aktif. Aset visual/domain aplikasi referensi tidak digunakan
+sebagai design system target.
+
+3. KARAKTERISTIK DAN BASELINE TARGET
+-----------------------------------
+- apps/: Flutter Android/Web, Dart ^3.13.2, Provider, http,
+  flutter_secure_storage, flutter_lints ^6.0.0; struktur lib/core, features,
+  models, providers dan services. Mode mock/demo default; API dengan
+  --dart-define=MOCK_MODE=false.
+- backend/: Node.js, Express ^4.18, CommonJS; routes/controllers/middleware/
+  services/models/validators, Supabase JS, JWT dan migration Supabase.
+  Backend config membutuhkan Supabase URL/keys dan JWT_SECRET.
+- PRD menyebut participant/organizer/admin dan flow event/ticket/QR; fitur
+  prototype/dummy tidak berarti sudah punya kontrol produksi.
+- Source migration saat ini lebih otoritatif daripada schema historis di bagian
+  README backend. Tidak dilakukan mutasi database.
+
+Baseline sebelum perubahan:
+- Flutter 3.47.2 / Dart 3.13.2, Node v22.17.1, npm 10.9.2,
+  Python 3.11.6 tersedia.
+- `cd apps && flutter analyze`: FAIL (exit 1), 60 temuan info lama; tidak
+  diubah dalam pekerjaan ini.
+- `cd apps && flutter test`: PASS, 5 widget tests.
+- `cd backend && npm test`: FAIL karena script awal hanya placeholder.
+- `node --check` semua file backend yang ada: PASS.
+
+4. EVALUASI RELEVANSI
+---------------------
+SANGAT DIREKOMENDASIKAN:
+- Instruksi AI, skill modular, arsitektur/dokumentasi, kontribusi dan checklist
+  verifikasi: bermanfaat langsung dan diadaptasi untuk stack target.
+- Flutter analyze/widget test dan test backend/syntax: sesuai stack; menutup
+  gap test backend yang sebelumnya tidak berfungsi.
+- CI push/PR dengan permissions read-only dan EditorConfig.
+
+DIREKOMENDASIKAN DENGAN PENYESUAIAN:
+- Skills backend/UI/review/debug/verification dan aturan keamanan referensi:
+  disesuaikan agar tidak memakai NestJS, MySQL, domain banjir atau asumsi UI.
+- CI Flutter analyzer memakai --no-fatal-infos karena baseline memiliki 60 info;
+  error/warning tetap menggagalkan job.
+- `node:test` bawaan Node untuk helper murni, tanpa dependency test baru.
+
+OPSIONAL (tidak diterapkan):
+- Markdown lint/link validator, OpenAPI lint/code generation, coverage,
+  pre-commit, visual/browser/device tests. Target belum memiliki kontrak OpenAPI
+  atau ekosistem browser test mapan; tooling tambahan belum prioritas.
+- VS Code extension recommendations: tidak menambah extension yang belum
+  dipastikan wajib/tersedia; EditorConfig bekerja lintas IDE.
+- Changelog/release automation: belum ada proses release/tag target.
+
+DITERAPKAN DARI SKILL REFERENSI:
+- requirements: skill referensi berguna untuk pemetaan aktor,
+  role, acceptance criteria, API dan batas prototype; disesuaikan ke PRD e-ticket.
+- workspace: skill referensi berguna untuk routing instruksi,
+  validasi tautan/metadata serta menghindari duplikasi/konfigurasi global.
+- UI dan Flutter digabung menjadi flutter-ui karena sama-sama mencakup layar,
+  state, design tokens, responsive design dan accessibility.
+- Debug/review/verification/backend dipertahankan sebagai skill terpisah.
+
+TERTUNDA KARENA KENDALA LINGKUNGAN:
+- Referensi memakai ESLint + Prettier; keduanya cocok untuk JavaScript Express.
+  Instalasi dev dependency dicoba dengan Node 22/npm 10 tetapi gagal sebelum
+  perubahan manifest/lockfile karena registry npm mengembalikan ECONNRESET.
+  Karena paket tidak tersedia lokal, tidak ada konfigurasi ESLint/Prettier
+  setengah jadi. Saat jaringan registry pulih, tambahkan versi kompatibel,
+  konfigurasi flat ESLint untuk CommonJS, dan validasi existing source dahulu.
+
+TIDAK DIREKOMENDASIKAN:
+- NestJS, TypeScript, pnpm, MySQL, Docker backend referensi; tidak cocok dengan
+  Express CommonJS/Supabase dan akan mengganti arsitektur.
+- Branch policy, mandatory commits dan release workflow khusus repo sumber.
+- Tema/ikon/aset banjir atau library UI baru.
+- MCP/subagents/AI provider config: tidak ditemukan sumber yang dapat diverifikasi
+  dan target tidak menetapkan assistant tertentu.
+
+5. YANG DITERAPKAN
+------------------
+- AGENTS.md: fakta proyek, batas aman, siklus development dan sumber kebenaran.
+- SKILL.md dan .agents/skills/{flutter-ui,backend-api,review,verification,debug,
+  requirements,workspace}/SKILL.md: tujuh skill target. Semua delapan skill sumber
+  dipetakan; Flutter dan UI referensi digabung karena cakupannya tumpang tindih.
+- docs/ARCHITECTURE.md: stack, struktur, workflow, UI dan batas integrasi.
+- CONTRIBUTING.md: alur perubahan dan PR.
+- .editorconfig: konfigurasi format dasar lintas editor.
+- .github/workflows/quality.yml: backend tests/syntax dan Flutter analyze/widget
+  tests pada push/PR; permissions hanya contents: read.
+- backend/scripts/check-syntax.js dan `npm run check`: node --check rekursif
+  pada server.js dan backend/src JavaScript.
+- backend/scripts/check-format.js dengan `npm run format:check`: pemeriksaan
+  trailing whitespace dan parse JSON tanpa menyentuh baseline lama.
+- `npm run lint`: pemeriksaan syntax lokal sebagai fallback minimal, bukan ESLint.
+- scripts/validate-skills.js dan `npm run validate:skills`: memvalidasi YAML
+  frontmatter skill, nama unik, dan target tautan relatif katalog/skills.
+- backend/test/utils.test.js dan `npm test` berbasis node:test: 5 unit tests
+  response helper/constant tanpa layanan eksternal.
+- README.md: tautan panduan dan perintah pemeriksaan.
+- Tidak ada dependency baru; lockfile tidak berubah.
+
+6. FILE BARU/BERUBAH
+--------------------
+BARU:
+  AGENTS.md
+  SKILL.md
+  .agents/skills/flutter-ui/SKILL.md
+  .agents/skills/backend-api/SKILL.md
+  .agents/skills/review/SKILL.md
+  .agents/skills/verification/SKILL.md
+  .agents/skills/debug/SKILL.md
+  .agents/skills/requirements/SKILL.md
+  .agents/skills/workspace/SKILL.md
+  .editorconfig
+  .github/workflows/quality.yml
+  docs/ARCHITECTURE.md
+  CONTRIBUTING.md
+  backend/scripts/check-syntax.js
+  backend/scripts/check-format.js
+  backend/test/utils.test.js
+  scripts/validate-skills.js
+  LAPORAN_ANALISIS_DAN_PENERAPAN_TOOLS.txt
+BERUBAH:
+  README.md — panduan tools dan pemeriksaan lokal.
+  AGENTS.md — routing skills dan daftar commands.
+  SKILL.md — padanan delapan skill sumber dengan tujuh skill target.
+  CONTRIBUTING.md, docs/ARCHITECTURE.md — prosedur skills/tools.
+  .github/workflows/quality.yml — menambahkan lint, format dan skill validation.
+  backend/package.json — test/check/lint/format/skill validation scripts.
+  backend/package-lock.json tidak berubah.
+
+7. CARA MENGGUNAKAN
+-------------------
+AI assistant: buka root repository e_ticket_event_qr_scane. Baca AGENTS.md,
+kemudian SKILL.md; pilih dan baca skill relevan. Assistant yang mendukung
+AGENTS.md/skills dapat menggunakannya langsung. Bila IDE memakai format rules
+lain, tambahkan instruksi secara manual; auto-discovery tidak dijamin lintas tool.
+
+Backend: cd backend; npm ci; npm test; npm run check; npm run lint;
+npm run format:check; npm run validate:skills.
+Flutter: cd apps; flutter pub get; flutter analyze; flutter test.
+GitHub Actions menjalankan checks tersebut pada push/PR. Workflow memerlukan
+runner Ubuntu serta akses internet untuk SDK dan paket.
+
+8. VERIFIKASI SETELAH PERUBAHAN
+-------------------------------
+Hasil setelah implementasi:
+- `cd backend && npm test`: PASS, 5 tests, 0 failures.
+- `cd backend && npm run check`: PASS, syntax 28 file JavaScript.
+- `backend/package.json`: PASS parse JSON.
+- `cd apps && flutter analyze --no-fatal-infos`: PASS (exit 0), 60 info tetap
+  ditampilkan; tidak ada warning/error fatal.
+- `cd apps && flutter test`: PASS, 5 widget tests.
+- Workflow YAML: PASS parse menggunakan PyYAML 6.0.2.
+- `npm run lint`: PASS, syntax check 28 file (fallback internal; belum setara
+  dengan ESLint semantic rules).
+- `npm run format:check`: PASS setelah memeriksa trailing whitespace dan JSON;
+  tidak memaksakan newline akhir pada baseline lama.
+- `npm run validate:skills`: PASS, 7 skill dan link pada 8 Markdown file.
+- `git diff --check`: PASS setelah README dikonversi ke LF.
+- File instruksi, seluruh tujuh skill, arsitektur, kontribusi, test dan laporan
+  diverifikasi keberadaannya serta dibaca ulang.
+- Script/npm tests tidak mengubah package graph; tidak ada konflik dependency.
+
+File `apps/devtools_options.yaml` muncul untracked pada status akhir, tetapi file
+tersebut sudah ada dan dibaca pada inspeksi awal; bukan file yang dibuat oleh
+pekerjaan ini. Tidak diubah.
+
+Tidak diuji: Supabase/API end-to-end, akun demo remote, kamera/QR fisik,
+deployment, browser/device matrix, payment, security audit dinamis. CI workflow
+belum dijalankan di GitHub; validasi lokal bukan bukti job GitHub sukses.
+
+9. KENDALA DAN RISIKO TERSISA
+-----------------------------
+- Baseline Flutter analyze memiliki 60 temuan info (saran lint dan dangling
+  library doc comments). Tidak dilakukan refactor massal. CI mengabaikan info,
+  tetapi tidak mengabaikan warning/error.
+- Lima unit test backend menguji helper murni; belum menguji route/controller,
+  authorization, race check-in atau Supabase.
+- README backend berisi schema historis; gunakan migration dan source aktual.
+  Tidak direvisi untuk menghindari scope perubahan bisnis.
+- Belum ada OpenAPI contract target, visual test, test kamera/device atau
+  Supabase test project.
+- `.agents/skills` adalah konvensi file skills readable; assistant target
+  mungkin memerlukan auto-discovery path khusus.
+
+10. REKOMENDASI LANJUTAN
+------------------------
+1. Tambahkan tests untuk middleware role, ownership event, validasi tiket dan
+   QR check-in dengan Supabase test project atau adapter mock.
+2. Tetapkan kontrak OpenAPI aktual dan selaraskan bagian historis README backend.
+3. Bersihkan temuan analyzer bertahap dalam perubahan terpisah dengan test.
+4. Validasi workflow di GitHub dan pin action ke commit SHA sesuai kebijakan tim.
+5. Pertimbangkan accessibility/device/browser regression tests saat runner dan
+   target yang diperlukan tersedia.
+6. Tentukan IDE/assistant target bila memerlukan auto-loading skills.
+
+KESIMPULAN
+----------
+Perangkat yang kompatibel telah diterapkan tanpa mengganti arsitektur atau
+menambah dependency. Backend unit tests (5/5), syntax check (28 file), skill
+validator (7 skill), linter/fallback syntax, format check,
+Flutter widget tests (5/5), analyzer dalam mode CI, YAML, JSON dan diff check
+lulus. Analyzer masih menampilkan 60 info lama. Integrasi eksternal dan eksekusi
+GitHub CI belum diklaim terverifikasi.
