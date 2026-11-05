@@ -6,6 +6,10 @@ const config = require('../config/env');
  * Auth service - business logic for authentication
  */
 const authService = {
+  hashToken(token) {
+    return require('crypto').createHash('sha256').update(token).digest('hex');
+  },
+
   generateToken(user) {
     return jwt.sign(
       { id: user.id, email: user.email, role: user.role },

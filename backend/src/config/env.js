@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-const requiredEnv = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'JWT_SECRET'];
+const requiredEnv = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'JWT_SECRET'];
 
 requiredEnv.forEach((key) => {
   if (!process.env[key]) {
