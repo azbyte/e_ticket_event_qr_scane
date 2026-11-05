@@ -1,0 +1,291 @@
+PEMBAGIAN TUGAS PENGEMBANGAN ROLE ORGANIZER
+Sumber analisis: prd.md (terutama bagian 2, 5, 8, 11, 13, 14, 15, 17, 18, dan audit bagian 20; snapshot 2026-11-05) dan source aktual di apps/lib serta backend.
+Fokus tahap: Tahap 0 — Flutter UI prototype, data dummy/mock service, tanpa backend/API/database.
+
+======================================================================
+1. GAMBARAN PROYEK DAN ROLE ORGANIZER
+======================================================================
+
+Aplikasi ini adalah platform tiket acara dan pemindaian QR. Source aplikasi saat ini adalah Flutter/Dart di apps/lib. State management memakai Provider; dependency yang tampak pada apps/lib/pubspec.yaml meliputi provider dan http. Backend yang ada di workspace memakai Node.js/Express, Supabase/PostgreSQL, tetapi keberadaannya bukan persetujuan untuk mengembangkan backend pada tahap ini.
+
+Menurut PRD, role global adalah Participant, Organizer, dan Admin. Organizer adalah pengguna global; untuk setiap event, ia memiliki keanggotaan Owner atau Staff. Owner mengelola event miliknya, sedangkan Staff hanya boleh mengakses event dan tindakan yang diberikan permission oleh Owner. Staff bukan role global. Jangan mempertahankan atau memperluas `UserRole.staff` sebagai role global tanpa keputusan produk; rekonsiliasi enum adalah isu yang perlu dikonfirmasi, bukan ruang lingkup untuk mengubah model global pada tugas ini.
+
+Area Organizer yang direncanakan meliputi dashboard dan navigasi, event dan tiket, peserta dan order, registrasi dibantu, tim/permission, scanner/check-in, laporan/aktivitas, paket/langganan, profil, notifikasi dan bantuan. UI harus responsif Android serta Web/desktop, memiliki state loading, empty, error, success, akses ditolak, validasi form dan konfirmasi tindakan destruktif jika relevan.
+
+======================================================================
+2. RINGKASAN KONDISI IMPLEMENTASI ORGANIZER SAAT INI
+======================================================================
+
+Status berikut mengikuti audit kode di PRD bagian 20 dan pemeriksaan struktur source. Keberadaan halaman, route, model, atau service saja tidak membuktikan alur bisnis end-to-end.
+
+- Sudah ada sebagian: layar dashboard, event management/form, profil Organizer, daftar peserta, pengelolaan Staff; model Event/TicketType/User, provider Event/Auth, dan service terkait. Sebagian service berkomunikasi HTTP saat MOCK_MODE=false. Itu tidak menjadikannya implementasi prototype dummy offline yang lengkap.
+- Belum selesai/placeholder: tab Organizer dinyatakan placeholder; navigasi Organizer/Staff tidak lengkap; Staff dashboard adalah stub; akses Staff berbasis membership dan permission belum terbukti. Event, peserta, undangan, scanner, dan report screens tidak membuktikan keseluruhan alur, filter, hasil sukses/gagal atau persistensi lokal.
+- Route map terpisah: `apps/lib/routes/app_routes.dart` mendefinisikan route, sementara `apps/lib/app_router.dart` adalah generator aktif yang tidak menangani seluruh nama/parameter route secara lengkap. Guard route sederhana bukan enforcement permission atau kepemilikan.
+- Katalog publik, order, payment, ticket/QR, scanner, check-in, report, subscription dan dashboard tidak terbukti tersambung end-to-end menggunakan dummy data yang terkendali. Jangan menyatakan transaksi nyata terjadi hanya karena UI berubah.
+- Backend aktual terbatas pada source auth/event/ticket/admin, middleware/model terkait, serta satu migration role/event membership. Tidak ditemukan route/service Organizer yang meliputi seluruh kebutuhan PRD. Untuk Tahap 0, backend tersebut tidak boleh dikembangkan.
+- Test backend `npm test` memang belum dikonfigurasi (script gagal secara eksplisit); jangan menganggap test backend ada. Uji Flutter melalui test yang ada dan tambah test yang relevan dalam scope masing-masing.
+
+Referensi source utama (semua path relatif terhadap root repository):
+`apps/lib/app.dart`, `apps/lib/app_router.dart`, `apps/lib/routes/app_router.dart`, `apps/lib/routes/app_routes.dart`, `apps/lib/models/`, `apps/lib/providers/`, `apps/lib/services/`, `apps/lib/features/organizer/`, `apps/lib/features/scanner/`, `apps/lib/features/check_in/`, `apps/lib/features/orders/`, `apps/lib/features/payments/`, `apps/lib/features/reports/`, `apps/lib/features/tickets/`.
+
+======================================================================
+3. SELURUH FITUR ORGANIZER YANG DICAKUP PRD
+======================================================================
+
+Daftar ini memetakan kebutuhan frontend Organizer dari PRD bagian 2, 5, 8, 11, 12–15, 17–18, dan audit bagian 20. FR di bawah meliputi requirement UI Organizer langsung serta konteks UI yang dipengaruhi requirement tersebut. Fitur Admin/Participant yang berdiri sendiri tidak termasuk; screen publik hanya ditautkan/pratinjau jika dibutuhkan oleh alur Owner.
+1. Autentikasi/konteks akun Organizer (FR-01): registrasi Organizer dengan nama, email, password, login/logout, sesi dan landing role yang benar. Pertahankan perilaku Participant/Admin; jangan menambahkan field registrasi yang tidak disebut PRD atau mengubah schema role tanpa keputusan.
+2. Profil Organizer: lihat/edit informasi Organizer dan profil akun yang memang didefinisikan PRD, validasi, simpan mock, pembatalan, logout. Bedakan profil Organizer dari profil global bila kode mendefinisikannya.
+3. Shell/dashboard Owner (FR-66): layout/sidebar/topbar responsif, navigasi seluruh menu Owner, event aktif, statistik event milik/aksesnya (draft, review, published, tiket, pending orders, peserta, check-in, gross sales), event terbaru, tindakan moderasi/revisi, notifikasi; bukan pendapatan platform.
+4. Navigasi Staff (FR-65, 73): landing/dashboard Staff sederhana, daftar hanya event ACTIVE yang ditugaskan, jadwal/status dan permission; menu peserta/registrasi/scanner/riwayat/laporan hanya ketika diizinkan; profil/bantuan/logout; larangan menu bisnis/pengaturan Owner.
+5. Event Saya dan lifecycle (FR-09): list/search/filter, create/edit/detail dan hapus bila aman; informasi dasar, deskripsi/poster, kategori event, jadwal/zona waktu, format/lokasi/link, kontak, pengaturan pendaftaran/peserta, kuota, draft, preview publik, submit review, status pending/published/revision/rejected/suspended, catatan revisi dan resubmit. Status moderasi tidak boleh diubah Owner secara manual.
+6. Detail event: subnavigation Ringkasan, Informasi, Tiket, Peserta & Pesanan, Registrasi Manual, Tim, Scanner, Laporan, Aktivitas. Ringkasan menampilkan jadwal/lokasi, status, tiket, pending, peserta/check-in, grafik demo sederhana, URL/QR registrasi, salin tautan, preview publik dan tautan laporan.
+7. Ticket types: CRUD aman, nama/deskripsi/harga/kuota/periode/status/batas pembelian, sold/remaining; fixture harus melindungi order historis, snapshot harga dan kuota tertahan/terjual; tidak menghapus tipe tiket yang sudah terpakai.
+8. Peserta & Order (FR-67–69): daftar per-event, nama/email/order/ticket type, status order/payment/ticket/check-in dan SELF_SERVICE/ASSISTED; search nama/email/order, filter ticket/payment/check-in, detail order/peserta, ekspor CSV UI/simulasi bila hak paket/permission mengizinkan, minimisasi data sensitif. Jangan mark PAID.
+9. Registrasi dibantu Owner/Staff (FR-30–35): form pemesan/kontak, ticket type/jumlah, data tiap peserta, ringkasan biaya dan konfirmasi → mock order bernomor → tampilan instruksi Virtual Account demo/reference/nominal/expiry/status sesuai data fixture bila berbayar → status tiket hanya sesuai fixture yang mengaku sudah dikonfirmasi; payment tidak dapat dipalsukan dari Organizer UI. Staff tidak boleh ubah harga/kuota; kuota/periode/limit/duplikasi divalidasi. Uji alur fixture yang setara dari segi state dengan registrasi mandiri tanpa membuat backend. Jangan menyiratkan mock mensimulasikan validasi server sungguhan.
+10. Tim & undangan (FR-60–65): daftar Owner/Staff, email/status/permission/waktu bergabung; invite fixture aman dengan expiry, acceptance, permission edit dan revoke. Uji permission PRD secara terpisah dan eksplisit: `VIEW_EVENT`, `VIEW_PARTICIPANTS`, `ASSIST_REGISTRATION`, `VIEW_ORDERS`, `SCAN_TICKET`, `CHECK_IN_TICKET`, `VIEW_SCAN_HISTORY`, `VIEW_REPORTS`, `EXPORT_PARTICIPANTS`. Staff tidak mengundang/mencabut Staff atau mengubah Owner. Kanal undangan final masih keputusan terbuka; UI mock tidak boleh mengunci kebijakan permanen.
+11. Scanner/Check-in (FR-50–59): mock scanner tanpa dependency scanner baru, scan fixture/entry QR, event dan ticket status checks, hasil valid/used/invalid/wrong event/cancelled/network issue, confirm check-in, riwayat pelaku/waktu, status offline belum diverifikasi server dan konflik sync ditandai untuk pemeriksaan. Staff dipisah permission SCAN_TICKET, CHECK_IN_TICKET, VIEW_SCAN_HISTORY.
+12. Laporan & aktivitas (FR-70–73): total order/tiket/gross sales, biaya/komisi bila datanya tersedia, status order, peserta check-in, grafik per waktu, filter tanggal/ticket type, export sesuai paket/permission; activity log event berisi actor/action/time/event/summary untuk create/edit/review/ticket/staff/assisted registration/check-in/settings. Developer 2 memiliki model/fixture dan layar laporan/activity event; Developer 3 menyediakan pemanggilan event log dari aksi membership/invitation/permission miliknya melalui event logger API Developer 2, tanpa mengedit file log Developer 2. Pisahkan gross, fee, platform commission, package revenue dan hak Organizer; nilai tarif belum diputuskan.
+13. Paket & langganan Organizer sendiri (FR-76–79): lihat plan, features/limits, start/end, status, perubahan paket dan payment history bila fixture PRD tersedia, transaksi paket/history screen bila termasuk Organizer. UI transaksi hanya representasi data demo; tidak membuat pembayaran paket. Harga/durasi/komisi belum final; jangan mengarang nilai.
+14. Notifikasi, bantuan dan support Organizer (FR-95/96 dan navigasi PRD): daftar notifikasi/status baca; kontak resmi; form keluhan kategori/subjek/deskripsi/email kontak, nomor laporan, token/status/riwayat balasan aman; internal notes tidak pernah ditampilkan kepada pelapor. Developer 3 pemilik fitur ini. Jangan mengklaim live chat/AI; detail yang tidak dijelaskan perlu keputusan.
+15. UI quality untuk seluruh item di atas: Android dan Flutter Web/desktop responsif; loading (tanpa aksi ganda), empty dengan next step, success, error/retry aman, access denied tanpa kebocoran, validasi form, confirmation destruktif, navigasi deep link/back yang benar, data dummy terpusat/mock terpisah dari widget, konsisten tanpa network/backend.
+Tidak semua perilaku sudah dapat dipastikan dari kode. Audit PRD mencatat screen peserta/form/event/staff/dashboard ada sebagian, tetapi tidak mengonfirmasi seluruh interaksi atau fixture. Seluruh 15 kelompok di atas masuk scope kerja; masing-masing kriteria hanya boleh ditandai selesai setelah demonstrasi/test. Kebijakan yang belum diputuskan bukan alasan menghilangkan layar: bangun UI netral berbasis fixture yang tidak mengunci kebijakan bisnis dan catat keputusan yang dibutuhkan.
+
+======================================================================
+4. KEKURANGAN DAN KEBUTUHAN PENGEMBANGAN
+======================================================================
+
+Kategori yang sudah selesai tanpa perubahan: Tidak ada kelompok fitur Organizer yang dapat dinyatakan selesai seluruhnya berdasarkan bukti audit PRD bagian 20. File yang ada adalah bukti implementasi parsial saja. Jika developer membuktikan subalur tertentu lulus acceptance criteria di bawah melalui aplikasi/test, dokumentasikan sebagai selesai parsial/terbatas, bukan memperluas klaim ke fitur lain.
+
+Sudah tersedia tetapi perlu diperbaiki/dilengkapi:
+- Dashboard Organizer, event list/form/management, profil, attendee list dan staff management: lengkapi alur, state, permission, navigasi dan fixture fungsional.
+- Model/provider/service event, order, ticket, payment, check-in, report, auth/user: audit terlebih dahulu. Gunakan pola Provider dan mock lokal; jangan mengganti pendekatan atau menganggap operasi HTTP sebagai mock.
+- Shell/tab/router dan akses role: satukan pemetaan route tanpa menghapus kompatibilitas route; implementasikan owner/staff per-event sesuai PRD. Hindari perubahan model global tanpa keputusan.
+- Screens scanner, report, order, payment dan ticket yang sudah ada: integrasikan sebagai tampilan operasional Organizer hanya sejauh sesuai PRD, permission dan data dummy; implementasi saat ini belum terbukti utuh.
+
+Belum tersedia atau belum terbukti dan harus dilengkapi dari awal bila belum ada:
+- Seluruh 15 kelompok fitur pada bagian 3; tidak ada yang otomatis dikecualikan hanya karena belum tampak di source.
+- Detail subtab event (ringkasan, informasi/revisi, tiket, peserta/order, registrasi manual, tim, scanner, laporan, aktivitas), Owner dashboard dan Staff dashboard.
+- Profile/account journey, Owner/Staff navigation, membership/permission route guard, undangan/expiry/acceptance/revoke.
+- Fitur paket/langganan dan tampilan riwayat perubahan/pembayaran paket; laporan/aktivitas/export yang hak akses dan sumber fixture-nya konsisten.
+- State UI responsif dan loading/empty/error/success/access-denied pada setiap layar/aksi yang relevan.
+
+Batas arsitektur wajib: PRD bagian 15 dan 18 memerintahkan Flutter UI prototype dengan data dummy terkontrol dan mock service/repository yang terpisah dari widget, tanpa request jaringan/API, backend atau database. Seluruh fitur pada pembagian ini harus dapat didemonstrasikan tanpa server; mock boleh menggunakan memory/local fixtures, tetapi tidak boleh mengaku menyimpan transaksi sungguhan atau aman lintas pengguna/perangkat. Bagian 13.2–13.4 menjelaskan target integrasi backend berikutnya, bukan tugas saat ini. Jangan membuat endpoint, migration, tabel, konfigurasi, integrasi Supabase, atau menyalakan API. Pastikan jalur Organizer tidak memanggil HTTP walaupun mode aplikasi umum memiliki ApiClient/HTTP.
+
+======================================================================
+5. JUMLAH DEVELOPER DAN ALASAN
+======================================================================
+
+Gunakan 3 developer. Ketiganya mulai implementasi dalam waktu bersamaan setelah satu sesi kickoff singkat untuk menyepakati interface/file boundary; tidak ada developer yang harus menunggu fitur developer lain selesai. Developer 1 memiliki event/ticket, Developer 2 seluruh operasi detail event, Developer 3 akun/shell/membership/plans, termasuk root/router. Semua membuat mock fixture lokal di namespace sendiri dan dapat menguji fitur secara mandiri dengan fake/mock boundary. API lintas fitur disepakati sebagai kontrak data/signature sederhana pada kickoff; perubahan berikutnya dibuat hanya oleh pemilik file dan diumumkan, bukan menjadi blocker pekerjaan consumer. Developer 3 mulai dengan route table yang mendaftarkan tujuan domain menggunakan stub/temp screen atau callback sementara yang ia miliki; saat Developer 1/2 menyerahkan signature, Developer 3 mengganti stub dengan integrasi screen tanpa mengedit file mereka. Tidak ada tugas yang menunggu fitur lain selesai, hanya integrasi final yang bergantung pada kontrak stabil. File edit tiap domain eksklusif sesuai bagian 8; perubahan route/root hanya Developer 3.
+
+======================================================================
+6–7. PEMBAGIAN DAN INSTRUKSI TEKNIS PER DEVELOPER
+======================================================================
+
+DEVELOPER 1 — EVENT, TIKET, RINGKASAN EVENT DAN PREVIEW PUBLIK
+Tujuan: melengkapi lifecycle Owner untuk event beserta jenis tiket dan UI ringkasan/preview yang hanya bersumber dari fixture lokal, dari draft hingga simulasi pengajuan review. Mulai segera setelah kickoff kontrak; jangan menunggu dashboard/router atau layanan order Developer 2.
+
+Fitur dan kondisi awal:
+- `apps/lib/features/organizer/screens/event_management_screen.dart`, `event_form_screen.dart` tersedia; implementasi keseluruhan daftar/detail, validasi, filter, lifecycle review dan navigasi belum terbukti lengkap.
+- `apps/lib/models/event/event_model.dart`, `ticket_type_model.dart`, `apps/lib/providers/event_provider.dart`, `apps/lib/services/event/event_service.dart` tersedia/terindikasi dalam struktur; audit source aktual sebelum mengubahnya. Operasi HTTP tidak boleh dipakai oleh Tahap 0.
+- `apps/lib/features/events/screens/event_detail_screen.dart` dan `event_list_screen.dart` adalah screen publik/Participant dan read-only untuk semua developer tugas Organizer. Jika preview perlu khusus Organizer, buat adapter/preview baru di namespace Developer 1 tanpa mengubah file tersebut.
+- `apps/lib/routes/app_routes.dart` dan router generator bukan file milik developer ini.
+
+Target dan user flow: Organizer Owner membuka Event Saya → melihat list/filter/search/empty → membuat draft atau detail → mengisi informasi dasar, media poster fixture, kategori, jadwal dan zona waktu, lokasi/format/link, kontak, informasi attendee dan kuota → validasi → simpan draft → lihat tab Ringkasan (status, jadwal/lokasi, order/tiket/peserta/check-in/grafik mock, URL/QR registrasi fixture, salin tautan, buka preview publik dan tautan laporan) → buka tab Informasi → lihat revisi/admin feedback fixture, edit bila status mengizinkan dan resubmit → simulasi status moderation. Owner tidak dapat mengubah status moderation. Jenis tiket mendukung nama/deskripsi/harga/kuota/periode/status/batas pembelian serta sold/remaining; lindungi snapshot harga dan order/kuota tertahan. Dashboard menggunakan data scope event, tetapi layar dashboard dimiliki Developer 3.
+
+Area/file utama yang boleh dibuat/diubah:
+- `apps/lib/features/organizer/screens/event_management_screen.dart`
+- `apps/lib/features/organizer/screens/event_form_screen.dart`
+- File baru khusus Event/TicketType hanya pada namespace eksklusif `apps/lib/features/organizer/events/` (screens/widgets). Jangan menambah file pada path umum organizer screens/widgets yang dapat tumpang tindih.
+- `apps/lib/models/event/event_model.dart`, `ticket_type_model.dart`, `apps/lib/providers/event_provider.dart`, `apps/lib/services/event/event_service.dart` adalah milik eksklusif Developer 1. Developer lain hanya memakai API yang diumumkan; mereka tidak mengedit file ini.
+- Tambahkan test khusus event/tiket di `apps/test/features/organizer/events/` (buat subfolder test bila perlu). Developer lain tidak menulis di folder test ini.
+
+Backend/API/database: tidak dikerjakan. Jangan mengubah folder backend, migration, `apps/lib/core/network/api_client.dart`, konfigurasi atau pubspec. Service event/tiket harus mock lokal dan tak membuat request jaringan. Publikasikan kontrak read-only event/tiket (field ID/event owner/status/ticket type/kuota) kepada rekan; jangan meminta mereka mengedit file domain milik Developer 1.
+
+Integrasi/batas: Developer 1 dapat bekerja mandiri menggunakan fixture dan signature event yang ditetapkan di kickoff; tidak menunggu route aktif. Developer 3 menerbitkan route dan kelak mengintegrasikan screen Event; Developer 1 tidak mengubah route, dashboard, tab controller, screen profil/staff, atau fitur Participant. Developer 2 membaca model/provider melalui API kontrak tetap; jika field baru diperlukan, Developer 1 menambahkannya dan mengumumkan perubahan tanpa menghentikan Developer 2 (Developer 2 gunakan fake lokal/adaptor sementara). Hindari perubahan terhadap `event_detail_screen.dart` publik; buat preview read-only khusus Organizer jika screen publik tidak dapat dipakai tanpa melanggar scope.
+
+Kriteria selesai/test:
+1) seluruh field event PRD dan alur list → create/edit → draft → preview → submit review → feedback/revision/resubmit/status demo bisa dijalankan offline;
+2) tab Ringkasan/Informasi dan preview/URL/QR salin tautan berfungsi dengan konten fixture, tanpa mengklaim publikasi server;
+3) jenis tiket mencakup price/quantity/period/status/limits, validasi kuota terjual+tertahan, empty/error/success dan konfirmasi destruktif;
+4) data fixture berada dalam scope Owner, disimpan melalui provider/mock service terpisah dari widget, serta dapat dibaca domain lain;
+5) tidak ada HTTP/backend dependency dalam alur mock;
+6) jalankan `flutter analyze` dan test relevan dari folder `apps`, laporkan hasil serta batasan.
+
+Hasil serah: kode domain/screen/test dalam batas di atas, daftar route yang diminta (tanpa mengubah pemilik route), kontrak fixture/status, bukti alur uji dan daftar bagian belum terselesaikan.
+
+DEVELOPER 2 — PESERTA/ORDER, REGISTRASI DIBANTU, SCANNER/CHECK-IN, LAPORAN DAN AKTIVITAS EVENT
+Tujuan: melengkapi secara utuh seluruh tab operasional detail event dari peserta/order sampai scanner, laporan, dan riwayat aktivitas, memakai satu fixture lokal; tidak ada pembayaran atau check-in server sungguhan. Mulai paralel dengan fake Event/TicketType lokal yang menyesuaikan kontrak kickoff; jangan menunggu Developer 1.
+
+Fitur dan kondisi awal:
+- `apps/lib/features/organizer/screens/attendee_list_screen.dart` tersedia sebagian. Screens registrasi/order/payment/ticket/scanner/check-in/reports juga terdapat di feature masing-masing, tetapi belum terbukti membentuk alur Organizer end-to-end.
+- Model dan provider yang relevan terlihat pada `apps/lib/models/order/`, `ticket/`, `payment/`, `check_in/`, `report/`, serta `apps/lib/providers/order_provider.dart`, `ticket_provider.dart`, `payment_provider.dart`, `check_in_provider.dart`, `report_provider.dart`.
+- Struktur service event/order/payment/check-in/report berada di `apps/lib/services/`; cek nama file persis sebelum mulai. Jangan memperluas service ke HTTP.
+- Belum ada bukti layanan fixture menyambungkan registrasi dibantu, order dan ticket ke riwayat aktivitas/report; ini wajib dibuat dalam batas file domain Developer 2.
+
+Target dan user flow: Dari detail event, Owner atau Staff berizin membuka peserta/order → search/filter nama/email/order, ticket type/payment/check-in → lihat detail attendee, order/ticket, status terpisah, metode SELF_SERVICE/ASSISTED dan data sensitif minimum → (bila ASSIST_REGISTRATION) isi pemesan/email, kategori/jumlah, data tiap attendee, biaya → validasi input, periode, kuota, batas/order, konsistensi harga dan duplicate → create order fixture ASSISTED beserta actor member dan instruksi demo payment → lihat status order/ticket demo (tanpa memaksa paid) → (bila SCAN_TICKET) buka scanner mock/entry QR → terima hasil valid/used/invalid/wrong event/cancelled/network error → (bila CHECK_IN_TICKET) confirm demo check-in → history untuk VIEW_SCAN_HISTORY, termasuk offline-unverified/conflict → lihat report dengan date/ticket filter, data fixture yang sama, package/permission gate dan export demo → activity tab dengan actor/action/time/event/summary untuk edit event, ticket, invitation, assisted registration dan check-in. Tidak boleh melihat event lain, memaksa pembayaran, atau menyamakan gross sales/fee/commission/package revenue/Organizer proceeds.
+
+Area/file utama yang boleh dibuat/diubah:
+- `apps/lib/features/organizer/screens/attendee_list_screen.dart`; layar Organizer baru untuk assisted registration, event activity, atau Organizer report hanya di namespace eksklusif `apps/lib/features/organizer/operations/` agar tidak bertabrakan dengan file domain Developer 1 atau shell/staff Developer 3.
+- File existing di `apps/lib/features/scanner/`, `check_in/`, dan `reports/report_list_screen.dart` belum dibuktikan eksklusif Organizer; perlakukan sebagai read-only. Developer 2 membuat layar Organizer tersendiri dalam namespace `organizer/operations/`. `report_form_screen.dart`/`report_status_screen.dart` Participant juga read-only.
+- File Participant screens di `apps/lib/features/orders/`, `payments/`, `tickets/`, `registration/`, dan public event juga read-only. Bila perlu, Developer 2 membuat adapter/screen Organizer di namespace operations dengan memakai model/provider API, tanpa mengambil alih file UI Participant.
+- Provider/service/model order, payment, ticket, check-in, report di bawah `apps/lib/providers/`, `apps/lib/services/`, `apps/lib/models/` menjadi milik eksklusif Developer 2; daftar file aktual dicatat sebelum pengerjaan. Jangan mengedit `event_model.dart`, `ticket_type_model.dart`, `event_provider.dart` milik Developer 1 atau `user_model.dart`/auth milik Developer 3.
+- Test operasional di `apps/test/features/organizer/operations/`; jangan menambah test pada folder test domain Developer 1/3.
+
+Backend/API/database: tidak dikerjakan. Jangan mengubah backend, migrations, `api_client.dart`, konfigurasi atau dependency. Jika scan real memerlukan dependency yang tidak tercantum, jangan menambahkannya; gunakan input/fixture mock yang jelas diberi label simulasi. Seluruh service yang dimiliki Developer 2 tidak membuat HTTP di alur prototype. Order/payment/check-in/ticket adalah state fixture, bukan transaksi nyata.
+
+Integrasi/batas: mulai memakai fake Event/TicketType sesuai kontrak kickoff; setelah API Developer 1 tersedia, ganti fake pada boundary sendiri tanpa mengedit file domainnya dan tanpa menunda kerja. Gunakan interface permission Developer 3 yang disepakati saat kickoff; jika implementasinya belum tersedia, buat fake interface lokal dengan signature sama. Jangan mengedit auth/membership/router. Developer 2 satu-satunya pemilik layar/folder operasi; jangan mengubah screen Participant/platform; buat screen Organizer di folder operations. Data report/activity dihitung dari satu fixture operasional. Jika tab event perlu komposisi, Developer 3 menambahkan route/slot miliknya dan kelak memasang screen Developer 2; Developer 2 tidak menunggu route dan tidak mengedit tab controller.
+
+Kriteria selesai/test:
+1) peserta/order menampilkan semua field/status/metode registrasi PRD, search/filter/detail, minimisasi data dan pembatasan event;
+8) assisted form lengkap dengan ticket selection/count/per-attendee data/cost summary, validasi duplicate/period/quota/limit, order reference dan VA demo fields/status/expiry jika applicable serta attribution actor; tanpa tombol yang memalsukan payment PAID;
+3) semua hasil scanner/check-in (valid, used, invalid, wrong event, cancelled, network, offline/conflict), permission terpisah, history dan pelaku/waktu dapat diuji;
+4) laporan mencakup metrik/grafik/filter yang ditetapkan, membedakan financial values, export tunduk plan+permission; activity mencatat actor/action/time/event/summary untuk semua operasi milik Developer 2;
+5) integrasi tidak mengubah layar Participant atau screen domain Developer 1/3; ekspor demo ditandai simulasi bila tidak menghasilkan file;
+5) loading/empty/error/success/access denied tersedia sesuai alur, tanpa HTTP;
+6) jalankan `flutter analyze` dan test relevan dari `apps`, laporkan hasil serta keterbatasan.
+
+Hasil serah: alur seluruh tab operasional, provider/service/fixture terhubung ke event/tiket, log activity, test, daftar permission/route yang dibutuhkan dan bukti uji positif/negatif.
+
+DEVELOPER 3 — AUTH/PROFIL ORGANIZER, DASHBOARD/SHELL/ROUTING, AKSES OWNER-STAFF, TIM, PAKET/LANGGANAN, NOTIFIKASI DAN SUPPORT
+Tujuan: melengkapi entry/exit dan seluruh shell/navigation Organizer, akses per-event dan kelompok fitur akun/tim/plan/support, lalu mengintegrasikan screen Developer 1/2 melalui API route tanpa mengedit file domain mereka. Mulai route/shell, permission interface, dashboard fixture dan fitur akun secara paralel; jangan menunggu screen Developer 1/2.
+
+Fitur dan kondisi awal:
+- `apps/lib/features/organizer/screens/organizer_dashboard_screen.dart`, `organizer_profile_screen.dart`, `staff_management_screen.dart`, `apps/lib/features/organizer/tabs/organizer_tab_controller.dart` tersedia. Audit PRD menyebut tab sebagai placeholder, Staff dashboard sebagai stub, serta membership/permission belum terbukti.
+- Router ganda berada di `apps/lib/app_router.dart`, `apps/lib/routes/app_router.dart`, konstanta di `apps/lib/routes/app_routes.dart`; `apps/lib/app.dart` menyediakan aplikasi. Seluruh file tersebut dipakai bersama dan hanya Developer 3 boleh mengubahnya selama pembagian ini.
+- `apps/lib/models/user/user_model.dart`, `user_role.dart`, `apps/lib/providers/auth_provider.dart`, `user_provider.dart`, `apps/lib/core/services/session_service.dart` dan `apps/lib/services/auth/auth_service.dart` berkaitan dengan login/session global; perubahan harus menjaga role global sesuai PRD.
+- Belum ditemukan layar Organizer paket/langganan, transaksi paket, notifikasi/bantuan/support yang lengkap. Organizer complaint merupakan FR-95 dan harus memiliki flow report sendiri (nomor laporan, token/status aman sesuai FR-96; internal notes tidak ditampilkan kepada pelapor).
+- Registrasi/login screens ada di `apps/lib/features/auth/`; audit PRD mencatat Organizer demo login terbatas dan tidak mengonfirmasi registrasi/full session journey. Penerimaan invitation Staff harus tetap mendaftar/login sebagai akun global Organizer, bukan role global Staff.
+
+Target dan user flow: registrasi/login Organizer → session/AuthGate mendarat ke Owner dashboard (global role tetap Organizer) → responsive shell/sidebar/topbar dan seluruh route/subtab terhubung → Owner melihat event summary dari provider kontrak Developer 1/2 → membuka event tertentu; shell memeriksa scope membership sebelum memasang tab/screen → melihat profil/edit, notifikasi, bantuan, tim, plan/subscription/riwayat transaksi demo → mengundang email fixture, state pending/expired/accepted, Staff menerima via login/registrasi akun Organizer, masuk hanya ke assigned ACTIVE event; Owner memberi permission granular atau revoke; Staff sees only allowed tasks and route guard denies disallowed action/deep link without revealing data. Semua tab Event Detail (ringkasan/informasi/tiket/peserta/manual/team/scanner/report/activity) di-route melalui screen pemiliknya. Logout menutup sesi demo. Paket/langganan/transaksi hanya tampilan fixture; bukan payment real. Shell tidak mengubah fitur Participant/Admin.
+
+Area/file utama yang boleh dibuat/diubah:
+- `apps/lib/app.dart`, `apps/lib/app_router.dart`, `apps/lib/routes/app_router.dart`, `apps/lib/routes/app_routes.dart`: Developer 3 pemilik tunggal aplikasi shell/generator/konstanta route. Route generator lain di `routes/` yang placeholder tidak boleh menjadi routing ganda; integrasikan satu entry route sesuai arsitektur aktual, tanpa refactor non-Organizer.
+- `apps/lib/features/organizer/screens/organizer_dashboard_screen.dart`, `organizer_profile_screen.dart`, `staff_management_screen.dart`, `apps/lib/features/organizer/tabs/organizer_tab_controller.dart`, dan `apps/lib/features/staff/screens/staff_dashboard_screen.dart`.
+- Screen baru domain ini di namespace `apps/lib/features/organizer/shell/`, `membership/`, `plans/`, `support/` untuk dashboard/staff shell, tim/invitations/permissions, package/subscription/package transactions, Organizer profile/settings, notification/help/support. Jangan menimpa file Developer 1 (event) atau Developer 2 (operations).
+- Auth screens `login_screen.dart`, `register_screen.dart`, `profile_edit_screen.dart` dan notification screen existing berpotensi shared: read-only. Buat Organizer adapter/screen baru di `organizer/shell/` dan `support/`; bila perubahan pada screen shared terbukti perlu, hanya Developer 3 boleh mengubah dalam commit terpisah dan wajib menguji regresi Participant/Admin.
+- Provider/service notification/auth/session existing yang digunakan role lain juga read-only. Developer 3 membuat mock adapter khusus Organizer di `apps/lib/services/organizer_shell/`, `organizer_membership/`, `organizer_plans/`, `organizer_support/`, `organizer_notifications/`; konsumsi interface auth/session read-only.
+- `apps/lib/models/user/user_model.dart`, `user_role.dart`, `apps/lib/providers/auth_provider.dart`, `user_provider.dart`, `apps/lib/core/services/session_service.dart`, `apps/lib/services/auth/auth_service.dart`: Developer 3 bertanggung jawab untuk kebutuhan Organizer; tidak boleh mengubah schema global role pada ketidakcocokan PRD/kode tanpa konfirmasi dan persetujuan.
+- Provider/service notification/auth/session existing bila juga dipakai role lain diperlakukan sebagai read-only untuk menghindari konflik/efek samping. Developer 3 membuat adapter/mock service baru yang khusus Organizer pada `apps/lib/services/organizer_shell/`, `organizer_membership/`, `organizer_plans/`, `organizer_support/`, `organizer_notifications/`; gunakan interface auth/session yang ada tanpa edit file lintas role. Root router/app tetap satu-satunya area integrasi lintas domain milik Developer 3.
+- Test khusus auth/shell/membership di `apps/test/features/organizer/shell/`; test lain yang sudah ada hanya boleh dijalankan, bukan diubah, kecuali file tersebut dimiliki Developer 3.
+
+Backend/API/database: tidak dikerjakan. Permission prototype harus dicek di entry route dan handler/provider mock, bukan sekadar menyembunyikan tombol; jangan klaim sebagai keamanan server. Jangan mengubah schema role global menjadi empat role. Rancangan PRD menetapkan tiga role global; Owner/Staff adalah membership per-event. Auth/reg/session UI dikerjakan lokal sesuai prototype tanpa API.
+
+Integrasi/batas: mulai dengan route table dan stub route milik Developer 3 untuk screen domain 1/2; Developer 3 tidak menunggu file tersebut tersedia. Kontrak kickoff mencantumkan path, constructor/signature, eventId dan permission input; stub diganti saat screen siap. Developer 3 pemilik route/shell, bukan pemilik screen/service/model domain 1/2. Sediakan interface membership+permission agar Developer 1/2 dapat membuat fake ber-signature sama sampai implementasi siap. Jangan mengedit domain rekan. Developer 1/2 tidak edit route. Auth/user/session/notification shared existing read-only; gunakan Organizer mock adapters. Jika kelak perubahan role model global diperlukan, ajukan terpisah dan jangan jadikan blocker untuk mock shell.
+
+Kriteria selesai/test:
+1) Organizer login/register, session, profile/settings, logout dan role landing berfungsi; tidak ada regresi Participant/Admin;
+2) seluruh Owner/Staff menus/routes/subroutes dan tab event terhubung ke screen domain 1/2, termasuk direct-route authorization;
+3) Owner/Staff access scope dan setiap permission action deny di guard serta provider, without information leak;
+4) invitations/expiry/acceptance/per-event permission/revocation dapat didemonstrasikan; Staff tidak pernah menjadi global role;
+5) dashboard memakai ringkasan provider/fixture yang disepakati, menampilkan seluruh statistik dan moderation/revision action sesuai PRD, bukan revenue platform;
+6) plan/subscription/status/period/change history/package transaction UI, profile/settings/notifications/help dan complaint/status/history mock dapat dicapai dengan proper states, tanpa menetapkan tarif yang belum diputuskan;
+7) layout responsive Android/Web/desktop, no HTTP backend in mock;
+8) jalankan `flutter analyze` dan test relevan, laporkan hasil dan keterbatasan.
+
+Hasil serah: shell/router, interface+mock membership/permission, auth/profile/dashboard/team/plans/notifikasi/hub screens, test own-domain, route registry dan bukti integrasi seluruh screen domain lain tanpa mengedit file mereka.
+
+======================================================================
+8. BATASAN FILE DAN FOLDER — PEMILIK EKSKLUSIF, TANPA EDIT BERSAMA
+======================================================================
+
+Aturan integrasi: seluruh file existing yang dikerjakan mempunyai tepat satu developer pemilik. Developer lain tidak boleh mengedit file yang sama, termasuk untuk “perbaikan kecil”. Integrasi dilakukan lewat API publik/kontrak yang diumumkan, import/callback/route registry milik Developer 3, atau permintaan perubahan kepada pemilik file. File model/provider/service yang dipakai lintas fitur tetap memiliki satu pemilik; consumer membaca API, tidak melakukan edit silang. Hindari konflik yang mustahil dihilangkan secara teknis hanya dengan memberi semua developer hak pada file umum.
+
+DEVELOPER 1 — daftar file pemilik eksklusif:
+- `apps/lib/features/organizer/screens/event_management_screen.dart`
+- `apps/lib/features/organizer/screens/event_form_screen.dart`
+- File baru Event/TicketType hanya di namespace terpisah `apps/lib/features/organizer/events/` (screens/widgets); Developer 2/3 dilarang membuat/mengubah file di namespace tersebut.
+- `apps/lib/models/event/event_model.dart`, `apps/lib/models/event/ticket_type_model.dart`, `apps/lib/providers/event_provider.dart`, `apps/lib/services/event/event_service.dart`.
+- Mock data/service Organizer Event baru dibuat di namespace Developer 1 `apps/lib/services/organizer_events/` (tidak menimpa `services/event/event_service.dart` jika ia dipakai oleh public/Participant flow).
+- Test hanya `apps/test/features/organizer/events/`.
+
+DEVELOPER 2 — daftar file pemilik eksklusif:
+- `apps/lib/features/organizer/screens/attendee_list_screen.dart`.
+- File baru Organizer operations hanya di namespace `apps/lib/features/organizer/operations/` (assisted registration, organizer attendee/order details, organizer scanner/check-in/report/activity adapters/screens). Developer 1/3 dilarang membuat/mengubah file di namespace tersebut.
+- File existing dalam folder scanner/check_in/reports/orders/payments/tickets/registration diperlakukan read-only karena belum ada pemisahan screen per role yang dibuktikan. Screen Organizer baru hanya dalam `organizer/operations/`, untuk menjaga kepemilikan file berbeda.
+- Model/provider/service milik Developer 2 yang ada: `apps/lib/models/order/order_item_model.dart`, `order_model.dart`, `payment/payment_model.dart`, `ticket/ticket_model.dart`, `check_in/check_in_model.dart`, `report/report_activity_model.dart`; provider `order_provider.dart`, `payment_provider.dart`, `ticket_provider.dart`, `check_in_provider.dart`, `report_provider.dart`; service `order_service.dart`, `payment_service.dart`, `ticket_service.dart`, `check_in_service.dart`, `scanner_service.dart`, `report_service.dart`. Gunakan mock lokal. Jangan edit `event_model.dart`, `ticket_type_model.dart`, `event_provider.dart`, event service milik Developer 1 atau user/auth milik Developer 3.
+- Semua model/provider/service di atas shared dengan alur lain diperlakukan read-only; Developer 2 membuat model/provider/mock repository terpisah hanya di `apps/lib/features/organizer/operations/` atau `apps/lib/services/organizer_operations/`. Ini mencegah efek samping pada Participant dan memungkinkan mulai sebelum implementasi Developer 1/3.
+- File Participant order/payment/ticket/registration/report tidak boleh diedit. Jika benar-benar perlu alur Organizer, buat adapter/screen Organizer terpisah di namespace operations dan hubungkan ke API provider milik Developer 2.
+- Test hanya `apps/test/features/organizer/operations/`.
+
+DEVELOPER 3 — daftar file pemilik eksklusif:
+- `apps/lib/app.dart`, `apps/lib/app_router.dart`, `apps/lib/routes/app_router.dart`, `apps/lib/routes/app_routes.dart` (routing/root shell; satu pemilik route).
+- `apps/lib/features/organizer/screens/organizer_dashboard_screen.dart`, `organizer_profile_screen.dart`, `staff_management_screen.dart`, `apps/lib/features/organizer/tabs/organizer_tab_controller.dart`, `apps/lib/features/staff/screens/staff_dashboard_screen.dart`.
+- Screen baru shell/membership/plan/notifikasi/support/help hanya di namespace `apps/lib/features/organizer/shell/`, `membership/`, `plans/`, dan `support/`; Developer 1/2 tidak membuat atau mengubah file namespace ini.
+- `apps/lib/features/auth/screens/login_screen.dart`, `register_screen.dart`, `profile_edit_screen.dart` hanya untuk alur Organizer dengan regresi Participant/Admin diuji; `apps/lib/features/notifications/screens/notification_list_screen.dart` hanya untuk tampilan konteks Organizer.
+- User/auth/session/notification domain file yang disebut dalam instruksi Developer 3, setelah diverifikasi terhadap struktur aktual: `apps/lib/models/user/user_model.dart`, `user_role.dart`, `apps/lib/providers/auth_provider.dart`, `user_provider.dart`, `notification_provider.dart`, `apps/lib/core/services/session_service.dart`, `apps/lib/services/auth/auth_service.dart`, `apps/lib/services/notification/notification_service.dart`.
+- File model/provider/service existing di atas berpotensi shared; gunakan read-only. Fitur mock Organizer auth/session/notification/membership dibuat terpisah dalam namespace service milik Developer 3 dan fixture shell sendiri. Jika login/register page bersama perlu modifikasi perilaku, Developer 3 satu-satunya pemilik file itu dan wajib uji regresi; Developer 1/2 tidak mengedit.
+- `apps/lib/models/report/support_report_model.dart` adalah model aktual; Developer 3 boleh menggunakannya read-only. Untuk form/notification/status provider/service Organizer Support, buat file baru milik Developer 3 di namespace `apps/lib/features/organizer/support/` dan `apps/lib/services/organizer_support/`; jangan ubah model atau service shared yang mungkin dipakai Participant. Support/report screens Participant `apps/lib/features/reports/screens/report_form_screen.dart`, `report_status_screen.dart` tidak boleh diedit. Flow mencakup form, nomor/token/status mock dan riwayat aman; internal notes tidak ditampilkan.
+- Test hanya `apps/test/features/organizer/shell/`.
+
+Daftar ini bukan izin bagi developer untuk mengubah screen/service/model Participant atau shared yang kebetulan dapat digunakan Organizer. Screen/service Organizer baru harus memiliki path dalam namespace eksklusif di atas. Bila integrasi membutuhkan perubahan file shared yang read-only, catat permintaan terpisah; jangan memasukkannya ke branch developer mana pun sebelum pemilik produk menetapkan satu pemilik tunggal. Tidak ada file yang diinstruksikan untuk diedit oleh dua developer.
+
+Semua developer:
+- Hanya mengubah file pada daftar eksklusif sendiri dan file baru pada namespace khususnya. Perubahan file di luar daftar memerlukan pemilik mengerjakannya; jangan edit langsung.
+- Jangan menyentuh `backend/`, Supabase/migrations, generated platform files, `pubspec.yaml`, lockfile, theme/config global, PRD, atau struktur aplikasi di luar scope. Tahap 0 tidak memerlukan perubahan tersebut.
+- Jangan melakukan refactor lintas fitur, mengganti Provider, atau mengubah role schema. Jangan membuat file baru dalam namespace developer lain.
+- Jaga perubahan Git yang telah ada: generated registrant/cmake Linux, macOS, dan Windows tercatat modified sebelum tugas ini. Jangan menimpa, revert, stage, atau memasukkannya dalam branch fitur.
+- `apps/test/widget_test.dart` adalah test global yang sudah ada: hanya jalankan, jangan diubah oleh developer domain; masing-masing menambah test baru pada folder test eksklusifnya.
+
+======================================================================
+9. KETERGANTUNGAN DAN KONTRAK INTEGRASI
+======================================================================
+
+Kontrak minimal yang harus disepakati pada awal pengerjaan (mengikuti nama field aktual setelah pemeriksaan kode; jangan menebak atau mengganti tanpa migrasi terkoordinasi):
+- Event: ID stabil, ownerId, judul, tanggal/status, ringkasan dan daftar ticket type.
+- Ticket type: ID, eventId, nama, harga, kuota/terjual, periode/status.
+- Assisted order/attendee: ID, eventId, ticketTypeId, metode registrasi, status order/payment/ticket yang terpisah, serta identitas attendee yang diperlukan.
+- Check-in: ticketId/eventId, status, waktu/pelaku fixture; status offline harus dibedakan dari server-verified.
+- Event activity: eventId, actor/memberId, action type, timestamp dan summary; event logger API/implementasi milik Developer 2. Developer 1/3 mengirim event melalui API publik tanpa mengedit file log.
+- Membership: eventId/userId, Owner atau Staff, invitation/membership status, permission eksplisit. Permission sekurangnya mengendalikan akses peserta, assisted registration, scanner/check-in, laporan dan pengelolaan tim sesuai daftar PRD.
+- Route: nama/path, parameter eventId, cara meneruskan argumen, serta guard role. Developer 3 menerbitkan daftar route aktif sebelum fitur lain memasang navigasi.
+- Mock: service/repository lokal dan fixture. Domain Developer 1/2/3 masing-masing memiliki mock eksklusif agar dapat bekerja paralel; kontrak field/ID/status minimum disepakati di kickoff dan tiap domain memiliki adapter yang mengonsumsi kontrak tersebut. Integrasi akhir menggunakan fixture gabungan melalui adapter satu pemilik, tanpa developer lain menulis file fixture domain pemilik.
+
+Ketergantungan: Semua kontrak stabil disepakati di kickoff. Tiap developer membuat mock lokal selama implementasi mandiri. Developer 3 menyediakan interface membership/permission dan route; Developer 1/2 mengonsumsi signature-nya, dapat memakai fake sepadan sebelum implementasi siap. Developer 1 menyediakan interface event/ticket; Developer 2 memakai fake lokal dan mengganti adapter saat tersedia; Developer 3 memakai interface ringkasan. Developer 3 menerbitkan event Staff/team melalui interface logger yang Developer 2 sediakan, atau menggunakan no-op adapter lokal sampai siap. Tidak ada yang menunggu penyelesaian fitur lain dan tidak ada edit file lintas pemilik.
+
+======================================================================
+10. PENGERJAAN PARALEL DAN INTEGRASI
+======================================================================
+
+1. **Kickoff kontrak singkat, bukan fase tunggu:** semua developer memeriksa entity/route yang sudah ada lalu menyepakati nama field, signature screen, permission enum dan contoh fixture minimum. Batas waktu kickoff: satu sesi; setelah itu setiap developer mulai implementasi sendiri walaupun interface implementasi domain lain belum tersedia.
+2. Developer 1 mulai event/ticket dengan fixture/mock repository domain miliknya; Developer 2 mulai operasi memakai fixture/fake event dan permission sesuai kontrak; Developer 3 mulai auth/shell/dashboard/membership/plans memakai fixture miliknya dan route stub. Semua dapat menulis serta menguji domain secara mandiri.
+3. Route screen domain 1/2 ditetapkan di kickoff. Developer 3 membuat route entry dengan stub screen lokal miliknya, sehingga aplikasi/shell dapat dikembangkan tanpa mengimpor file yang belum ada. Saat screen tersedia, Developer 3 hanya mengganti stub di file routing miliknya. Developer 1/2 tidak perlu menunggu route selesai.
+4. Fixture/fake sementara berada di test atau mock namespace masing-masing dan tidak ditulis ke file milik developer lain. Saat integrasi, setiap consumer mengganti fake dengan API kontrak pemilik tanpa mengedit file pemilik tersebut. Jangan membuat dua implementasi production untuk satu entity; fake sementara dipisah/dihapus oleh pembuatnya saat kontrak tersedia.
+5. Setiap developer menulis dan menjalankan test domain sendiri. Root/router integration test milik Developer 3; test operasional milik Developer 2; test event/tiket milik Developer 1. Test lintas domain dijalankan setelah interface tersedia, tanpa memindahkan kepemilikan file.
+6. Integrasi bertahap melalui PR/merge kecil setelah interface stabil; integrasi bukan sinyal bagi developer lain untuk baru mulai. Hindari cherry-pick bersamaan yang mengubah file sama. Perubahan file root hanya Developer 3; perubahan schema/API domain dilakukan pemilik domain.
+7. Jalankan analyzer/test Flutter dari `apps` dan demo offline mobile/Web/desktop yang tersedia. Backend bukan kriteria tahap ini. Uji alur event/ticket → assisted registration → attendee/order → scanner/check-in → report/activity → dashboard, Owner/Staff permission, deep route deny, UI state dan tidak ada regresi Participant/Admin.
+8. Tandai requirement lulus hanya berdasarkan test/demo. Bedakan kelengkapan UI mock dari backend/security/transaksi yang tidak termasuk scope.
+
+======================================================================
+11. CHECKLIST PENYELESAIAN ROLE ORGANIZER
+======================================================================
+
+[ ] Seluruh layar/tab Owner dan Staff yang tercantum di PRD dapat dicapai melalui navigasi: Owner Dashboard, Event Saya, Create/Detail seluruh 9 subtab, Plan/Subscription/Package Transactions, Organizer Profile, Help/Support, Notifications, Logout; Staff Dashboard, assigned events/detail, permission-gated participants/assisted registration/scanner/scan history/report, profile/help/logout. Tidak ada placeholder.
+[ ] Role global tetap Participant/Organizer/Admin; Owner dan Staff diterapkan sebagai membership event. Perbedaan kode yang belum diputuskan dicatat dan tidak diubah diam-diam.
+[ ] Dashboard Owner memakai fixture konsisten, hanya merangkum event miliknya/yang diakses, mencakup statistik/event terbaru/status tindakan dan tidak menampilkan pendapatan platform.
+[ ] Event list/search/filter/create/edit/detail/status/review mock berfungsi dengan validasi, empty/error/success dan fixture offline.
+[ ] Ticket type dan kapasitas/periode divalidasi; data yang sudah terkait order tidak dihapus secara tidak aman.
+[ ] Daftar peserta, filter/status, metode registrasi, order/payment/ticket terlihat konsisten dan terpisah.
+[ ] Registrasi dibantu menerapkan permission, validasi data, kuota dan pencegahan duplikasi; payment tidak bisa ditandai paid manual.
+[ ] Undangan Staff, masa berlaku, acceptance mock, permission dan pencabutan akses dapat diuji.
+[ ] Staff hanya melihat event/menu/tindakan sesuai assignment dan permission; akses langsung/deep link tidak membocorkan informasi.
+[ ] Scanner/check-in dapat mendemonstrasikan hasil sukses/gagal dan riwayat; offline ditandai belum diverifikasi server; tidak ada klaim server/API nyata.
+[ ] Laporan dan aktivitas berasal dari fixture yang sama; nilai gross/komisi/pendapatan dibedakan; ekspor tunduk pada permission/paket.
+[ ] Semua fitur frontend Organizer dalam bagian 3 memiliki implementasi/mock dan test; item yang hanya dicatat sebagai belum tersedia tidak dihitung selesai. Kebijakan belum final ditampilkan netral dan dicatat untuk keputusan.
+[ ] UI paket/langganan memuat fitur/batas, masa/status, riwayat perubahan dan riwayat transaksi yang didefinisikan PRD; fitur yang belum memiliki aturan final ditampilkan netral tanpa nilai tarif/kebijakan rekaan.
+[ ] Organizer support/report screen dan status/history mock sesuai field PRD, terpisah dari Participant report; jika detail akses/token belum didefinisikan, tunjukkan state fixture tanpa membuka data sensitif.
+[ ] Loading, empty, error/retry, success, access denied, validasi dan konfirmasi destruktif diuji pada layar terkait.
+[ ] Semua alur prototype berjalan tanpa server/request jaringan; seluruh status pembayaran, order, ticket, check-in, invitations dan subscription ditandai sebagai simulasi. Backend, database, migration, konfigurasi dan dependency tidak diubah.
+[ ] `flutter analyze` dan test relevan dijalankan; hasil dan keterbatasan dicatat. Test widget bukan pengganti uji alur fungsional.
+[ ] Setiap fitur mempunyai satu pemilik end-to-end termasuk test; setiap file yang diedit hanya diubah satu developer, semua namespace/file domain berbeda, route/root dimiliki Developer 3; tidak ada perubahan generated files atau perubahan Git awal yang tertimpa.
+[ ] Review integrasi memastikan event → ticket → assisted order/attendee → check-in/report → dashboard berfungsi dan data/permission tetap konsisten.
+
+======================================================================
+CATATAN HAL YANG PERLU DIKONFIRMASI — JANGAN DIANGGAP SUDAH DIPUTUSKAN
+======================================================================
+
+1. PRD menyatakan tiga role global, tetapi frontend enum mempunyai `staff` sebagai role global. Pertahankan desain PRD; konfirmasi pemilik keputusan produk sebelum menyentuh representasi global.
+2. PRD tahap saat ini menetapkan dummy/mock frontend tanpa backend. Jika tim bermaksud mengubahnya menjadi integrasi backend sekarang, scope dan urutan tahap harus disetujui terpisah; pembagian ini tidak mencakup perubahan tersebut.
+3. Detail fixture status moderasi/review, strategi persistence mock antar sesi, nilai statistik/event demo, serta batas paket untuk export harus disepakati dari aturan PRD yang ada; jangan menciptakan kebijakan bisnis baru. Ketidakpastian produk yang tidak menghalangi mock netral tidak boleh menghentikan parallel work.
+4. Audit repository memperlihatkan perubahan generated platform yang sudah ada. Asal dan pemilik perubahan itu tidak dipastikan; semua developer harus menghindarinya.
+
+AKHIR DOKUMEN
