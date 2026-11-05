@@ -40,70 +40,7 @@ class AppRouter {
       case AppRoutes.login:
         return _buildPageRoute(settings, const LoginScreen());
       case AppRoutes.register:
-        return _buildPageRoute(settings, const RegisterScreen());
-      case AppRoutes.eventList:
-        return _buildPageRoute(settings, const EventListScreen());
-      case AppRoutes.eventDetail:
-        return _buildPageRoute(
-          settings,
-          EventDetailScreen(eventId: args is String ? args : null),
-        );
-      case AppRoutes.registration:
-        return _buildPageRoute(
-          settings,
-          RegistrationScreen(eventId: args is String ? args : null),
-        );
-      case AppRoutes.ticketList:
-        return _buildPageRoute(settings, const TicketListScreen());
-      case AppRoutes.ticketDetail:
-        return _buildPageRoute(
-          settings,
-          TicketDetailScreen(ticketId: args is String ? args : null),
-        );
-      case AppRoutes.orderList:
-        return _buildPageRoute(settings, const OrderListScreen());
-      case AppRoutes.orderDetail:
-        return _buildPageRoute(
-          settings,
-          OrderDetailScreen(orderId: args is String ? args : null),
-        );
-      case AppRoutes.payment:
-        return _buildPageRoute(
-          settings,
-          PaymentScreen(orderId: args is String ? args : null),
-        );
-      case AppRoutes.paymentStatus:
-        return _buildPageRoute(
-          settings,
-          PaymentStatusScreen(orderId: args is String ? args : null),
-        );
-      case AppRoutes.organizerDashboard:
-        return _buildPageRoute(settings, const OrganizerTabController());
-      case AppRoutes.organizerEvents:
-        return _buildPageRoute(settings, const EventManagementScreen());
-      case AppRoutes.staffDashboard:
-        return _buildPageRoute(settings, const StaffDashboardScreen());
-      case AppRoutes.staffScanner:
-        return _buildPageRoute(settings, const ScannerScreen());
-      case AppRoutes.checkInHistory:
-        return _buildPageRoute(settings, const CheckInHistoryScreen());
-      case AppRoutes.adminDashboard:
-        return _buildPageRoute(settings, const AdminTabController());
-      case AppRoutes.adminEventModeration:
-        return _buildPageRoute(settings, const EventModerationScreen());
-      case AppRoutes.adminReports:
-        return _buildPageRoute(settings, const ReportManagementScreen());
-      case AppRoutes.reportList:
-        return _buildPageRoute(settings, const ReportListScreen());
-      case AppRoutes.reportForm:
-        return _buildPageRoute(
-          settings,
-          ReportFormScreen(
-            initialOrderReference: args is String ? args : null,
-          ),
-        );
-      case AppRoutes.notificationList:
-        return _buildPageRoute(settings, const NotificationListScreen());
+
       default:
         return _buildPageRoute(
           settings,
@@ -117,13 +54,7 @@ class AppRouter {
     }
   }
 
-  static MaterialPageRoute<dynamic> _buildPageRoute(
-    RouteSettings settings,
-    Widget page,
-  ) {
-    return MaterialPageRoute<dynamic>(
-      settings: settings,
-      builder: (_) => page,
+
     );
   }
 }

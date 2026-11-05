@@ -1,7 +1,6 @@
 /// Notification list screen (PRD section: Notifications).
 ///
-/// System announcements, event moderation alerts, trouble ticket updates,
-/// and check-in synchronization logs.
+
 library;
 
 import 'package:flutter/material.dart';
