@@ -17,3 +17,4 @@ const validationMiddleware = (req, res, next) => {
 };
 
 module.exports = validationMiddleware;
+module.exports.validationMiddleware = validationMiddleware;

@@ -1,40 +1,57 @@
-/// Attendee list screen (organizer) — PRD sections 4.9, 7.4 D.
+/// Attendee list & operations screen (organizer) — PRD sections 4.9, 7.4 D, 13.3 & PEMBAGIAN_TUGAS_2.
 ///
 /// Attendee monitoring, search and filter, check-in rate breakdown,
-/// and CSV/Excel export triggers.
+/// sensitive data minimization, permission enforcement, and operational hub.
 library;
 
 import 'package:flutter/material.dart';
 
 import '../../../models/event/event_model.dart';
-import '../../../services/check_in/check_in_service.dart';
+import '../../../services/organizer_operations/organizer_operations_repository.dart';
+import '../../../services/organizer_operations/organizer_permission.dart';
+import '../operations/assisted_registration_screen.dart';
+import '../operations/organizer_activity_log_screen.dart';
+import '../operations/organizer_attendee_detail_screen.dart';
+import '../operations/organizer_report_screen.dart';
+import '../operations/organizer_scanner_screen.dart';
 
 class AttendeeListScreen extends StatefulWidget {
   const AttendeeListScreen({
     super.key,
     this.event,
     this.eventId = 'evt-001',
+    this.initialMembershipContext,
   });
 
   final EventModel? event;
   final String eventId;
+  final OrganizerMembershipContext? initialMembershipContext;
 
   @override
   State<AttendeeListScreen> createState() => _AttendeeListScreenState();
 }
 
 class _AttendeeListScreenState extends State<AttendeeListScreen> {
-  final CheckInService _service = CheckInService();
+  final OrganizerOperationsRepository _repo =
+      OrganizerOperationsRepository.instance;
   final TextEditingController _searchController = TextEditingController();
 
-  List<Map<String, dynamic>> _attendees = [];
-  bool _isLoading = true;
-  String _filter = 'all'; // all, checked_in, pending
+  late OrganizerMembershipContext _currentContext;
+
+  String _filterStatus = 'all'; // all, checked_in, pending, cancelled
+  String _filterMethod = 'all'; // all, SELF_SERVICE, ASSISTED
+  String _filterTicket = 'all'; // all, VIP Pass, Regular Pass, Early Bird
 
   @override
   void initState() {
     super.initState();
-    _loadAttendees();
+    final targetId = widget.event?.id ?? widget.eventId;
+    _currentContext = widget.initialMembershipContext ??
+        OrganizerMembershipContext.owner(
+          userId: 'usr-org-001',
+          userName: 'Penyelenggara Tech (Owner)',
+          eventId: targetId,
+        );
   }
 
   @override
@@ -43,118 +60,366 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
     super.dispose();
   }
 
-  Future<void> _loadAttendees() async {
-    setState(() => _isLoading = true);
-    final targetId = widget.event?.id ?? widget.eventId;
-    final list = await _service.listAttendees(eventId: targetId);
-    setState(() {
-      _attendees = list;
-      _isLoading = false;
-    });
-  }
+  String get _targetEventId => widget.event?.id ?? widget.eventId;
+  String get _targetEventTitle =>
+      widget.event?.title ?? 'Tech Innovation Summit 2026';
 
   void _exportCsv() {
+    if (!_currentContext.hasPermission(OrganizerPermission.exportParticipants)) {
+      _showAccessDeniedDialog('EXPORT_PARTICIPANTS');
+      return;
+    }
+
+    try {
+      final csvContent =
+          _repo.exportAttendeesCsv(_targetEventId, _currentContext);
+      final lineCount = csvContent.split('\n').length - 2;
+
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.file_download_done, color: Colors.teal),
+              SizedBox(width: 8),
+              Text('Simulasi Ekspor CSV'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Ekspor $lineCount peserta acara "$_targetEventTitle" berhasil dibuat (simulasi offline-first).',
+                style: const TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: const Text(
+                  'Catatan Kepatuhan PRD: Seluruh data email & no. telepon peserta telah disamarkan (masked) untuk perlindungan data pribadi.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.blueGrey,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Tutup'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
+  void _showAccessDeniedDialog(String permissionName) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.file_download_outlined, color: Colors.teal),
-            SizedBox(width: 8),
-            Text('Ekspor Data Peserta'),
-          ],
-        ),
+        icon: const Icon(Icons.gpp_bad, color: Colors.red, size: 48),
+        title: const Text('Akses Ditolak'),
         content: Text(
-          'Ekspor ${_attendees.length} data peserta ke format CSV (Comma Separated Values) untuk event "${widget.event?.title ?? 'Tech Innovation Summit 2026'}"?',
+          'Akun Anda (${_currentContext.userName} - ${_currentContext.isOwner ? "Owner" : "Staf"}) tidak memiliki izin $permissionName untuk acara ini.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
           FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('File peserta_event_export.csv berhasil dibuat dan diunduh.'),
-                  backgroundColor: Colors.teal,
-                ),
-              );
-            },
-            child: const Text('Unduh CSV'),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Mengerti'),
           ),
         ],
       ),
     );
   }
 
+  void _openAssistedRegistration() {
+    if (!_currentContext.hasPermission(OrganizerPermission.assistRegistration)) {
+      _showAccessDeniedDialog('ASSIST_REGISTRATION');
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AssistedRegistrationScreen(
+          eventId: _targetEventId,
+          eventName: _targetEventTitle,
+          contextScope: _currentContext,
+        ),
+      ),
+    );
+  }
+
+  void _openScanner() {
+    if (!_currentContext.hasPermission(OrganizerPermission.scanTicket)) {
+      _showAccessDeniedDialog('SCAN_TICKET');
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OrganizerScannerScreen(
+          eventId: _targetEventId,
+          eventName: _targetEventTitle,
+          contextScope: _currentContext,
+        ),
+      ),
+    );
+  }
+
+  void _openReport() {
+    if (!_currentContext.hasPermission(OrganizerPermission.viewReports)) {
+      _showAccessDeniedDialog('VIEW_REPORTS');
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OrganizerReportScreen(
+          eventId: _targetEventId,
+          eventName: _targetEventTitle,
+          contextScope: _currentContext,
+        ),
+      ),
+    );
+  }
+
+  void _openActivityLog() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OrganizerActivityLogScreen(
+          eventId: _targetEventId,
+          eventTitle: _targetEventTitle,
+        ),
+      ),
+    );
+  }
+
+  void _switchContext(String mode) {
+    setState(() {
+      if (mode == 'owner') {
+        _currentContext = OrganizerMembershipContext.owner(
+          userId: 'usr-org-001',
+          userName: 'Penyelenggara Tech (Owner)',
+          eventId: _targetEventId,
+        );
+      } else if (mode == 'staff_full') {
+        _currentContext = OrganizerMembershipContext.staff(
+          userId: 'usr-stf-001',
+          userName: 'Budi Santoso (Staf Operasional)',
+          eventId: _targetEventId,
+          permissions: {
+            OrganizerPermission.viewEvent,
+            OrganizerPermission.viewParticipants,
+            OrganizerPermission.assistRegistration,
+            OrganizerPermission.viewOrders,
+            OrganizerPermission.scanTicket,
+            OrganizerPermission.checkInTicket,
+            OrganizerPermission.viewScanHistory,
+          },
+        );
+      } else if (mode == 'staff_gate') {
+        _currentContext = OrganizerMembershipContext.staff(
+          userId: 'usr-stf-002',
+          userName: 'Siti Rahma (Staf Pintu Masuk)',
+          eventId: _targetEventId,
+          permissions: {
+            OrganizerPermission.viewEvent,
+            OrganizerPermission.scanTicket,
+            OrganizerPermission.checkInTicket,
+            OrganizerPermission.viewScanHistory,
+          },
+        );
+      } else if (mode == 'staff_restricted') {
+        _currentContext = OrganizerMembershipContext.staff(
+          userId: 'usr-stf-003',
+          userName: 'Doni (Staf Read-Only)',
+          eventId: _targetEventId,
+          permissions: {
+            OrganizerPermission.viewEvent,
+            OrganizerPermission.viewParticipants,
+          },
+        );
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final query = _searchController.text.trim().toLowerCase();
-    final filtered = _attendees.where((a) {
-      final name = (a['name'] as String? ?? '').toLowerCase();
-      final email = (a['email'] as String? ?? '').toLowerCase();
-      final code = (a['ticket_code'] as String? ?? '').toLowerCase();
-      final isCheckedIn = a['checked_in'] == true;
+    return ListenableBuilder(
+      listenable: _repo,
+      builder: (context, _) {
+        final allEventAttendees =
+            _repo.getAttendeesForEvent(_targetEventId);
+        final filteredAttendees = _repo.getAttendeesForEvent(
+          _targetEventId,
+          search: _searchController.text,
+          filterStatus: _filterStatus,
+          filterMethod: _filterMethod,
+          filterTicketType: _filterTicket,
+        );
 
-      final matchQuery = query.isEmpty ||
-          name.contains(query) ||
-          email.contains(query) ||
-          code.contains(query);
+        final totalCount = allEventAttendees.length;
+        final checkedInCount =
+            allEventAttendees.where((a) => a.checkedIn).length;
+        final pendingCount = totalCount - checkedInCount;
+        final attendanceRate = totalCount > 0
+            ? ((checkedInCount / totalCount) * 100).toInt()
+            : 0;
 
-      if (!matchQuery) return false;
-      if (_filter == 'checked_in') return isCheckedIn;
-      if (_filter == 'pending') return !isCheckedIn;
-      return true;
-    }).toList();
-
-    final checkedInCount = _attendees.where((a) => a['checked_in'] == true).length;
-    final totalCount = _attendees.length;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.event?.title != null ? 'Peserta: ${widget.event!.title}' : 'Daftar Peserta Event'),
-        actions: [
-          IconButton(
-            tooltip: 'Ekspor Data CSV',
-            icon: const Icon(Icons.download),
-            onPressed: _exportCsv,
-          ),
-          IconButton(
-            tooltip: 'Segarkan',
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadAttendees,
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Attendance Overview Bar
-          Container(
-            color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.4),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+        return Scaffold(
+          appBar: AppBar(
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildSummaryItem('Total Peserta', '$totalCount', Colors.black87),
-                _buildSummaryItem('Sudah Hadir', '$checkedInCount', Colors.green.shade800),
-                _buildSummaryItem('Belum Hadir', '${totalCount - checkedInCount}', Colors.orange.shade800),
-                _buildSummaryItem(
-                  'Tingkat Kehadiran',
-                  totalCount > 0 ? '${((checkedInCount / totalCount) * 100).toInt()}%' : '0%',
-                  Colors.teal,
+                const Text(
+                  'Peserta & Operasional Acara',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  _targetEventTitle,
+                  style: const TextStyle(fontSize: 12),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
+            actions: [
+              IconButton(
+                tooltip: 'Simulasi Ekspor CSV',
+                icon: const Icon(Icons.download),
+                onPressed: _exportCsv,
+              ),
+              IconButton(
+                tooltip: 'Riwayat Log Aktivitas',
+                icon: const Icon(Icons.history),
+                onPressed: _openActivityLog,
+              ),
+            ],
           ),
+          body: Column(
+            children: [
+              // Role/Context switcher bar (for prototype demonstration)
+              Container(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.shield_outlined, size: 18, color: Colors.blueGrey),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Simulasi Peran: ${_currentContext.userName}',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.tune, size: 20),
+                      tooltip: 'Ganti Hak Akses Uji',
+                      onSelected: _switchContext,
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'owner',
+                          child: Text('Owner (Penyelenggara Penuh)'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'staff_full',
+                          child: Text('Staf Lengkap (Scan + Registrasi)'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'staff_gate',
+                          child: Text('Staf Pintu Masuk (Hanya Scan/Check-in)'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'staff_restricted',
+                          child: Text('Staf Terbatas (Hanya Lihat Peserta)'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
 
-          // Search and Filters
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                TextField(
+              // Operational Quick Action Hub
+              Container(
+                padding: const EdgeInsets.all(12),
+                color: Colors.white,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      ActionChip(
+                        avatar: const Icon(Icons.app_registration, size: 18, color: Colors.indigo),
+                        label: const Text('Registrasi Dibantu'),
+                        onPressed: _openAssistedRegistration,
+                      ),
+                      const SizedBox(width: 8),
+                      ActionChip(
+                        avatar: const Icon(Icons.qr_code_scanner, size: 18, color: Colors.teal),
+                        label: const Text('Pemindai QR / Check-in'),
+                        onPressed: _openScanner,
+                      ),
+                      const SizedBox(width: 8),
+                      ActionChip(
+                        avatar: const Icon(Icons.analytics_outlined, size: 18, color: Colors.purple),
+                        label: const Text('Laporan & Finansial'),
+                        onPressed: _openReport,
+                      ),
+                      const SizedBox(width: 8),
+                      ActionChip(
+                        avatar: const Icon(Icons.history, size: 18, color: Colors.brown),
+                        label: const Text('Log Aktivitas'),
+                        onPressed: _openActivityLog,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const Divider(height: 1),
+
+              // Attendance Metrics Overview Bar
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildSummaryItem('Total Peserta', '$totalCount', Colors.black87),
+                    _buildSummaryItem('Hadir', '$checkedInCount', Colors.green.shade800),
+                    _buildSummaryItem('Belum Hadir', '$pendingCount', Colors.orange.shade800),
+                    _buildSummaryItem('Kehadiran', '$attendanceRate%', Colors.teal),
+                  ],
+                ),
+              ),
+
+              // Search & Multi-Filters
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    labelText: 'Cari Nama, Email, atau Tiket',
+                    labelText: 'Cari Nama, Email, No. HP, atau Kode Tiket',
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
@@ -170,103 +435,259 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
                   ),
                   onChanged: (_) => setState(() {}),
                 ),
-                const SizedBox(height: 10),
-                Row(
+              ),
+
+              // Filter Chips Row
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: Row(
                   children: [
-                    ChoiceChip(
-                      label: Text('Semua ($totalCount)'),
-                      selected: _filter == 'all',
-                      onSelected: (_) => setState(() => _filter = 'all'),
+                    FilterChip(
+                      label: const Text('Semua Status'),
+                      selected: _filterStatus == 'all',
+                      onSelected: (_) => setState(() => _filterStatus = 'all'),
                     ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: Text('Hadir ($checkedInCount)'),
-                      selected: _filter == 'checked_in',
-                      onSelected: (_) => setState(() => _filter = 'checked_in'),
+                    const SizedBox(width: 6),
+                    FilterChip(
+                      label: const Text('Hadir'),
+                      selected: _filterStatus == 'checked_in',
+                      onSelected: (_) => setState(() => _filterStatus = 'checked_in'),
                     ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: Text('Belum (${totalCount - checkedInCount})'),
-                      selected: _filter == 'pending',
-                      onSelected: (_) => setState(() => _filter = 'pending'),
+                    const SizedBox(width: 6),
+                    FilterChip(
+                      label: const Text('Belum Hadir'),
+                      selected: _filterStatus == 'pending',
+                      onSelected: (_) => setState(() => _filterStatus = 'pending'),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('|', style: TextStyle(color: Colors.grey)),
+                    const SizedBox(width: 12),
+                    FilterChip(
+                      label: const Text('Metode: Semua'),
+                      selected: _filterMethod == 'all',
+                      onSelected: (_) => setState(() => _filterMethod = 'all'),
+                    ),
+                    const SizedBox(width: 6),
+                    FilterChip(
+                      label: const Text('Self-Service'),
+                      selected: _filterMethod == 'SELF_SERVICE',
+                      onSelected: (_) => setState(() => _filterMethod = 'SELF_SERVICE'),
+                    ),
+                    const SizedBox(width: 6),
+                    FilterChip(
+                      label: const Text('Dibantu (Staff)'),
+                      selected: _filterMethod == 'ASSISTED',
+                      onSelected: (_) => setState(() => _filterMethod = 'ASSISTED'),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('|', style: TextStyle(color: Colors.grey)),
+                    const SizedBox(width: 12),
+                    FilterChip(
+                      label: const Text('Tiket: Semua'),
+                      selected: _filterTicket == 'all',
+                      onSelected: (_) => setState(() => _filterTicket = 'all'),
+                    ),
+                    const SizedBox(width: 6),
+                    FilterChip(
+                      label: const Text('VIP Pass'),
+                      selected: _filterTicket == 'VIP Pass',
+                      onSelected: (_) => setState(() => _filterTicket = 'VIP Pass'),
+                    ),
+                    const SizedBox(width: 6),
+                    FilterChip(
+                      label: const Text('Regular Pass'),
+                      selected: _filterTicket == 'Regular Pass',
+                      onSelected: (_) => setState(() => _filterTicket = 'Regular Pass'),
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
+              ),
 
-          const Divider(height: 1),
+              const Divider(height: 1),
 
-          // List of Attendees
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : filtered.isEmpty
+              // Attendees List
+              Expanded(
+                child: filteredAttendees.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.person_search, size: 64, color: Colors.grey.shade400),
+                            Icon(Icons.person_search,
+                                size: 54, color: Colors.grey.shade400),
                             const SizedBox(height: 12),
-                            const Text('Tidak ada peserta ditemukan.'),
+                            const Text(
+                              'Tidak ada peserta yang cocok dengan kriteria filter.',
+                              style: TextStyle(color: Colors.grey),
+                            ),
                           ],
                         ),
                       )
                     : ListView.separated(
                         padding: const EdgeInsets.all(16.0),
-                        itemCount: filtered.length,
+                        itemCount: filteredAttendees.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 8),
                         itemBuilder: (context, index) {
-                          final item = filtered[index];
-                          final isChecked = item['checked_in'] == true;
+                          final item = filteredAttendees[index];
+                          final isChecked = item.checkedIn;
+                          final isAssisted = item.registrationMethod == 'ASSISTED';
 
                           return Card(
-                            elevation: 1,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0.5,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: Colors.grey.shade200),
+                            ),
                             child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
                               leading: CircleAvatar(
-                                backgroundColor: isChecked ? Colors.green.shade50 : Colors.blueGrey.shade50,
+                                backgroundColor: isChecked
+                                    ? Colors.green.shade50
+                                    : Colors.blueGrey.shade50,
                                 child: Icon(
-                                  isChecked ? Icons.check_circle : Icons.person,
-                                  color: isChecked ? Colors.green.shade700 : Colors.blueGrey.shade700,
+                                  isChecked
+                                      ? Icons.check_circle
+                                      : (isAssisted
+                                          ? Icons.support_agent
+                                          : Icons.person),
+                                  color: isChecked
+                                      ? Colors.green.shade700
+                                      : Colors.blueGrey.shade700,
                                 ),
                               ),
-                              title: Text(
-                                item['name'] as String? ?? 'Peserta',
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              subtitle: Text(
-                                '${item['ticket_type']} • ${item['ticket_code']}\n${item['email']}',
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                              isThreeLine: true,
-                              trailing: Chip(
-                                label: Text(
-                                  isChecked ? 'Sudah Check-in' : 'Belum Check-in',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: isChecked ? Colors.green.shade800 : Colors.grey.shade800,
+                              title: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      item.name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                                backgroundColor: isChecked ? Colors.green.shade50 : Colors.grey.shade100,
+                                  if (isAssisted)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.amber.shade100,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        'DIBANTU',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.amber.shade900,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${item.ticketType} • ${item.ticketCode}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${item.maskedEmail} • ${item.maskedPhone}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                  if (item.isOfflinePending) ...[
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.cloud_queue,
+                                            size: 12, color: Colors.orange.shade800),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Menunggu Sinkronisasi Offline',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.orange.shade800,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              trailing: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Chip(
+                                    visualDensity: VisualDensity.compact,
+                                    label: Text(
+                                      isChecked ? 'Hadir' : 'Belum Hadir',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: isChecked
+                                            ? Colors.green.shade800
+                                            : Colors.grey.shade800,
+                                      ),
+                                    ),
+                                    backgroundColor: isChecked
+                                        ? Colors.green.shade50
+                                        : Colors.grey.shade100,
+                                    padding: EdgeInsets.zero,
+                                  ),
+                                ],
+                              ),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => OrganizerAttendeeDetailScreen(
+                                      attendee: item,
+                                      contextScope: _currentContext,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                           );
                         },
                       ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   Widget _buildSummaryItem(String label, String value, Color color) {
     return Column(
       children: [
-        Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
         const SizedBox(height: 2),
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: Colors.grey),
+        ),
       ],
     );
   }

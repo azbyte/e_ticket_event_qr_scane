@@ -38,10 +38,7 @@ class _AdminTabControllerState extends State<AdminTabController> {
   @override
   Widget build(BuildContext context) {
     final screens = [
-      AdminDashboardScreen(
-        organizerProvider: _orgProvider,
-        reportProvider: _reportProvider,
-      ),
+      const AdminDashboardScreen(),
       EventModerationScreen(organizerProvider: _orgProvider),
       ReportManagementScreen(reportProvider: _reportProvider),
     ];

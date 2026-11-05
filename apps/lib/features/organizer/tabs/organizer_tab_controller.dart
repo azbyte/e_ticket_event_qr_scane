@@ -6,7 +6,6 @@ library;
 
 import 'package:flutter/material.dart';
 
-import '../../../providers/organizer_provider.dart';
 import '../screens/attendee_list_screen.dart';
 import '../screens/event_management_screen.dart';
 import '../screens/organizer_dashboard_screen.dart';
@@ -26,7 +25,6 @@ class OrganizerTabController extends StatefulWidget {
 
 class _OrganizerTabControllerState extends State<OrganizerTabController> {
   late int _currentIndex;
-  final OrganizerProvider _provider = OrganizerProvider();
 
   @override
   void initState() {
@@ -37,10 +35,13 @@ class _OrganizerTabControllerState extends State<OrganizerTabController> {
   @override
   Widget build(BuildContext context) {
     final screens = [
-      OrganizerDashboardScreen(organizerProvider: _provider),
-      EventManagementScreen(organizerProvider: _provider),
+      const OrganizerDashboardScreen(),
+      const EventManagementScreen(),
       const AttendeeListScreen(),
-      StaffManagementScreen(organizerProvider: _provider),
+      const StaffManagementScreen(
+        eventId: 'evt-001',
+        eventName: 'Event Utama',
+      ),
     ];
 
     return Scaffold(
