@@ -10,6 +10,9 @@ import 'package:flutter/foundation.dart';
 
 import '../models/event/event_model.dart';
 import '../models/event/ticket_type_model.dart';
+import '../services/event/event_service.dart';
+import '../services/ticket/ticket_type_service.dart';
+import '../services/mock/mock_attendee_repository.dart';
 import '../services/organizer_events/organizer_event_contract.dart';
 import '../services/organizer_events/organizer_event_exceptions.dart';
 import '../services/organizer_events/organizer_event_fixtures.dart';
@@ -22,10 +25,38 @@ enum EventLoadStatus { idle, loading, ready, error, accessDenied }
 class EventProvider extends ChangeNotifier {
   EventProvider({
     OrganizerEventRepository? repository,
-    this.ownerId = OrganizerEventFixtures.demoOwnerId,
-  }) : _repository = repository ?? MockOrganizerEventRepository.shared();
+    EventService? eventService,
+    TicketTypeService? ticketTypeService,
+    String? ownerId,
+  }) : _repository = repository ?? MockOrganizerEventRepository.shared(),
+       _eventService = eventService,
+       _ticketTypeService = ticketTypeService,
+       _isPublicProvider = eventService != null,
+       _ownerId = ownerId ?? OrganizerEventFixtures.demoOwnerId;
 
   final OrganizerEventRepository _repository;
+  final EventService? _eventService;
+  final TicketTypeService? _ticketTypeService;
+  final bool _isPublicProvider;
+  final String _ownerId;
+  final MockAttendeeRepository _attendeeRepository =
+      MockAttendeeRepository.instance;
+  String? _publicLoadError;
+  String _selectedCategory = 'Semua';
+
+  /// Provider event untuk katalog publik saat alur legacy menggunakan constructor service.
+  static final EventProvider instance = EventProvider(
+    eventService: EventService(),
+    ticketTypeService: TicketTypeService(),
+  );
+
+  String? get error => _publicLoadError;
+  String get selectedCategory => _selectedCategory;
+
+  void setSelectedCategory(String category) {
+    _selectedCategory = category;
+    notifyListeners();
+  }
 
   /// Repository yang dipakai provider ini.
   ///
@@ -34,7 +65,7 @@ class EventProvider extends ChangeNotifier {
   OrganizerEventRepository get repository => _repository;
 
   /// Owner aktif; seluruh pembacaan dibatasi pada nilai ini.
-  final String ownerId;
+  String get ownerId => _ownerId;
 
   EventLoadStatus _status = EventLoadStatus.idle;
   String? _loadError;
@@ -73,6 +104,9 @@ class EventProvider extends ChangeNotifier {
 
   /// Seluruh event milik Owner pada fixture (setelah filter status).
   List<EventModel> get events => List<EventModel>.unmodifiable(_events);
+
+  /// Flag agar layar publik tetap memakai status loading setelah fetch selesai.
+  bool get isPublicProvider => _isPublicProvider;
 
   /// Hasil pencarian lokal di atas [events].
   List<EventModel> get visibleEvents {
@@ -126,6 +160,34 @@ class EventProvider extends ChangeNotifier {
 
   /// Memuat daftar event milik Owner aktif.
   Future<void> loadEvents() async {
+    if (_eventService != null) {
+      _publicLoadError = null;
+      _status = EventLoadStatus.loading;
+      notifyListeners();
+      try {
+        final rows = await _eventService.listEvents(
+          query: <String, dynamic>{
+            'q': _searchQuery,
+            'category': _selectedCategory,
+          },
+        );
+        _events = rows
+            .map(EventModel.fromJson)
+            .where((event) => event.isPublic)
+            .toList(growable: false);
+        _selectedEvent = null;
+        _publicLoadError = null;
+        _status = EventLoadStatus.ready;
+      } on Exception catch (error) {
+        _publicLoadError = error.toString();
+        _status = EventLoadStatus.error;
+      }
+      notifyListeners();
+      return;
+    }
+    if (!_isPublicProvider && _repository is MockOrganizerEventRepository) {
+      (_repository as MockOrganizerEventRepository).configureOwner(_ownerId);
+    }
     _status = EventLoadStatus.loading;
     _loadError = null;
     _actionError = null;
@@ -159,6 +221,27 @@ class EventProvider extends ChangeNotifier {
 
   /// Memuat satu event beserta kategori tiket, ringkasan, dan grafiknya.
   Future<void> loadEvent(String eventId) async {
+    if (_eventService != null) {
+      _publicLoadError = null;
+      _status = EventLoadStatus.loading;
+      notifyListeners();
+      try {
+        _selectedEvent = EventModel.fromJson(
+          await _eventService.getEvent(eventId),
+        );
+        _events = <EventModel>[_selectedEvent!];
+        _ticketTypes = _ticketTypeService == null
+            ? _attendeeRepository.getTicketTypesByEventId(eventId)
+            : await _ticketTypeService.getTicketTypesByEventId(eventId);
+        _publicLoadError = null;
+        _status = EventLoadStatus.ready;
+      } on Exception catch (error) {
+        _publicLoadError = error.toString();
+        _status = EventLoadStatus.error;
+      }
+      notifyListeners();
+      return;
+    }
     _status = EventLoadStatus.loading;
     _loadError = null;
     notifyListeners();
