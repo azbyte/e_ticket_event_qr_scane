@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import '../config/app_config.dart';
 import '../errors/app_exception.dart';
 import '../services/session_service.dart';
+import '../config/app_config.dart';
 
 class ApiClient {
   ApiClient._internal();

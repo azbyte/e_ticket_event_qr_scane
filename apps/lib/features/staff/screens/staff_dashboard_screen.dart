@@ -1,8 +1,5 @@
 /// Staff dashboard screen — assigned events and check-in station (PRD sections 2.3, 7.5 A).
-///
-/// Gated by per-event membership permissions. Only displays events actively assigned
-/// to the staff member, and restricts scanner, manual check-in, reports, and attendee actions
-/// according to granted OrganizerPermission flags.
+
 library;
 
 import 'package:flutter/material.dart';
@@ -25,67 +22,12 @@ class StaffDashboardScreen extends StatefulWidget {
     this.eventId = 'evt-001',
   });
 
+
   final CheckInProvider? checkInProvider;
   final String staffName;
   final String assignedEventTitle;
   final String eventId;
 
-  @override
-  State<StaffDashboardScreen> createState() => _StaffDashboardScreenState();
-}
-
-class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
-  final OrganizerMembershipService _membershipService = OrganizerMembershipService.instance;
-  List<EventMemberModel> _assignedEvents = [];
-  EventMemberModel? _selectedAssignment;
-  bool _isLoading = true;
-  bool _isOfflineMode = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadStaffAssignments();
-  }
-
-  Future<void> _loadStaffAssignments() async {
-    setState(() => _isLoading = true);
-    final auth = context.read<AuthProvider>();
-    final userEmailOrId = auth.user?.email ?? 'budi.santoso@eventcrew.id';
-
-    final events = await _membershipService.getAssignedActiveEvents(userEmailOrId);
-    if (mounted) {
-      setState(() {
-        _assignedEvents = events;
-        if (events.isNotEmpty) {
-          _selectedAssignment = events.firstWhere(
-            (e) => e.eventId == widget.eventId,
-            orElse: () => events.first,
-          );
-        } else {
-          _selectedAssignment = null;
-        }
-        _isLoading = false;
-      });
-    }
-  }
-
-  bool _hasPermission(OrganizerPermission permission) {
-    if (_selectedAssignment == null) return false;
-    return _selectedAssignment!.hasPermission(permission);
-  }
-
-  void _showPermissionDenied(String actionName) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: Colors.red.shade800,
-        content: Row(
-          children: [
-            const Icon(Icons.gpp_bad, color: Colors.white),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Akses ditolak: Anda tidak memiliki izin "$actionName" untuk event ini.',
-              ),
             ),
           ],
         ),

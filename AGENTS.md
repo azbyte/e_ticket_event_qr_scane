@@ -25,7 +25,8 @@ atau dummy sebagai jaminan keamanan maupun perilaku backend.
 ## Routing skills
 
 Pilih skill berdasarkan pekerjaan, jangan jalankan semua prosedur untuk setiap
-perubahan. Baca `SKILL.md` untuk tautan:
+perubahan. Baca katalog root [`SKILL.md`](SKILL.md) untuk memilih skill yang
+sesuai; file skill berada di `.agents/skills/<nama>/SKILL.md`.
 
 - Requirement, role, acceptance criteria dan dampak API: skill `requirements`.
 - Perubahan struktur instruksi, skills, tooling atau editor: skill `workspace`.
