@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../routes/app_routes.dart';
 import '../../../services/organizer_notifications/organizer_notifications_service.dart';
+import '../../notifications/screens/notification_list_screen.dart';
 
 class OrganizerShell extends StatelessWidget {
   const OrganizerShell({
@@ -44,25 +45,32 @@ class OrganizerShell extends StatelessWidget {
             alignment: Alignment.center,
             children: [
               IconButton(
-                tooltip: 'Notifikasi Penyelenggara',
+                tooltip: 'Notifikasi',
                 icon: const Icon(Icons.notifications_outlined),
-                onPressed: () => Navigator.pushNamed(context, AppRoutes.notificationList),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => const NotificationListScreen(),
+                  ),
+                ),
               ),
               if (unreadCount > 0)
                 Positioned(
                   top: 10,
                   right: 10,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                    child: Text(
-                      '$unreadCount',
-                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                      textAlign: TextAlign.center,
+                  child: IgnorePointer(
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      child: Text(
+                        '$unreadCount',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   ),
                 ),
@@ -72,7 +80,7 @@ class OrganizerShell extends StatelessWidget {
             builder: (context, auth, _) {
               final name = auth.user?.name ?? 'Penyelenggara';
               return IconButton(
-                tooltip: 'Profil Saya',
+                tooltip: 'Profil',
                 onPressed: () => Navigator.pushNamed(context, AppRoutes.organizerProfile),
                 icon: CircleAvatar(
                   radius: 16,

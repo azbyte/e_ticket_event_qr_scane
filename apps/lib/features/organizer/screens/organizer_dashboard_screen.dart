@@ -58,7 +58,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
       ],
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
-        label: const Text('Buat Event'),
+        label: const Text('Tambah Event'),
         onPressed: () => Navigator.pushNamed(context, AppRoutes.organizerEvents),
       ),
       child: _isLoading
