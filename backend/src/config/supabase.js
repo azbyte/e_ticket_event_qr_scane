@@ -10,7 +10,7 @@ const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey, {
 
 const supabaseAdmin = createClient(
   config.supabaseUrl,
-  config.supabaseServiceRoleKey || config.supabaseAnonKey,
+  config.supabaseServiceRoleKey,
   {
     auth: {
       persistSession: false,
