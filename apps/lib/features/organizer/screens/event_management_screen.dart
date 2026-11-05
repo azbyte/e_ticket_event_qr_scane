@@ -19,11 +19,7 @@ import 'event_form_screen.dart';
 /// Daftar ini hanya memuat event milik Owner aktif dari fixture lokal; tidak ada
 /// request jaringan. Aksi yang tidak diizinkan oleh status event disembunyikan.
 class EventManagementScreen extends StatefulWidget {
-  const EventManagementScreen({
-    super.key,
-    this.ownerId,
-    this.repository,
-  });
+  const EventManagementScreen({super.key, this.ownerId, this.repository});
 
   /// Owner aktif; default memakai fixture Owner demo.
   final String? ownerId;
@@ -70,10 +66,8 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
   Future<void> _openDetail(EventModel event) async {
     final changed = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
-        builder: (_) => OrganizerEventDetailScreen(
-          eventId: event.id,
-          provider: _provider,
-        ),
+        builder: (_) =>
+            OrganizerEventDetailScreen(eventId: event.id, provider: _provider),
       ),
     );
     if (changed == true && mounted) {
@@ -117,37 +111,37 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
     if (!mounted) return;
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => OrganizerEventPreviewScreen(
-          event: event,
-          ticketTypes: types,
-        ),
+        builder: (_) =>
+            OrganizerEventPreviewScreen(event: event, ticketTypes: types),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-        listenable: _provider,
-        builder: (context, _) => Scaffold(
-          appBar: AppBar(
-            title: const Text('Event Saya'),
-            actions: <Widget>[
-              IconButton(
-                tooltip: 'Muat ulang',
-                onPressed: () => _provider.loadEvents(),
-                icon: const Icon(Icons.refresh),
-              ),
-            ],
+    listenable: _provider,
+    builder: (context, _) => Scaffold(
+      appBar: AppBar(
+        title: const Text('Event Saya'),
+        actions: <Widget>[
+          IconButton(
+            tooltip: 'Muat ulang',
+            onPressed: () => _provider.loadEvents(),
+            icon: const Icon(Icons.refresh),
           ),
-          floatingActionButton: FloatingActionButton.extended(
-            key: const Key('event-create-fab'),
-            onPressed: _createEvent,
-            icon: const Icon(Icons.add),
-            label: const Text('Buat event'),
-          ),
-          body: _buildBody(),
-        ),
-      );
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        key: const Key('event-create-fab'),
+        onPressed: _createEvent,
+        icon: const Icon(Icons.add),
+        label: const Text('Buat event'),
+      ),
+      body: _provider.isLoading && _provider.events.isEmpty
+          ? const OrganizerLoadingView()
+          : _buildBody(),
+    ),
+  );
 
   Widget _buildBody() {
     if (_provider.hasAccessDenied) {
@@ -161,13 +155,17 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
         onRetry: () => _provider.loadEvents(),
       );
     }
+    if (_provider.isLoading && _provider.events.isNotEmpty) {
+      return const OrganizerLoadingView();
+    }
     if (_provider.isLoading && _provider.events.isEmpty) {
       return const OrganizerLoadingView();
     }
     if (_provider.isEmpty) {
       return OrganizerEmptyView(
         title: 'Belum ada event',
-        description: 'Buat draft event pertama, lalu ajukan moderasi setelah '
+        description:
+            'Buat draft event pertama, lalu ajukan moderasi setelah '
             'informasi dan kategori tiket lengkap.',
         primaryLabel: 'Buat event',
         onPrimary: _createEvent,
@@ -183,45 +181,45 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
   }
 
   Widget _buildSearchField() => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-        child: TextField(
-          key: const Key('event-search-field'),
-          controller: _searchController,
-          onChanged: _provider.setSearchQuery,
-          decoration: InputDecoration(
-            hintText: 'Cari nama event, lokasi, atau kategori',
-            prefixIcon: const Icon(Icons.search),
-            suffixIcon: _provider.searchQuery.isEmpty
-                ? null
-                : IconButton(
-                    tooltip: 'Bersihkan pencarian',
-                    onPressed: () {
-                      _searchController.clear();
-                      _provider.setSearchQuery('');
-                    },
-                    icon: const Icon(Icons.close),
-                  ),
-          ),
-        ),
-      );
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+    child: TextField(
+      key: const Key('event-search-field'),
+      controller: _searchController,
+      onChanged: _provider.setSearchQuery,
+      decoration: InputDecoration(
+        hintText: 'Cari nama event, lokasi, atau kategori',
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: _provider.searchQuery.isEmpty
+            ? null
+            : IconButton(
+                tooltip: 'Bersihkan pencarian',
+                onPressed: () {
+                  _searchController.clear();
+                  _provider.setSearchQuery('');
+                },
+                icon: const Icon(Icons.close),
+              ),
+      ),
+    ),
+  );
 
   Widget _buildFilterChips() => SizedBox(
-        height: 44,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: OrganizerEventFilter.values.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 8),
-          itemBuilder: (context, index) {
-            final filter = OrganizerEventFilter.values[index];
-            return ChoiceChip(
-              label: Text(filter.label),
-              selected: _provider.filter == filter,
-              onSelected: (_) => _provider.setFilter(filter),
-            );
-          },
-        ),
-      );
+    height: 44,
+    child: ListView.separated(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: OrganizerEventFilter.values.length,
+      separatorBuilder: (_, __) => const SizedBox(width: 8),
+      itemBuilder: (context, index) {
+        final filter = OrganizerEventFilter.values[index];
+        return ChoiceChip(
+          label: Text(filter.label),
+          selected: _provider.filter == filter,
+          onSelected: (_) => _provider.setFilter(filter),
+        );
+      },
+    ),
+  );
 
   Widget _buildList() {
     if (_provider.hasNoMatch) {
@@ -274,7 +272,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
           resubmit
               ? 'Event akan dikirim ulang ke moderator beserta perbaikan Anda.'
               : 'Event akan dikirim ke moderator dan status berubah menjadi '
-                  '"Menunggu moderasi" (simulasi).',
+                    '"Menunggu moderasi" (simulasi).',
         ),
         actions: <Widget>[
           TextButton(
@@ -290,8 +288,10 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
     );
     if (confirmed != true) return;
 
-    final updated =
-        await _provider.submitForReview(event.id, resubmit: resubmit);
+    final updated = await _provider.submitForReview(
+      event.id,
+      resubmit: resubmit,
+    );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
