@@ -2,16 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_utils.dart' as app_date;
+import '../../../models/event/event_model.dart';
 import '../../../models/event/ticket_type_model.dart';
+import '../../../services/mock/mock_attendee_repository.dart';
 import '../../../providers/event_provider.dart';
 import '../../registration/screens/registration_screen.dart';
 
 /// Event detail screen displaying full event info and ticket options (PRD section 7.2 C).
 class EventDetailScreen extends StatefulWidget {
-  const EventDetailScreen({
-    super.key,
-    this.eventId,
-  });
+  const EventDetailScreen({super.key, this.eventId});
 
   final String? eventId;
 
@@ -20,7 +19,11 @@ class EventDetailScreen extends StatefulWidget {
 }
 
 class _EventDetailScreenState extends State<EventDetailScreen> {
+  final MockAttendeeRepository _repository = MockAttendeeRepository.instance;
   final EventProvider _provider = EventProvider.instance;
+  EventModel? _fallbackEvent;
+  List<TicketTypeModel> _fallbackTicketTypes = const <TicketTypeModel>[];
+  String? _fallbackError;
   late String _effectiveEventId;
 
   @override
@@ -33,16 +36,33 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       if (routeArg is String && routeArg.isNotEmpty) {
         _effectiveEventId = routeArg;
       }
-      _provider.loadEvent(_effectiveEventId);
+      _loadEvent();
+    });
+  }
+
+  void _loadEvent() {
+    _provider.loadEvent(_effectiveEventId).then((_) {
+      if (_provider.selectedEvent != null || !mounted) return;
+      setState(() {
+        try {
+          _fallbackEvent = _repository.getEventById(_effectiveEventId);
+          _fallbackTicketTypes = _repository.getTicketTypesByEventId(
+            _effectiveEventId,
+          );
+          _fallbackError = null;
+        } catch (error) {
+          _fallbackError = error.toString();
+        }
+      });
     });
   }
 
   String _formatCurrency(double amount) {
     if (amount <= 0) return 'Gratis';
     final str = amount.toInt().toString().replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (Match m) => '${m[1]}.',
-        );
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
     return 'Rp $str';
   }
 
@@ -51,11 +71,15 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     return ListenableBuilder(
       listenable: _provider,
       builder: (context, _) {
-        final event = _provider.selectedEvent;
-        final ticketTypes = _provider.ticketTypes;
+        final event = _provider.selectedEvent ?? _fallbackEvent;
+        final ticketTypes = _provider.ticketTypes.isNotEmpty
+            ? _provider.ticketTypes
+            : _fallbackTicketTypes;
+        final loading = _provider.isLoading;
+        final error = _provider.loadError ?? _provider.error ?? _fallbackError;
 
         return Scaffold(
-          body: _provider.isLoading
+          body: loading
               ? const Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -66,224 +90,253 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     ],
                   ),
                 )
-              : _provider.error != null || event == null
-                  ? Scaffold(
-                      appBar: AppBar(title: const Text('Detail Event')),
-                      body: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.error_outline, size: 56, color: Colors.redAccent),
-                              const SizedBox(height: 16),
-                              Text(
-                                _provider.error ?? 'Event tidak ditemukan.',
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: () => _provider.loadEvent(_effectiveEventId),
-                                child: const Text('Coba Lagi'),
-                              ),
-                            ],
+              : error != null || event == null
+              ? Scaffold(
+                  appBar: AppBar(title: const Text('Detail Event')),
+                  body: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            size: 56,
+                            color: Colors.redAccent,
                           ),
+                          const SizedBox(height: 16),
+                          Text(
+                            error ?? 'Event tidak ditemukan.',
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _loadEvent,
+                            child: const Text('Coba Lagi'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+              : CustomScrollView(
+                  slivers: [
+                    // Sliver AppBar with Poster
+                    SliverAppBar(
+                      expandedHeight: 240,
+                      pinned: true,
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.black45,
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.white,
+                          ),
+                          onPressed: () => Navigator.of(context).pop(),
                         ),
                       ),
-                    )
-                  : CustomScrollView(
-                      slivers: [
-                        // Sliver AppBar with Poster
-                        SliverAppBar(
-                          expandedHeight: 240,
-                          pinned: true,
-                          leading: CircleAvatar(
-                            backgroundColor: Colors.black45,
-                            child: IconButton(
-                              icon: const Icon(Icons.arrow_back, color: Colors.white),
-                              onPressed: () => Navigator.of(context).pop(),
+                      flexibleSpace: FlexibleSpaceBar(
+                        background: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            if (event.posterUrl != null &&
+                                event.posterUrl!.isNotEmpty)
+                              Image.network(
+                                event.posterUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    _buildHeaderFallback(),
+                              )
+                            else
+                              _buildHeaderFallback(),
+                            const DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [Colors.transparent, Colors.black87],
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                ),
+                              ),
                             ),
-                          ),
-                          flexibleSpace: FlexibleSpaceBar(
-                            background: Stack(
-                              fit: StackFit.expand,
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Event Main Content
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Category and Event Type Badges
+                            Row(
                               children: [
-                                if (event.posterUrl != null && event.posterUrl!.isNotEmpty)
-                                  Image.network(
-                                    event.posterUrl!,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => _buildHeaderFallback(),
-                                  )
-                                else
-                                  _buildHeaderFallback(),
-                                const DecoratedBox(
+                                if (event.category != null)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primaryColor.withOpacity(
+                                        0.12,
+                                      ),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      event.category!,
+                                      style: TextStyle(
+                                        color: AppTheme.primaryColor,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [Colors.transparent, Colors.black87],
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
+                                    color: Colors.grey.shade200,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    event.eventType.toUpperCase(),
+                                    style: TextStyle(
+                                      color: Colors.grey.shade800,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
                                     ),
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                        ),
+                            const SizedBox(height: 12),
 
-                        // Event Main Content
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            // Title
+                            Text(
+                              event.title,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                height: 1.3,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Date Card
+                            _buildInfoTile(
+                              icon: Icons.calendar_today,
+                              iconColor: Colors.indigo,
+                              title: 'Waktu Pelaksanaan',
+                              subtitle:
+                                  '${app_date.DateUtils.formatDateTime(event.startDateTime)} - ${app_date.DateUtils.formatDateTime(event.endDateTime)}',
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Location Card
+                            _buildInfoTile(
+                              icon: Icons.location_on,
+                              iconColor: Colors.pink,
+                              title: 'Lokasi / Platform',
+                              subtitle:
+                                  event.location ??
+                                  (event.onlineUrl ??
+                                      'Akan diumumkan oleh penyelenggara'),
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Contact Info
+                            if (event.contactInfo != null &&
+                                event.contactInfo!.isNotEmpty)
+                              _buildInfoTile(
+                                icon: Icons.contact_support_outlined,
+                                iconColor: Colors.teal,
+                                title: 'Kontak Penyelenggara',
+                                subtitle: event.contactInfo!,
+                              ),
+
+                            const Divider(height: 36),
+
+                            // Description
+                            const Text(
+                              'Tentang Acara Ini',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              event.description ??
+                                  'Belum ada deskripsi untuk acara ini.',
+                              style: TextStyle(
+                                fontSize: 14,
+                                height: 1.6,
+                                color: Colors.grey.shade800,
+                              ),
+                            ),
+
+                            const Divider(height: 36),
+
+                            // Ticket Types Section
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                // Category and Event Type Badges
-                                Row(
-                                  children: [
-                                    if (event.category != null)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.primaryColor.withOpacity(0.12),
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        child: Text(
-                                          event.category!,
-                                          style: TextStyle(
-                                            color: AppTheme.primaryColor,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey.shade200,
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Text(
-                                        event.eventType.toUpperCase(),
-                                        style: TextStyle(
-                                          color: Colors.grey.shade800,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-
-                                // Title
-                                Text(
-                                  event.title,
-                                  style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                    height: 1.3,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-
-                                // Date Card
-                                _buildInfoTile(
-                                  icon: Icons.calendar_today,
-                                  iconColor: Colors.indigo,
-                                  title: 'Waktu Pelaksanaan',
-                                  subtitle:
-                                      '${app_date.DateUtils.formatDateTime(event.startDateTime)} - ${app_date.DateUtils.formatDateTime(event.endDateTime)}',
-                                ),
-                                const SizedBox(height: 12),
-
-                                // Location Card
-                                _buildInfoTile(
-                                  icon: Icons.location_on,
-                                  iconColor: Colors.pink,
-                                  title: 'Lokasi / Platform',
-                                  subtitle: event.location ??
-                                      (event.onlineUrl ?? 'Akan diumumkan oleh penyelenggara'),
-                                ),
-                                const SizedBox(height: 12),
-
-                                // Contact Info
-                                if (event.contactInfo != null && event.contactInfo!.isNotEmpty)
-                                  _buildInfoTile(
-                                    icon: Icons.contact_support_outlined,
-                                    iconColor: Colors.teal,
-                                    title: 'Kontak Penyelenggara',
-                                    subtitle: event.contactInfo!,
-                                  ),
-
-                                const Divider(height: 36),
-
-                                // Description
                                 const Text(
-                                  'Tentang Acara Ini',
+                                  'Kategori Tiket',
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                const SizedBox(height: 8),
                                 Text(
-                                  event.description ?? 'Belum ada deskripsi untuk acara ini.',
+                                  '${ticketTypes.length} Kategori',
                                   style: TextStyle(
-                                    fontSize: 14,
-                                    height: 1.6,
-                                    color: Colors.grey.shade800,
+                                    color: Colors.grey.shade600,
+                                    fontSize: 13,
                                   ),
                                 ),
-
-                                const Divider(height: 36),
-
-                                // Ticket Types Section
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text(
-                                      'Kategori Tiket',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Text(
-                                      '${ticketTypes.length} Kategori',
-                                      style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-
-                                if (ticketTypes.isEmpty)
-                                  Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade100,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: const Center(
-                                      child: Text(
-                                        'Belum ada kategori tiket untuk acara ini.',
-                                        style: TextStyle(color: Colors.grey),
-                                      ),
-                                    ),
-                                  )
-                                else
-                                  ...ticketTypes.map((tt) => _buildTicketTypeCard(tt)),
-
-                                const SizedBox(height: 80),
                               ],
                             ),
-                          ),
+                            const SizedBox(height: 12),
+
+                            if (ticketTypes.isEmpty)
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Center(
+                                  child: Text(
+                                    'Belum ada kategori tiket untuk acara ini.',
+                                    style: TextStyle(color: Colors.grey),
+                                  ),
+                                ),
+                              )
+                            else
+                              ...ticketTypes.map(
+                                (tt) => _buildTicketTypeCard(tt),
+                              ),
+
+                            const SizedBox(height: 80),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
+                  ],
+                ),
           bottomNavigationBar: event != null
               ? Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     boxShadow: [
@@ -304,11 +357,18 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             children: [
                               Text(
                                 'Mulai dari',
-                                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 12,
+                                ),
                               ),
                               Text(
                                 ticketTypes.isNotEmpty
-                                    ? _formatCurrency(ticketTypes.map((t) => t.price).reduce((a, b) => a < b ? a : b))
+                                    ? _formatCurrency(
+                                        ticketTypes
+                                            .map((t) => t.price)
+                                            .reduce((a, b) => a < b ? a : b),
+                                      )
                                     : 'Gratis',
                                 style: const TextStyle(
                                   fontSize: 18,
@@ -323,19 +383,26 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                           onPressed: () {
                             Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) => RegistrationScreen(event: event),
+                                builder: (_) =>
+                                    RegistrationScreen(event: event),
                               ),
                             );
                           },
                           style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 28,
+                              vertical: 14,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                           child: const Text(
                             'Pesan Tiket',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
                           ),
                         ),
                       ],
@@ -376,12 +443,19 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               children: [
                 Text(
                   title,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -400,7 +474,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         color: isSoldOut ? Colors.grey.shade100 : Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isSoldOut ? Colors.grey.shade300 : AppTheme.primaryColor.withOpacity(0.3),
+          color: isSoldOut
+              ? Colors.grey.shade300
+              : AppTheme.primaryColor.withOpacity(0.3),
         ),
       ),
       child: Row(
@@ -417,20 +493,29 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: isSoldOut ? Colors.grey.shade600 : Colors.black87,
+                        color: isSoldOut
+                            ? Colors.grey.shade600
+                            : Colors.black87,
                       ),
                     ),
                     const SizedBox(width: 8),
                     if (isSoldOut)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.red.shade100,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Text(
                           'HABIS',
-                          style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                   ],
@@ -444,7 +529,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 ],
                 const SizedBox(height: 8),
                 Text(
-                  isSoldOut ? 'Kuota telah habis terjual' : 'Sisa kuota: ${ticketType.availableQuota} tiket',
+                  isSoldOut
+                      ? 'Kuota telah habis terjual'
+                      : 'Sisa kuota: ${ticketType.availableQuota} tiket',
                   style: TextStyle(
                     fontSize: 11,
                     color: isSoldOut ? Colors.grey : Colors.green.shade700,

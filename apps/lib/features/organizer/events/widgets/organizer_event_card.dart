@@ -45,6 +45,7 @@ class OrganizerEventCard extends StatelessWidget {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
+        key: Key('organizer-event-card-${event.id}'),
         onTap: onOpen,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),

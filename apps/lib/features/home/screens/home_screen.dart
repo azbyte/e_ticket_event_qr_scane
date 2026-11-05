@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_drawer.dart';
+import '../../../services/mock/mock_attendee_repository.dart';
 import '../../../providers/event_provider.dart';
 import '../../admin/tabs/admin_tab_controller.dart';
 import '../../auth/screens/login_screen.dart';
@@ -23,14 +24,13 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final EventProvider _eventProvider = EventProvider.instance;
-
+  final MockAttendeeRepository _eventRepository =
+      MockAttendeeRepository.instance;
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_eventProvider.events.isEmpty) {
-        _eventProvider.loadEvents();
-      }
+      _eventProvider.loadEvents();
     });
   }
 
@@ -48,7 +48,9 @@ class _HomeScreenState extends State<HomeScreen> {
             tooltip: 'Notifikasi',
             onPressed: () {
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const NotificationListScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const NotificationListScreen(),
+                ),
               );
             },
           ),
@@ -56,16 +58,15 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.login),
             tooltip: 'Masuk',
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-              );
+              Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (_) => const LoginScreen()));
             },
           ),
         ],
       ),
       drawer: const AppDrawer(),
       body: RefreshIndicator(
-        onRefresh: () => _eventProvider.loadEvents(),
+        onRefresh: _eventProvider.loadEvents,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
@@ -124,7 +125,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       onPressed: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const EventListScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const EventListScreen(),
+                          ),
                         );
                       },
                       icon: const Icon(Icons.search),
@@ -141,7 +144,10 @@ class _HomeScreenState extends State<HomeScreen> {
               // 2. ROLE PORTALS (4 ROLES ACCESS)
               // -------------------------------------------------------------
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -154,7 +160,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     Text(
                       '4 Peran',
-                      style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
@@ -178,7 +187,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: Colors.indigo,
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const EventListScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const EventListScreen(),
+                          ),
                         );
                       },
                     ),
@@ -234,7 +245,10 @@ class _HomeScreenState extends State<HomeScreen> {
               // 3. FEATURED EVENTS SECTION
               // -------------------------------------------------------------
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -248,7 +262,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     TextButton(
                       onPressed: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const EventListScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const EventListScreen(),
+                          ),
                         );
                       },
                       child: const Text('Lihat Semua'),
@@ -263,12 +279,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (_eventProvider.isLoading) {
                     return const Center(
                       child: Padding(
-                        padding: EdgeInsets.all(32.0),
+                        padding: EdgeInsets.all(32),
                         child: CircularProgressIndicator(),
                       ),
                     );
                   }
-
                   final events = _eventProvider.events;
                   if (events.isEmpty) {
                     return Center(
@@ -276,12 +291,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.all(32.0),
                         child: Column(
                           children: [
-                            const Icon(Icons.event_busy, size: 48, color: Colors.grey),
+                            const Icon(
+                              Icons.event_busy,
+                              size: 48,
+                              color: Colors.grey,
+                            ),
                             const SizedBox(height: 12),
                             const Text('Belum ada event yang tersedia.'),
                             const SizedBox(height: 8),
                             ElevatedButton(
-                              onPressed: () => _eventProvider.loadEvents(),
+                              onPressed: _eventProvider.loadEvents,
                               child: const Text('Muat Ulang'),
                             ),
                           ],
@@ -336,7 +355,10 @@ class _HomeScreenState extends State<HomeScreen> {
               const Spacer(),
               Text(
                 title,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),

@@ -42,18 +42,12 @@ class _EventListScreenState extends State<EventListScreen> {
   }
 
   void _onSearchChanged(String value) {
-    _provider.loadEvents(
-      search: value,
-      category: _provider.selectedCategory,
-    );
+    _provider.loadEvents();
   }
 
   void _onCategorySelected(String category) {
     _provider.setSelectedCategory(category);
-    _provider.loadEvents(
-      search: _searchController.text,
-      category: category,
-    );
+    _provider.loadEvents();
   }
 
   @override
@@ -89,11 +83,9 @@ class _EventListScreenState extends State<EventListScreen> {
       body: ListenableBuilder(
         listenable: _provider,
         builder: (context, _) {
+          final events = _provider.events;
           return RefreshIndicator(
-            onRefresh: () => _provider.loadEvents(
-              search: _searchController.text,
-              category: _provider.selectedCategory,
-            ),
+            onRefresh: _provider.loadEvents,
             child: CustomScrollView(
               slivers: [
                 // Search Bar
@@ -115,7 +107,9 @@ class _EventListScreenState extends State<EventListScreen> {
                                 },
                               )
                             : null,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                        ),
                       ),
                     ),
                   ),
@@ -126,7 +120,10 @@ class _EventListScreenState extends State<EventListScreen> {
                   child: SizedBox(
                     height: 52,
                     child: ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       scrollDirection: Axis.horizontal,
                       itemCount: _categories.length,
                       separatorBuilder: (_, __) => const SizedBox(width: 8),
@@ -139,7 +136,9 @@ class _EventListScreenState extends State<EventListScreen> {
                           selectedColor: AppTheme.primaryColor,
                           labelStyle: TextStyle(
                             color: isSelected ? Colors.white : Colors.black87,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
                           ),
                           onSelected: (_) => _onCategorySelected(cat),
                         );
@@ -149,61 +148,32 @@ class _EventListScreenState extends State<EventListScreen> {
                 ),
 
                 // Main Content States
-                if (_provider.isLoading)
-                  const SliverFillRemaining(
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          CircularProgressIndicator(),
-                          SizedBox(height: 16),
-                          Text('Memuat daftar event...', style: TextStyle(color: Colors.grey)),
-                        ],
-                      ),
-                    ),
-                  )
-                else if (_provider.error != null)
-                  SliverFillRemaining(
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.error_outline, size: 56, color: Colors.redAccent),
-                            const SizedBox(height: 16),
-                            Text(
-                              _provider.error!,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 15),
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              onPressed: () => _provider.loadEvents(),
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Coba Lagi'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  )
-                else if (_provider.events.isEmpty)
+                if (events.isEmpty)
                   SliverFillRemaining(
                     child: Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.event_busy, size: 70, color: Colors.grey.shade400),
+                          Icon(
+                            Icons.event_busy,
+                            size: 70,
+                            color: Colors.grey.shade400,
+                          ),
                           const SizedBox(height: 16),
                           const Text(
                             'Tidak ada event ditemukan',
-                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             'Coba gunakan kata kunci pencarian atau kategori lain.',
-                            style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),
@@ -211,18 +181,13 @@ class _EventListScreenState extends State<EventListScreen> {
                   )
                 else
                   SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final event = _provider.events[index];
-                        return EventCard(event: event);
-                      },
-                      childCount: _provider.events.length,
-                    ),
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final event = events[index];
+                      return EventCard(event: event);
+                    }, childCount: events.length),
                   ),
 
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: 24),
-                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 24)),
               ],
             ),
           );

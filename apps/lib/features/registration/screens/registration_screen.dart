@@ -5,17 +5,14 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/validators/input_validator.dart';
 import '../../../models/event/event_model.dart';
 import '../../../models/event/ticket_type_model.dart';
-import '../../../providers/event_provider.dart';
 import '../../../providers/order_provider.dart';
+import '../../../providers/event_provider.dart';
+import '../../../services/mock/mock_attendee_repository.dart';
 import '../../payments/screens/payment_screen.dart';
 
 /// Registration screen — choose ticket types & quantity + attendee info (PRD sections 3.1 #5,#6, 4.4, 7.2 D).
 class RegistrationScreen extends StatefulWidget {
-  const RegistrationScreen({
-    super.key,
-    this.event,
-    this.eventId,
-  });
+  const RegistrationScreen({super.key, this.event, this.eventId});
 
   final EventModel? event;
   final String? eventId;
@@ -35,6 +32,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   late EventModel _event;
   List<TicketTypeModel> _ticketTypes = [];
+  final MockAttendeeRepository _repository = MockAttendeeRepository.instance;
+  final EventProvider _eventProvider = EventProvider.instance;
 
   @override
   void initState() {
@@ -44,20 +43,25 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       _loadTicketTypes(_event.id);
     } else {
       final id = widget.eventId ?? 'evt-001';
-      final found = EventProvider.instance.events.firstWhere(
-        (e) => e.id == id,
-        orElse: () => EventProvider.instance.selectedEvent ?? _buildFallbackEvent(id),
-      );
+      EventModel found;
+      try {
+        found = _repository.getEventById(id);
+      } catch (_) {
+        found = _buildFallbackEvent(id);
+      }
       _event = found;
       _loadTicketTypes(_event.id);
     }
   }
 
-  void _loadTicketTypes(String eventId) async {
-    await EventProvider.instance.loadTicketTypes(eventId);
+  Future<void> _loadTicketTypes(String eventId) async {
+    await _eventProvider.loadEvent(eventId);
+    final ticketTypes = _eventProvider.ticketTypes.isNotEmpty
+        ? _eventProvider.ticketTypes
+        : _repository.getTicketTypesByEventId(eventId);
     if (mounted) {
       setState(() {
-        _ticketTypes = EventProvider.instance.ticketTypes;
+        _ticketTypes = ticketTypes;
         for (final tt in _ticketTypes) {
           _selectedQuantities[tt.id] = 0;
         }
@@ -103,9 +107,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   String _formatCurrency(double amount) {
     if (amount <= 0) return 'Gratis';
     final str = amount.toInt().toString().replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (Match m) => '${m[1]}.',
-        );
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
     return 'Rp $str';
   }
 
@@ -117,14 +121,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     final tt = _ticketTypes.firstWhere((t) => t.id == ticketTypeId);
     if (newQty > tt.availableQuota) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sisa kuota untuk "${tt.name}" hanya ${tt.availableQuota} tiket.')),
+        SnackBar(
+          content: Text(
+            'Sisa kuota untuk "${tt.name}" hanya ${tt.availableQuota} tiket.',
+          ),
+        ),
       );
       return;
     }
 
     if (delta > 0 && _totalTicketCount >= AppConstants.maxTicketsPerOrder) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Maksimal ${AppConstants.maxTicketsPerOrder} tiket per pesanan.')),
+        const SnackBar(
+          content: Text(
+            'Maksimal ${AppConstants.maxTicketsPerOrder} tiket per pesanan.',
+          ),
+        ),
       );
       return;
     }
@@ -137,7 +149,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   Future<void> _submitOrder() async {
     if (_totalTicketCount == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Silakan pilih minimal 1 tiket untuk melanjutkan.')),
+        const SnackBar(
+          content: Text('Silakan pilih minimal 1 tiket untuk melanjutkan.'),
+        ),
       );
       return;
     }
@@ -152,7 +166,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       eventId: _event.id,
       attendeeName: _nameController.text.trim(),
       attendeeEmail: _emailController.text.trim(),
-      attendeePhone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
+      attendeePhone: _phoneController.text.trim().isNotEmpty
+          ? _phoneController.text.trim()
+          : null,
       selectedTicketQuantities: _selectedQuantities,
     );
 
@@ -162,14 +178,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     if (newOrder != null) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => PaymentScreen(orderId: newOrder.id),
-        ),
+        MaterialPageRoute(builder: (_) => PaymentScreen(orderId: newOrder.id)),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(OrderProvider.instance.error ?? 'Gagal membuat pesanan.'),
+          content: Text(
+            OrderProvider.instance.error ?? 'Gagal membuat pesanan.',
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -179,9 +195,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Pemesanan Tiket'),
-      ),
+      appBar: AppBar(title: const Text('Pemesanan Tiket')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Form(
@@ -195,11 +209,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 decoration: BoxDecoration(
                   color: AppTheme.primaryColor.withOpacity(0.06),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
+                  border: Border.all(
+                    color: AppTheme.primaryColor.withOpacity(0.2),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.event, color: AppTheme.primaryColor, size: 36),
+                    const Icon(
+                      Icons.event,
+                      color: AppTheme.primaryColor,
+                      size: 36,
+                    ),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
@@ -207,12 +227,18 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         children: [
                           Text(
                             _event.title,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             _event.location ?? (_event.onlineUrl ?? 'Online'),
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade700,
+                            ),
                           ),
                         ],
                       ),
@@ -248,7 +274,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       color: isSoldOut ? Colors.grey.shade100 : Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: qty > 0 ? AppTheme.primaryColor : Colors.grey.shade300,
+                        color: qty > 0
+                            ? AppTheme.primaryColor
+                            : Colors.grey.shade300,
                         width: qty > 0 ? 1.5 : 1,
                       ),
                     ),
@@ -263,22 +291,30 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 15,
-                                  color: isSoldOut ? Colors.grey : Colors.black87,
+                                  color: isSoldOut
+                                      ? Colors.grey
+                                      : Colors.black87,
                                 ),
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 _formatCurrency(tt.price),
                                 style: TextStyle(
-                                  color: isSoldOut ? Colors.grey : AppTheme.primaryColor,
+                                  color: isSoldOut
+                                      ? Colors.grey
+                                      : AppTheme.primaryColor,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
                               Text(
-                                isSoldOut ? 'Habis terjual' : 'Sisa kuota: ${tt.availableQuota}',
+                                isSoldOut
+                                    ? 'Habis terjual'
+                                    : 'Sisa kuota: ${tt.availableQuota}',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: isSoldOut ? Colors.red : Colors.grey.shade600,
+                                  color: isSoldOut
+                                      ? Colors.red
+                                      : Colors.grey.shade600,
                                 ),
                               ),
                             ],
@@ -287,19 +323,30 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         if (isSoldOut)
                           const Text(
                             'HABIS',
-                            style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12),
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
                           )
                         else
                           Row(
                             children: [
                               IconButton(
                                 icon: const Icon(Icons.remove_circle_outline),
-                                color: qty > 0 ? AppTheme.primaryColor : Colors.grey.shade400,
-                                onPressed: qty > 0 ? () => _updateQuantity(tt.id, -1) : null,
+                                color: qty > 0
+                                    ? AppTheme.primaryColor
+                                    : Colors.grey.shade400,
+                                onPressed: qty > 0
+                                    ? () => _updateQuantity(tt.id, -1)
+                                    : null,
                               ),
                               Text(
                                 '$qty',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
                               ),
                               IconButton(
                                 icon: const Icon(Icons.add_circle_outline),
@@ -334,7 +381,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   hintText: 'Misal: Budi Santoso',
                   prefixIcon: Icon(Icons.person_outline),
                 ),
-                validator: (val) => InputValidator.required(val, field: 'Nama lengkap'),
+                validator: (val) =>
+                    InputValidator.required(val, field: 'Nama lengkap'),
               ),
               const SizedBox(height: 12),
 
@@ -375,13 +423,19 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   children: [
                     const Text(
                       'Ringkasan Biaya',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
                     ),
                     const Divider(height: 20),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Jumlah Tiket ($_totalTicketCount tiket)', style: TextStyle(color: Colors.grey.shade700)),
+                        Text(
+                          'Jumlah Tiket ($_totalTicketCount tiket)',
+                          style: TextStyle(color: Colors.grey.shade700),
+                        ),
                         Text(_formatCurrency(_subtotalAmount)),
                       ],
                     ),
@@ -389,7 +443,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Biaya Layanan & Admin', style: TextStyle(color: Colors.grey.shade700)),
+                        Text(
+                          'Biaya Layanan & Admin',
+                          style: TextStyle(color: Colors.grey.shade700),
+                        ),
                         Text(_formatCurrency(_serviceFee)),
                       ],
                     ),
@@ -399,7 +456,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       children: [
                         const Text(
                           'Total Pembayaran',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
                         ),
                         Text(
                           _formatCurrency(_grandTotal),
@@ -424,17 +484,27 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 child: ElevatedButton(
                   onPressed: _isSubmitting ? null : _submitOrder,
                   style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   child: _isSubmitting
                       ? const SizedBox(
                           height: 22,
                           width: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
                         )
                       : Text(
-                          _grandTotal == 0 ? 'Daftar Sekarang (Gratis)' : 'Lanjut ke Pembayaran',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          _grandTotal == 0
+                              ? 'Daftar Sekarang (Gratis)'
+                              : 'Lanjut ke Pembayaran',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                 ),
               ),
