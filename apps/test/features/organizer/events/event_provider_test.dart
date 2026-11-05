@@ -43,6 +43,21 @@ void main() {
     expect(provider.summaryFor('evt-1001')!.ticketsSold, greaterThan(0));
   });
 
+  test('loadEvents hanya memuat event milik owner aktif', () async {
+    final provider = EventProvider(
+      repository: MockOrganizerEventRepository(latency: Duration.zero),
+      ownerId: OrganizerEventFixtures.otherOwnerId,
+    );
+
+    await provider.loadEvents();
+
+    expect(provider.status, EventLoadStatus.ready);
+    expect(provider.events, hasLength(1));
+    expect(provider.events.single.id, 'evt-9001');
+    expect(provider.events.every((event) =>
+        event.organizerId == OrganizerEventFixtures.otherOwnerId), isTrue);
+  });
+
   test('state empty terdeteksi pada repository kosong', () async {
     final provider = buildProvider(MockOrganizerEventRepository.empty());
     await provider.loadEvents();

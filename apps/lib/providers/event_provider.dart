@@ -185,9 +185,6 @@ class EventProvider extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    if (!_isPublicProvider && _repository is MockOrganizerEventRepository) {
-      (_repository as MockOrganizerEventRepository).configureOwner(_ownerId);
-    }
     _status = EventLoadStatus.loading;
     _loadError = null;
     _actionError = null;
