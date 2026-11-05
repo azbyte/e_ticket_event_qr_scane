@@ -22,13 +22,25 @@ class OrganizerAttendeeDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canViewOrders =
-        contextScope.hasPermission(OrganizerPermission.viewOrders);
+    final eventMatches = contextScope.eventId == attendee.eventId;
+    if (!eventMatches ||
+        !contextScope.hasPermission(OrganizerPermission.viewParticipants)) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Detail Peserta')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('Akses ditolak untuk data peserta event ini.'),
+          ),
+        ),
+      );
+    }
+    final canViewOrders = contextScope.hasPermission(
+      OrganizerPermission.viewOrders,
+    );
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Detail Peserta'),
-      ),
+      appBar: AppBar(title: const Text('Detail Peserta')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -36,16 +48,22 @@ class OrganizerAttendeeDetailScreen extends StatelessWidget {
           children: [
             // Header Profile Card
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
                     CircleAvatar(
                       radius: 30,
-                      backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.15),
+                      backgroundColor: AppTheme.primaryColor.withValues(
+                        alpha: 0.15,
+                      ),
                       child: Text(
-                        attendee.name.isNotEmpty ? attendee.name[0].toUpperCase() : 'P',
+                        attendee.name.isNotEmpty
+                            ? attendee.name[0].toUpperCase()
+                            : 'P',
                         style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
@@ -68,11 +86,17 @@ class OrganizerAttendeeDetailScreen extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             attendee.maskedEmail,
-                            style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 13,
+                            ),
                           ),
                           Text(
                             attendee.maskedPhone,
-                            style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),
@@ -90,7 +114,9 @@ class OrganizerAttendeeDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -99,17 +125,22 @@ class OrganizerAttendeeDetailScreen extends StatelessWidget {
                     const Divider(),
                     _buildRow('Kode Tiket QR', attendee.ticketCode),
                     const Divider(),
-                    _buildRow('Status Tiket', attendee.ticketStatus.toUpperCase(),
-                        valueColor: attendee.ticketStatus == 'valid'
-                            ? Colors.green
-                            : attendee.ticketStatus == 'checked_in'
-                                ? Colors.blue
-                                : Colors.red),
+                    _buildRow(
+                      'Status Tiket',
+                      attendee.ticketStatus.toUpperCase(),
+                      valueColor: attendee.ticketStatus == 'valid'
+                          ? Colors.green
+                          : attendee.ticketStatus == 'checked_in'
+                          ? Colors.blue
+                          : Colors.red,
+                    ),
                     const Divider(),
                     _buildRow(
                       'Status Check-in',
                       attendee.checkedIn ? 'SUDAH CHECK-IN' : 'BELUM CHECK-IN',
-                      valueColor: attendee.checkedIn ? Colors.blue : Colors.orange,
+                      valueColor: attendee.checkedIn
+                          ? Colors.blue
+                          : Colors.orange,
                     ),
                     if (attendee.checkedIn) ...[
                       const Divider(),
@@ -136,12 +167,19 @@ class OrganizerAttendeeDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    _buildRow('Nomor Pesanan', canViewOrders ? attendee.orderId : 'ORD-**** (Izin VIEW_ORDERS Diperlukan)'),
+                    _buildRow(
+                      'Nomor Pesanan',
+                      canViewOrders
+                          ? attendee.orderId
+                          : 'ORD-**** (Izin VIEW_ORDERS Diperlukan)',
+                    ),
                     const Divider(),
                     _buildRow(
                       'Metode Registrasi',
@@ -157,9 +195,15 @@ class OrganizerAttendeeDetailScreen extends StatelessWidget {
                       _buildRow('Didaftarkan Oleh', attendee.assistedBy!),
                     ],
                     const Divider(),
-                    _buildRow('Status Pembayaran', attendee.paymentStatus.toUpperCase()),
+                    _buildRow(
+                      'Status Pembayaran',
+                      attendee.paymentStatus.toUpperCase(),
+                    ),
                     const Divider(),
-                    _buildRow('Tanggal Registrasi', '${attendee.createdAt.day}/${attendee.createdAt.month}/${attendee.createdAt.year}'),
+                    _buildRow(
+                      'Tanggal Registrasi',
+                      '${attendee.createdAt.day}/${attendee.createdAt.month}/${attendee.createdAt.year}',
+                    ),
                   ],
                 ),
               ),
@@ -200,4 +244,3 @@ class OrganizerAttendeeDetailScreen extends StatelessWidget {
     );
   }
 }
-

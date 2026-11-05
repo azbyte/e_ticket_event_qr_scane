@@ -45,7 +45,8 @@ class EventProvider extends ChangeNotifier {
   EventModel? _selectedEvent;
   List<TicketTypeModel> _ticketTypes = const <TicketTypeModel>[];
   OrganizerEventSummary? _summary;
-  List<OrganizerEventSalesPoint> _salesPoints = const <OrganizerEventSalesPoint>[];
+  List<OrganizerEventSalesPoint> _salesPoints =
+      const <OrganizerEventSalesPoint>[];
   OrganizerOverview? _overview;
 
   Map<String, OrganizerEventSummary> _summaries =
@@ -77,15 +78,17 @@ class EventProvider extends ChangeNotifier {
   List<EventModel> get visibleEvents {
     final keyword = _searchQuery.trim().toLowerCase();
     if (keyword.isEmpty) return events;
-    return _events.where((event) {
-      final haystack = <String?>[
-        event.title,
-        event.location,
-        event.category,
-        event.organizerName,
-      ].whereType<String>().join(' ').toLowerCase();
-      return haystack.contains(keyword);
-    }).toList(growable: false);
+    return _events
+        .where((event) {
+          final haystack = <String?>[
+            event.title,
+            event.location,
+            event.category,
+            event.organizerName,
+          ].whereType<String>().join(' ').toLowerCase();
+          return haystack.contains(keyword);
+        })
+        .toList(growable: false);
   }
 
   /// True bila Owner belum punya event sama sekali (state empty awal).
@@ -93,10 +96,13 @@ class EventProvider extends ChangeNotifier {
 
   /// True bila filter/pencarian tidak menemukan hasil (empty karena filter).
   bool get hasNoMatch =>
-      _status == EventLoadStatus.ready && _events.isNotEmpty && visibleEvents.isEmpty;
+      _status == EventLoadStatus.ready &&
+      _events.isNotEmpty &&
+      visibleEvents.isEmpty;
 
   EventModel? get selectedEvent => _selectedEvent;
-  List<TicketTypeModel> get ticketTypes => List<TicketTypeModel>.unmodifiable(_ticketTypes);
+  List<TicketTypeModel> get ticketTypes =>
+      List<TicketTypeModel>.unmodifiable(_ticketTypes);
   OrganizerEventSummary? get summary => _summary;
   List<OrganizerEventSalesPoint> get salesPointSeries =>
       List<OrganizerEventSalesPoint>.unmodifiable(_salesPoints);
@@ -122,12 +128,12 @@ class EventProvider extends ChangeNotifier {
   Future<void> loadEvents() async {
     _status = EventLoadStatus.loading;
     _loadError = null;
+    _actionError = null;
+    _events = const <EventModel>[];
+    _summaries = const <String, OrganizerEventSummary>{};
     notifyListeners();
     try {
-      _events = await _repository.listEvents(
-        ownerId: ownerId,
-        filter: _filter,
-      );
+      _events = await _repository.listEvents(ownerId: ownerId, filter: _filter);
     } on OrganizerEventAccessDeniedException catch (error) {
       _status = EventLoadStatus.accessDenied;
       _loadError = error.message;
@@ -136,16 +142,18 @@ class EventProvider extends ChangeNotifier {
     } on OrganizerEventException catch (error) {
       _status = EventLoadStatus.error;
       _loadError = error.message;
+      _events = const <EventModel>[];
+      _summaries = const <String, OrganizerEventSummary>{};
       notifyListeners();
       return;
     }
+    _status = EventLoadStatus.ready;
     try {
       _summaries = await _repository.eventSummaries(ownerId: ownerId);
     } on OrganizerEventException catch (error) {
       _summaries = const <String, OrganizerEventSummary>{};
       _loadError = error.message;
     }
-    _status = EventLoadStatus.ready;
     notifyListeners();
   }
 

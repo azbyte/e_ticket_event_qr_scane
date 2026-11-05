@@ -5,6 +5,7 @@
 library;
 
 import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 
 import 'event_activity_service.dart';
@@ -21,9 +22,9 @@ class OrganizerAttendee {
     required this.ticketCode,
     required this.orderId,
     required this.registrationMethod, // 'SELF_SERVICE' or 'ASSISTED'
-    required this.orderStatus,        // 'confirmed', 'pending', 'cancelled'
-    required this.paymentStatus,      // 'paid', 'pending', 'cancelled'
-    required this.ticketStatus,       // 'valid', 'checked_in', 'cancelled'
+    required this.orderStatus, // 'confirmed', 'pending', 'cancelled'
+    required this.paymentStatus, // 'paid', 'pending', 'cancelled'
+    required this.ticketStatus, // 'valid', 'checked_in', 'cancelled'
     required this.checkedIn,
     this.checkedInAt,
     this.checkedInBy,
@@ -161,8 +162,9 @@ class OrganizerReportMetrics {
   final double grossSales;
   final double platformCommission;
   final double paymentGatewayFee;
-  final double organizerProceeds; // grossSales - platformCommission - paymentGatewayFee
-  final double packageRevenue;    // platform internal revenue (isolated)
+  final double
+  organizerProceeds; // grossSales - platformCommission - paymentGatewayFee
+  final double packageRevenue; // platform internal revenue (isolated)
   final Map<String, int> tierBreakdown;
 }
 
@@ -187,6 +189,8 @@ class OrganizerOperationsRepository extends ChangeNotifier {
   }
 
   void _initMockAttendees() {
+    _attendees.clear();
+    _offlineQueue.clear();
     final now = DateTime.now();
     _attendees.addAll([
       OrganizerAttendee(
@@ -294,6 +298,14 @@ class OrganizerOperationsRepository extends ChangeNotifier {
     ]);
   }
 
+  /// Restores deterministic in-memory fixtures for isolated prototype tests.
+  @visibleForTesting
+  void resetMockData() {
+    _offlineModeEnabled = false;
+    _initMockAttendees();
+    notifyListeners();
+  }
+
   // ---------------------------------------------------------------------------
   // ATTENDEE QUERY & FILTERING
   // ---------------------------------------------------------------------------
@@ -304,6 +316,7 @@ class OrganizerOperationsRepository extends ChangeNotifier {
     String filterStatus = 'all', // 'all', 'checked_in', 'pending', 'cancelled'
     String filterMethod = 'all', // 'all', 'SELF_SERVICE', 'ASSISTED'
     String filterTicketType = 'all',
+    String filterPaymentStatus = 'all',
   }) {
     final query = search.trim().toLowerCase();
 
@@ -312,18 +325,27 @@ class OrganizerOperationsRepository extends ChangeNotifier {
 
       // Status filter
       if (filterStatus == 'checked_in' && !a.checkedIn) return false;
-      if (filterStatus == 'pending' && (a.checkedIn || a.ticketStatus == 'cancelled')) return false;
-      if (filterStatus == 'cancelled' && a.ticketStatus != 'cancelled') return false;
+      if (filterStatus == 'pending' &&
+          (a.checkedIn || a.ticketStatus == 'cancelled'))
+        return false;
+      if (filterStatus == 'cancelled' && a.ticketStatus != 'cancelled')
+        return false;
 
       // Method filter
-      if (filterMethod != 'all' && a.registrationMethod != filterMethod) return false;
+      if (filterMethod != 'all' && a.registrationMethod != filterMethod)
+        return false;
 
       // Ticket tier filter
-      if (filterTicketType != 'all' && a.ticketType != filterTicketType) return false;
+      if (filterTicketType != 'all' && a.ticketType != filterTicketType)
+        return false;
+      if (filterPaymentStatus != 'all' &&
+          a.paymentStatus != filterPaymentStatus)
+        return false;
 
       // Search query filter
       if (query.isNotEmpty) {
-        final match = a.name.toLowerCase().contains(query) ||
+        final match =
+            a.name.toLowerCase().contains(query) ||
             a.email.toLowerCase().contains(query) ||
             a.phone.contains(query) ||
             a.ticketCode.toLowerCase().contains(query) ||
@@ -341,15 +363,31 @@ class OrganizerOperationsRepository extends ChangeNotifier {
 
   AssistedRegistrationResult createAssistedRegistration({
     required String eventId,
+    OrganizerMembershipContext? context,
     required String ordererName,
     required String ordererEmail,
     required String ordererPhone,
     required String ticketType,
     required double unitPrice,
-    required List<Map<String, String>> attendeeDetails, // [{name, email, phone}]
+    required List<Map<String, String>>
+    attendeeDetails, // [{name, email, phone}]
     required String actorId,
     required String actorName,
   }) {
+    if (context != null &&
+        (context.eventId != eventId ||
+            !context.hasPermission(OrganizerPermission.assistRegistration))) {
+      return const AssistedRegistrationResult(
+        isSuccess: false,
+        message: 'Akses ditolak untuk registrasi dibantu pada event ini.',
+      );
+    }
+    if (unitPrice < 0 || ticketType.trim().isEmpty) {
+      return const AssistedRegistrationResult(
+        isSuccess: false,
+        message: 'Kategori tiket dan harga yang valid wajib dipilih.',
+      );
+    }
     // 1. Validation
     if (ordererName.trim().isEmpty || ordererEmail.trim().isEmpty) {
       return const AssistedRegistrationResult(
@@ -372,13 +410,20 @@ class OrganizerOperationsRepository extends ChangeNotifier {
     if (attendeeDetails.length > 5) {
       return const AssistedRegistrationResult(
         isSuccess: false,
-        message: 'Batas maksimal registrasi dibantu adalah 5 tiket per pesanan.',
+        message:
+            'Batas maksimal registrasi dibantu adalah 5 tiket per pesanan.',
       );
     }
 
     // Check duplicate attendee emails in the same submission
     final emails = <String>{};
     for (final att in attendeeDetails) {
+      if ((att['name'] ?? '').trim().isEmpty) {
+        return const AssistedRegistrationResult(
+          isSuccess: false,
+          message: 'Nama setiap peserta wajib diisi.',
+        );
+      }
       final email = (att['email'] ?? '').trim().toLowerCase();
       if (email.isEmpty || !email.contains('@')) {
         return const AssistedRegistrationResult(
@@ -389,14 +434,17 @@ class OrganizerOperationsRepository extends ChangeNotifier {
       if (emails.contains(email)) {
         return AssistedRegistrationResult(
           isSuccess: false,
-          message: 'Duplikasi email ditemukan: $email tidak boleh didaftarkan ganda dalam pesanan yang sama.',
+          message:
+              'Duplikasi email ditemukan: $email tidak boleh didaftarkan ganda dalam pesanan yang sama.',
         );
       }
       emails.add(email);
     }
 
-    final orderId = 'ORD-${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}-${100 + _attendees.length}';
-    final totalAmount = (unitPrice * attendeeDetails.length) + (unitPrice > 0 ? 4500 : 0);
+    final orderId =
+        'ORD-${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}-${100 + _attendees.length}';
+    final totalAmount =
+        (unitPrice * attendeeDetails.length) + (unitPrice > 0 ? 4500 : 0);
     final randomSuffix = Random().nextInt(89999) + 10000;
     final vaNumber = '88001$randomSuffix';
     final vaExpiry = DateTime.now().add(const Duration(hours: 24));
@@ -405,7 +453,8 @@ class OrganizerOperationsRepository extends ChangeNotifier {
     var seq = 1;
 
     for (final att in attendeeDetails) {
-      final code = 'TK-AST-${DateTime.now().millisecondsSinceEpoch % 100000}-$seq';
+      final code =
+          'TK-AST-${DateTime.now().millisecondsSinceEpoch % 100000}-$seq';
       final attendee = OrganizerAttendee(
         id: 'att-${DateTime.now().millisecondsSinceEpoch}-$seq',
         eventId: eventId,
@@ -435,7 +484,8 @@ class OrganizerOperationsRepository extends ChangeNotifier {
       actorId: actorId,
       actorName: actorName,
       action: 'ASSISTED_REGISTRATION',
-      summary: '$actorName membuat pesanan dibantu $orderId (${newAttendees.length} tiket $ticketType).',
+      summary:
+          '$actorName membuat pesanan dibantu $orderId (${newAttendees.length} tiket $ticketType).',
       metadata: {
         'order_id': orderId,
         'count': newAttendees.length,
@@ -447,7 +497,8 @@ class OrganizerOperationsRepository extends ChangeNotifier {
 
     return AssistedRegistrationResult(
       isSuccess: true,
-      message: 'Registrasi dibantu berhasil dibuat dengan metode Virtual Account.',
+      message:
+          'Registrasi dibantu berhasil dibuat dengan metode Virtual Account.',
       orderId: orderId,
       orderReference: orderId,
       totalAmount: totalAmount,
@@ -468,10 +519,25 @@ class OrganizerOperationsRepository extends ChangeNotifier {
     required OrganizerMembershipContext context,
     bool autoCommitCheckIn = true,
   }) {
+    if (context.eventId != eventId) {
+      return const ScanCheckInResult(
+        status: 'DENIED',
+        message: 'Akses ditolak: keanggotaan tidak berlaku untuk event ini.',
+        isSuccess: false,
+      );
+    }
     if (!context.hasPermission(OrganizerPermission.scanTicket)) {
       return const ScanCheckInResult(
         status: 'DENIED',
         message: 'Akses ditolak: Anda tidak memiliki izin SCAN_TICKET.',
+        isSuccess: false,
+      );
+    }
+    if (context.hasPermission(OrganizerPermission.checkInTicket) &&
+        !context.hasPermission(OrganizerPermission.scanTicket)) {
+      return const ScanCheckInResult(
+        status: 'DENIED',
+        message: 'Akses ditolak: izin scan tiket diperlukan.',
         isSuccess: false,
       );
     }
@@ -528,7 +594,8 @@ class OrganizerOperationsRepository extends ChangeNotifier {
     if (attendee.checkedIn) {
       return ScanCheckInResult(
         status: 'ALREADY_CHECKED_IN',
-        message: 'Peringatan: Tiket ${attendee.ticketCode} sudah pernah digunakan check-in oleh ${attendee.checkedInBy ?? "staf"} pada ${attendee.checkedInAt?.hour}:${attendee.checkedInAt?.minute.toString().padLeft(2, '0')} WIB.',
+        message:
+            'Peringatan: Tiket ${attendee.ticketCode} sudah pernah digunakan check-in oleh ${attendee.checkedInBy ?? "staf"} pada ${attendee.checkedInAt?.hour}:${attendee.checkedInAt?.minute.toString().padLeft(2, '0')} WIB.',
         isSuccess: false,
         attendee: attendee,
       );
@@ -562,7 +629,8 @@ class OrganizerOperationsRepository extends ChangeNotifier {
           actorId: context.userId,
           actorName: context.userName,
           action: 'CHECK_IN_OFFLINE',
-          summary: 'Check-in offline tersimpan lokal untuk ${attendee.name} (${attendee.ticketCode}).',
+          summary:
+              'Check-in offline tersimpan lokal untuk ${attendee.name} (${attendee.ticketCode}).',
         );
 
         notifyListeners();
@@ -590,7 +658,8 @@ class OrganizerOperationsRepository extends ChangeNotifier {
         actorId: context.userId,
         actorName: context.userName,
         action: 'CHECK_IN_SUCCESS',
-        summary: 'Check-in berhasil untuk ${attendee.name} (${attendee.ticketCode} - ${attendee.ticketType}).',
+        summary:
+            'Check-in berhasil untuk ${attendee.name} (${attendee.ticketCode} - ${attendee.ticketType}).',
       );
 
       notifyListeners();
@@ -617,6 +686,7 @@ class OrganizerOperationsRepository extends ChangeNotifier {
     var conflictCount = 0;
 
     for (final item in List.from(_offlineQueue)) {
+      if (item.eventId != eventId) continue;
       if (item.ticketCode.contains('CONFLICT')) {
         conflictCount++;
       } else {
@@ -631,7 +701,8 @@ class OrganizerOperationsRepository extends ChangeNotifier {
       'synced': syncedCount,
       'conflicts': conflictCount,
       'remaining': _offlineQueue.length,
-      'message': 'Sinkronisasi selesai: $syncedCount berhasil disinkronkan, $conflictCount konflik data check-in.',
+      'message':
+          'Sinkronisasi selesai: $syncedCount berhasil disinkronkan, $conflictCount konflik data check-in.',
     };
   }
 
@@ -639,14 +710,29 @@ class OrganizerOperationsRepository extends ChangeNotifier {
   // REPORTING & METRICS (FR-70–73)
   // ---------------------------------------------------------------------------
 
-  OrganizerReportMetrics getEventReport(String eventId) {
-    final eventAttendees = _attendees.where((a) => a.eventId == eventId).toList();
-    final validOrPaid = eventAttendees.where((a) => a.paymentStatus == 'paid').toList();
+  OrganizerReportMetrics getEventReport(
+    String eventId, {
+    String? ticketType,
+    DateTime? from,
+    DateTime? through,
+  }) {
+    final eventAttendees = _attendees.where((a) {
+      if (a.eventId != eventId) return false;
+      if (ticketType != null && a.ticketType != ticketType) return false;
+      if (from != null && a.createdAt.isBefore(from)) return false;
+      if (through != null && a.createdAt.isAfter(through)) return false;
+      return true;
+    }).toList();
+    final validOrPaid = eventAttendees
+        .where((a) => a.paymentStatus == 'paid')
+        .toList();
 
     final totalOrders = {for (final a in validOrPaid) a.orderId}.length;
     final totalTickets = validOrPaid.length;
     final totalCheckedIn = validOrPaid.where((a) => a.checkedIn).length;
-    final checkInRate = totalTickets > 0 ? (totalCheckedIn / totalTickets) * 100 : 0.0;
+    final checkInRate = totalTickets > 0
+        ? (totalCheckedIn / totalTickets) * 100
+        : 0.0;
 
     // Approximate financial metrics based on tier
     double gross = 0;
@@ -682,14 +768,26 @@ class OrganizerOperationsRepository extends ChangeNotifier {
     );
   }
 
-  String exportAttendeesCsv(String eventId, OrganizerMembershipContext context) {
+  String exportAttendeesCsv(
+    String eventId,
+    OrganizerMembershipContext context,
+  ) {
+    if (context.eventId != eventId) {
+      throw Exception(
+        'Akses ditolak: keanggotaan tidak berlaku untuk event ini.',
+      );
+    }
     if (!context.hasPermission(OrganizerPermission.exportParticipants)) {
-      throw Exception('Akses ditolak: Anda tidak memiliki izin EXPORT_PARTICIPANTS.');
+      throw Exception(
+        'Akses ditolak: Anda tidak memiliki izin EXPORT_PARTICIPANTS.',
+      );
     }
 
     final attendees = getAttendeesForEvent(eventId);
     final buffer = StringBuffer();
-    buffer.writeln('ID,Nama,Email,No_HP,Kategori_Tiket,Kode_Tiket,No_Pesanan,Metode,Status_Tiket,CheckIn,Waktu_CheckIn');
+    buffer.writeln(
+      'ID,Nama,Email,No_HP,Kategori_Tiket,Kode_Tiket,No_Pesanan,Metode,Status_Tiket,CheckIn,Waktu_CheckIn',
+    );
 
     for (final a in attendees) {
       buffer.writeln(
@@ -702,7 +800,8 @@ class OrganizerOperationsRepository extends ChangeNotifier {
       actorId: context.userId,
       actorName: context.userName,
       action: 'EXPORT_ATTENDEES',
-      summary: '${context.userName} mengekspor ${attendees.length} data peserta ke CSV.',
+      summary:
+          '${context.userName} mengekspor ${attendees.length} data peserta ke CSV.',
     );
 
     return buffer.toString();

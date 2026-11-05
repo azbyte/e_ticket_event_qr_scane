@@ -48,7 +48,7 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
     super.dispose();
   }
 
-  void _handleScan(String code) {
+  Future<void> _handleScan(String code) async {
     if (!widget.contextScope.hasPermission(OrganizerPermission.scanTicket)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -67,8 +67,48 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
       eventId: widget.eventId,
       ticketCode: code.trim(),
       context: widget.contextScope,
-      autoCommitCheckIn: true,
+      autoCommitCheckIn: false,
     );
+
+    if (result.isSuccess &&
+        result.status == 'VALID' &&
+        widget.contextScope.hasPermission(OrganizerPermission.checkInTicket)) {
+      final shouldCheckIn = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Konfirmasi check-in'),
+          content: Text(
+            'Tiket valid untuk ${result.attendee?.name ?? 'peserta ini'}. '
+            'Lanjutkan check-in demo?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Batal'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Konfirmasi'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      if (shouldCheckIn == true) {
+        final committed = _repo.validateAndCheckIn(
+          eventId: widget.eventId,
+          ticketCode: code.trim(),
+          context: widget.contextScope,
+          autoCommitCheckIn: true,
+        );
+        setState(() {
+          _lastResult = committed;
+          _isProcessing = false;
+          _tokenController.clear();
+        });
+        return;
+      }
+    }
 
     setState(() {
       _lastResult = result;
@@ -85,7 +125,10 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
         title: const Text('Hasil Sinkronisasi Offline'),
         content: Text(report['message'] as String),
         actions: [
-          FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Tutup')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Tutup'),
+          ),
         ],
       ),
     );
@@ -93,8 +136,12 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final canScan = widget.contextScope.hasPermission(OrganizerPermission.scanTicket);
-    final canViewHistory = widget.contextScope.hasPermission(OrganizerPermission.viewScanHistory);
+    final canScan = widget.contextScope.hasPermission(
+      OrganizerPermission.scanTicket,
+    );
+    final canViewHistory = widget.contextScope.hasPermission(
+      OrganizerPermission.viewScanHistory,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -108,7 +155,9 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
-                  color: _repo.isOfflineModeEnabled ? Colors.orange : Colors.green,
+                  color: _repo.isOfflineModeEnabled
+                      ? Colors.orange
+                      : Colors.green,
                 ),
               ),
               Switch(
@@ -145,7 +194,10 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                         Expanded(
                           child: Text(
                             'Lokasi Scan: ${widget.eventName}\nOperator: ${widget.contextScope.userName} (${widget.contextScope.role.toUpperCase()})',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -170,17 +222,26 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                           Expanded(
                             child: Text(
                               'Ada ${_repo.offlineQueue.length} data check-in lokal tersimpan di antrean offline.',
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.orange,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
                             ),
                             onPressed: _handleSyncOffline,
-                            child: const Text('Sinkron', style: TextStyle(fontSize: 12)),
+                            child: const Text(
+                              'Sinkron',
+                              style: TextStyle(fontSize: 12),
+                            ),
                           ),
                         ],
                       ),
@@ -200,17 +261,27 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                           width: 140,
                           height: 140,
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.greenAccent, width: 2),
+                            border: Border.all(
+                              color: Colors.greenAccent,
+                              width: 2,
+                            ),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Center(
-                            child: Icon(Icons.qr_code_scanner, color: Colors.greenAccent, size: 48),
+                            child: Icon(
+                              Icons.qr_code_scanner,
+                              color: Colors.greenAccent,
+                              size: 48,
+                            ),
                           ),
                         ),
                         Positioned(
                           bottom: 12,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.black54,
                               borderRadius: BorderRadius.circular(20),
@@ -219,7 +290,10 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                               _repo.isOfflineModeEnabled
                                   ? 'Mode Scanner Offline Aktif'
                                   : 'Arahkan QR Code Tiket ke Kotak',
-                              style: const TextStyle(color: Colors.white, fontSize: 11),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                              ),
                             ),
                           ),
                         ),
@@ -239,7 +313,9 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                             labelText: 'Input Kode / Token Tiket QR',
                             hintText: 'Contoh: TK-TECH-003',
                             prefixIcon: Icon(Icons.vpn_key),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
                           ),
                           onSubmitted: _handleScan,
                         ),
@@ -247,13 +323,23 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                       const SizedBox(width: 8),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
                         ),
                         onPressed: _isProcessing
                             ? null
                             : () => _handleScan(_tokenController.text),
                         child: _isProcessing
-                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
                             : const Text('Periksa'),
                       ),
                     ],
@@ -276,7 +362,10 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                     runSpacing: 8,
                     children: _quickPresets.map((p) {
                       return ActionChip(
-                        label: Text('${p['label']} (${p['code']})', style: const TextStyle(fontSize: 11)),
+                        label: Text(
+                          '${p['label']} (${p['code']})',
+                          style: const TextStyle(fontSize: 11),
+                        ),
                         onPressed: () => _handleScan(p['code']!),
                       );
                     }).toList(),
@@ -374,14 +463,21 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                         result.status == 'VALID'
                             ? 'CHECK-IN BERHASIL'
                             : result.status == 'OFFLINE_QUEUED'
-                                ? 'DISIMPAN OFFLINE'
-                                : result.status == 'ALREADY_CHECKED_IN'
-                                    ? 'TIKET SUDAH DIGUNAKAN'
-                                    : 'CHECK-IN DITOLAK',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: iconColor, fontSize: 15),
+                            ? 'DISIMPAN OFFLINE'
+                            : result.status == 'ALREADY_CHECKED_IN'
+                            ? 'TIKET SUDAH DIGUNAKAN'
+                            : 'CHECK-IN DITOLAK',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: iconColor,
+                          fontSize: 15,
+                        ),
                       ),
                       const SizedBox(height: 2),
-                      Text(result.message, style: const TextStyle(fontSize: 12)),
+                      Text(
+                        result.message,
+                        style: const TextStyle(fontSize: 12),
+                      ),
                     ],
                   ),
                 ),
@@ -392,24 +488,51 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Peserta:', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                  Text(result.attendee!.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const Text(
+                    'Peserta:',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                  Text(
+                    result.attendee!.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 4),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Kategori:', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                  Text(result.attendee!.ticketType, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const Text(
+                    'Kategori:',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                  Text(
+                    result.attendee!.ticketType,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 4),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Kode Tiket:', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                  Text(result.attendee!.ticketCode, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const Text(
+                    'Kode Tiket:',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                  Text(
+                    result.attendee!.ticketCode,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -446,9 +569,15 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                     children: [
                       Text(
                         'Riwayat Check-in (${checkedInList.length} Peserta)',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
                     ],
                   ),
                   const Divider(),
@@ -467,21 +596,48 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                           final a = checkedInList[idx];
                           return ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: a.isOfflinePending ? Colors.orange.shade100 : Colors.green.shade100,
+                              backgroundColor: a.isOfflinePending
+                                  ? Colors.orange.shade100
+                                  : Colors.green.shade100,
                               child: Icon(
-                                a.isOfflinePending ? Icons.cloud_off : Icons.check,
-                                color: a.isOfflinePending ? Colors.orange : Colors.green,
+                                a.isOfflinePending
+                                    ? Icons.cloud_off
+                                    : Icons.check,
+                                color: a.isOfflinePending
+                                    ? Colors.orange
+                                    : Colors.green,
                                 size: 18,
                               ),
                             ),
-                            title: Text(a.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            title: Text(
+                              a.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             subtitle: Text(
                               '${a.ticketCode} • ${a.ticketType}\nOleh: ${a.checkedInBy ?? "-"} (${a.checkedInAt?.hour}:${a.checkedInAt?.minute.toString().padLeft(2, "0")} WIB)',
                               style: const TextStyle(fontSize: 11),
                             ),
                             trailing: a.isOfflinePending
-                                ? const Chip(label: Text('Offline', style: TextStyle(fontSize: 10, color: Colors.orange)))
-                                : const Chip(label: Text('Tersinkron', style: TextStyle(fontSize: 10, color: Colors.green))),
+                                ? const Chip(
+                                    label: Text(
+                                      'Offline',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.orange,
+                                      ),
+                                    ),
+                                  )
+                                : const Chip(
+                                    label: Text(
+                                      'Tersinkron',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.green,
+                                      ),
+                                    ),
+                                  ),
                           );
                         },
                       ),
@@ -495,4 +651,3 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
     );
   }
 }
-

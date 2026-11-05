@@ -148,10 +148,47 @@ void main() {
     final submitted = await provider.submitForReview(created!.id);
     expect(submitted?.status, OrganizerEventStatus.pendingReview);
 
-    final listed =
-        provider.events.firstWhere((event) => event.id == created.id);
+    final listed = provider.events.firstWhere(
+      (event) => event.id == created.id,
+    );
     expect(listed.status, OrganizerEventStatus.pendingReview);
   });
+
+  test(
+    'moderation revision dapat diedit dan diajukan ulang hingga approved',
+    () async {
+      final provider = buildProvider();
+      final created = await provider.createEvent(buildDraft());
+      expect(created, isNotNull);
+
+      final submitted = await provider.submitForReview(created!.id);
+      expect(submitted?.status, OrganizerEventStatus.pendingReview);
+      final revision = await provider.simulateModeration(
+        created.id,
+        OrganizerModerationDecision.requestRevision,
+        note: 'Lengkapi lokasi acara.',
+      );
+      expect(revision?.status, OrganizerEventStatus.revisionRequested);
+      expect(revision?.reviewNote, 'Lengkapi lokasi acara.');
+
+      final edited = await provider.updateEvent(
+        created.id,
+        buildDraft(title: 'Event Provider Revisi'),
+      );
+      expect(edited?.status, OrganizerEventStatus.revisionRequested);
+      final resubmitted = await provider.submitForReview(
+        created.id,
+        resubmit: true,
+      );
+      expect(resubmitted?.status, OrganizerEventStatus.pendingReview);
+      final approved = await provider.simulateModeration(
+        created.id,
+        OrganizerModerationDecision.approve,
+      );
+      expect(approved?.status, OrganizerEventStatus.approved);
+      expect(approved?.isPublic, isTrue);
+    },
+  );
 
   test('deleteEvent hanya berhasil untuk draft', () async {
     final provider = buildProvider();

@@ -94,10 +94,14 @@ class _AssistedRegistrationScreenState
   }
 
   void _handleSubmit() {
-    if (!widget.contextScope.hasPermission(OrganizerPermission.assistRegistration)) {
+    if (!widget.contextScope.hasPermission(
+      OrganizerPermission.assistRegistration,
+    )) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Akses Ditolak: Anda tidak memiliki izin ASSIST_REGISTRATION.'),
+          content: Text(
+            'Akses Ditolak: Anda tidak memiliki izin ASSIST_REGISTRATION.',
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -116,17 +120,19 @@ class _AssistedRegistrationScreenState
       };
     }).toList();
 
-    final result = OrganizerOperationsRepository.instance.createAssistedRegistration(
-      eventId: widget.eventId,
-      ordererName: _ordererNameController.text.trim(),
-      ordererEmail: _ordererEmailController.text.trim(),
-      ordererPhone: _ordererPhoneController.text.trim(),
-      ticketType: _selectedTicketType,
-      unitPrice: _ticketPrice,
-      attendeeDetails: attendeeDetails,
-      actorId: widget.contextScope.userId,
-      actorName: widget.contextScope.userName,
-    );
+    final result = OrganizerOperationsRepository.instance
+        .createAssistedRegistration(
+          eventId: widget.eventId,
+      context: widget.contextScope,
+          ordererName: _ordererNameController.text.trim(),
+          ordererEmail: _ordererEmailController.text.trim(),
+          ordererPhone: _ordererPhoneController.text.trim(),
+          ticketType: _selectedTicketType,
+          unitPrice: _ticketPrice,
+          attendeeDetails: attendeeDetails,
+          actorId: widget.contextScope.userId,
+          actorName: widget.contextScope.userName,
+        );
 
     setState(() {
       _isSubmitting = false;
@@ -135,36 +141,32 @@ class _AssistedRegistrationScreenState
 
     if (!result.isSuccess) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.message),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text(result.message), backgroundColor: Colors.red),
       );
     }
   }
 
   String _formatCurrency(double amount) {
     final str = amount.toInt().toString().replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (Match m) => '${m[1]}.',
-        );
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
     return 'Rp $str';
   }
 
   @override
   Widget build(BuildContext context) {
-    final hasPermission =
-        widget.contextScope.hasPermission(OrganizerPermission.assistRegistration);
+    final hasPermission = widget.contextScope.hasPermission(
+      OrganizerPermission.assistRegistration,
+    );
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Registrasi Dibantu'),
-      ),
+      appBar: AppBar(title: const Text('Registrasi Dibantu')),
       body: !hasPermission
           ? _buildAccessDenied()
           : _result != null && _result!.isSuccess
-              ? _buildSuccessView(_result!)
-              : _buildFormView(),
+          ? _buildSuccessView(_result!)
+          : _buildFormView(),
     );
   }
 
@@ -226,7 +228,10 @@ class _AssistedRegistrationScreenState
                   Expanded(
                     child: Text(
                       'Pendaftar: ${widget.contextScope.userName} (${widget.contextScope.role.toUpperCase()})\nEvent: ${widget.eventName}',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -246,7 +251,9 @@ class _AssistedRegistrationScreenState
                 labelText: 'Nama Lengkap Pemesan *',
                 prefixIcon: Icon(Icons.person),
               ),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Nama pemesan wajib diisi' : null,
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Nama pemesan wajib diisi'
+                  : null,
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -257,7 +264,8 @@ class _AssistedRegistrationScreenState
                 prefixIcon: Icon(Icons.email),
               ),
               validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Email pemesan wajib diisi';
+                if (v == null || v.trim().isEmpty)
+                  return 'Email pemesan wajib diisi';
                 if (!v.contains('@')) return 'Format email tidak valid';
                 return null;
               },
@@ -270,7 +278,9 @@ class _AssistedRegistrationScreenState
                 labelText: 'Nomor WhatsApp / HP *',
                 prefixIcon: Icon(Icons.phone),
               ),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Nomor HP wajib diisi' : null,
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Nomor HP wajib diisi'
+                  : null,
             ),
             const SizedBox(height: 24),
 
@@ -285,7 +295,9 @@ class _AssistedRegistrationScreenState
               items: _ticketTiers.keys.map((tier) {
                 return DropdownMenuItem(
                   value: tier,
-                  child: Text('$tier (${_formatCurrency(_ticketTiers[tier]!)})'),
+                  child: Text(
+                    '$tier (${_formatCurrency(_ticketTiers[tier]!)})',
+                  ),
                 );
               }).toList(),
               onChanged: (val) {
@@ -308,7 +320,10 @@ class _AssistedRegistrationScreenState
               children: [
                 Text(
                   'Data Peserta ($count Orang)',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
                 TextButton.icon(
                   onPressed: count < 5 ? _addAttendeeField : null,
@@ -321,7 +336,9 @@ class _AssistedRegistrationScreenState
             ...List.generate(count, (index) {
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Column(
@@ -336,7 +353,10 @@ class _AssistedRegistrationScreenState
                           ),
                           if (count > 1)
                             IconButton(
-                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: Colors.red,
+                              ),
                               onPressed: () => _removeAttendeeField(index),
                             ),
                         ],
@@ -344,16 +364,24 @@ class _AssistedRegistrationScreenState
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _attendeesControllers[index]['name'],
-                        decoration: const InputDecoration(labelText: 'Nama Peserta *'),
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Nama peserta wajib' : null,
+                        decoration: const InputDecoration(
+                          labelText: 'Nama Peserta *',
+                        ),
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Nama peserta wajib'
+                            : null,
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _attendeesControllers[index]['email'],
-                        decoration: const InputDecoration(labelText: 'Email Peserta *'),
+                        decoration: const InputDecoration(
+                          labelText: 'Email Peserta *',
+                        ),
                         validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Email peserta wajib';
-                          if (!v.contains('@')) return 'Format email tidak valid';
+                          if (v == null || v.trim().isEmpty)
+                            return 'Email peserta wajib';
+                          if (!v.contains('@'))
+                            return 'Format email tidak valid';
                           return null;
                         },
                       ),
@@ -377,7 +405,9 @@ class _AssistedRegistrationScreenState
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('$_selectedTicketType ($count x ${_formatCurrency(_ticketPrice)})'),
+                      Text(
+                        '$_selectedTicketType ($count x ${_formatCurrency(_ticketPrice)})',
+                      ),
                       Text(_formatCurrency(subtotal)),
                     ],
                   ),
@@ -393,8 +423,21 @@ class _AssistedRegistrationScreenState
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Total Tagihan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      Text(_formatCurrency(grandTotal), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.primaryColor)),
+                      const Text(
+                        'Total Tagihan',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Text(
+                        _formatCurrency(grandTotal),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: AppTheme.primaryColor,
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -410,7 +453,10 @@ class _AssistedRegistrationScreenState
                 onPressed: _isSubmitting ? null : _handleSubmit,
                 child: _isSubmitting
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Buat Pesanan & Terbitkan VA Demo', style: TextStyle(fontWeight: FontWeight.bold)),
+                    : const Text(
+                        'Buat Pesanan & Terbitkan VA Demo',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
               ),
             ),
           ],
@@ -453,29 +499,55 @@ class _AssistedRegistrationScreenState
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(result.vaBank ?? 'BCA Virtual Account', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Text(
+                      result.vaBank ?? 'BCA Virtual Account',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.orange.shade100,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Text('MENUNGGU PEMBAYARAN', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange)),
+                      child: const Text(
+                        'MENUNGGU PEMBAYARAN',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange,
+                        ),
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                const Text('Nomor Virtual Account Demo:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const Text(
+                  'Nomor Virtual Account Demo:',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
                 Text(
                   result.vaNumber ?? '880012345678',
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 2),
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('Total Tagihan:'),
-                    Text(_formatCurrency(result.totalAmount ?? 0), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text(
+                      _formatCurrency(result.totalAmount ?? 0),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -492,7 +564,11 @@ class _AssistedRegistrationScreenState
           const Text(
             'Catatan: Sesuai aturan PRD (FR-30–35), status pembayaran tetap "pending" sampai peserta menyelesaikan transaksi melalui simulasi atau konfirmasi resmi.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic),
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey,
+              fontStyle: FontStyle.italic,
+            ),
           ),
           const SizedBox(height: 32),
 

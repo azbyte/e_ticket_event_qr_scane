@@ -31,20 +31,25 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
       OrganizerOperationsRepository.instance;
 
   String _selectedTierFilter = 'Semua';
+  DateTimeRange? _selectedDateRange;
 
   String _formatCurrency(double amount) {
     final str = amount.toInt().toString().replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (Match m) => '${m[1]}.',
-        );
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
     return 'Rp $str';
   }
 
   void _handleExport() {
-    if (!widget.contextScope.hasPermission(OrganizerPermission.exportParticipants)) {
+    if (!widget.contextScope.hasPermission(
+      OrganizerPermission.exportParticipants,
+    )) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Akses Ditolak: Anda tidak memiliki izin EXPORT_PARTICIPANTS.'),
+          content: Text(
+            'Akses Ditolak: Anda tidak memiliki izin EXPORT_PARTICIPANTS.',
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -52,7 +57,10 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
     }
 
     try {
-      final csvData = _repo.exportAttendeesCsv(widget.eventId, widget.contextScope);
+      final csvData = _repo.exportAttendeesCsv(
+        widget.eventId,
+        widget.contextScope,
+      );
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -61,7 +69,9 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Data operasional event "${widget.eventName}" berhasil dikompilasi ke format CSV (Simulasi Offline).'),
+              Text(
+                'Data operasional event "${widget.eventName}" berhasil dikompilasi ke format CSV (Simulasi Offline).',
+              ),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(8),
@@ -83,15 +93,38 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal mengekspor: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Gagal mengekspor: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
 
+  Future<void> _selectDateRange() async {
+    final now = DateTime.now();
+    final selected = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 5),
+      lastDate: DateTime(now.year + 5),
+      initialDateRange: _selectedDateRange,
+      helpText: 'Pilih periode laporan',
+    );
+    if (!mounted || selected == null) return;
+    setState(() => _selectedDateRange = selected);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final hasReportPermission =
-        widget.contextScope.hasPermission(OrganizerPermission.viewReports);
+    if (widget.contextScope.eventId != widget.eventId) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Laporan Event')),
+        body: const Center(child: Text('Akses ditolak untuk event ini.')),
+      );
+    }
+    final hasReportPermission = widget.contextScope.hasPermission(
+      OrganizerPermission.viewReports,
+    );
 
     if (!hasReportPermission) {
       return Scaffold(
@@ -121,7 +154,21 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
       );
     }
 
-    final report = _repo.getEventReport(widget.eventId);
+    final report = _repo.getEventReport(
+      widget.eventId,
+      ticketType: _selectedTierFilter == 'Semua' ? null : _selectedTierFilter,
+      from: _selectedDateRange?.start,
+      through: _selectedDateRange == null
+          ? null
+          : DateTime(
+              _selectedDateRange!.end.year,
+              _selectedDateRange!.end.month,
+              _selectedDateRange!.end.day,
+              23,
+              59,
+              59,
+            ),
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -139,6 +186,16 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            OutlinedButton.icon(
+              key: const Key('report-date-filter'),
+              onPressed: _selectDateRange,
+              icon: const Icon(Icons.date_range),
+              label: Text(
+                _selectedDateRange == null
+                    ? 'Filter tanggal'
+                    : '${_selectedDateRange!.start.day}/${_selectedDateRange!.start.month}/${_selectedDateRange!.start.year} – ${_selectedDateRange!.end.day}/${_selectedDateRange!.end.month}/${_selectedDateRange!.end.year}',
+              ),
+            ),
             // Event Header
             Text(
               widget.eventName,
@@ -209,7 +266,9 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
             const SizedBox(height: 8),
             Card(
               elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -221,7 +280,7 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
                     ),
                     const Divider(height: 16),
                     _buildFinanceRow(
-                      'Komisi Platform E-Ticket (5%)',
+                      'Komisi Platform E-Ticket',
                       '- ${_formatCurrency(report.platformCommission)}',
                       textColor: Colors.red.shade700,
                     ),
@@ -258,7 +317,10 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
                   Expanded(
                     child: Text(
                       'Catatan: Pendapatan paket langganan platform (${_formatCurrency(report.packageRevenue)}) dipisahkan secara ketat dan bukan bagian dari hasil penjualan tiket acara.',
-                      style: const TextStyle(fontSize: 11, color: Colors.black87),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.black87,
+                      ),
                     ),
                   ),
                 ],
@@ -278,13 +340,13 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
                   value: _selectedTierFilter,
                   isDense: true,
                   underline: const SizedBox(),
-                  items: [
-                    'Semua',
-                    ...report.tierBreakdown.keys,
-                  ]
-                      .map((k) => DropdownMenuItem(
+                  items: ['Semua', ...report.tierBreakdown.keys]
+                      .map(
+                        (k) => DropdownMenuItem(
                           value: k,
-                          child: Text(k, style: const TextStyle(fontSize: 12))))
+                          child: Text(k, style: const TextStyle(fontSize: 12)),
+                        ),
+                      )
                       .toList(),
                   onChanged: (val) {
                     if (val != null) {
@@ -296,50 +358,63 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
             ),
             const SizedBox(height: 12),
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
-                  children: (report.tierBreakdown.entries.where((e) =>
-                          _selectedTierFilter == 'Semua' ||
-                          e.key == _selectedTierFilter)).map((e) {
-                    final tierName = e.key;
-                    final count = e.value;
-                    final pct = report.totalTicketsSold > 0
-                        ? (count / report.totalTicketsSold)
-                        : 0.0;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children:
+                      (report.tierBreakdown.entries.where(
+                        (e) =>
+                            _selectedTierFilter == 'Semua' ||
+                            e.key == _selectedTierFilter,
+                      )).map((e) {
+                        final tierName = e.key;
+                        final count = e.value;
+                        final pct = report.totalTicketsSold > 0
+                            ? (count / report.totalTicketsSold)
+                            : 0.0;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(tierName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              Text('$count Tiket (${(pct * 100).toStringAsFixed(0)}%)'),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: pct,
-                              minHeight: 8,
-                              backgroundColor: Colors.grey.shade200,
-                              valueColor: AlwaysStoppedAnimation(
-                                tierName == 'VIP Pass'
-                                    ? Colors.amber.shade700
-                                    : tierName == 'Regular Pass'
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    tierName,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    '$count Tiket (${(pct * 100).toStringAsFixed(0)}%)',
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: LinearProgressIndicator(
+                                  value: pct,
+                                  minHeight: 8,
+                                  backgroundColor: Colors.grey.shade200,
+                                  valueColor: AlwaysStoppedAnimation(
+                                    tierName == 'VIP Pass'
+                                        ? Colors.amber.shade700
+                                        : tierName == 'Regular Pass'
                                         ? AppTheme.primaryColor
                                         : Colors.teal,
+                                  ),
+                                ),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
+                        );
+                      }).toList(),
                 ),
               ),
             ),
@@ -382,10 +457,19 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
               child: Icon(icon, color: color, size: 18),
             ),
             const SizedBox(height: 12),
-            Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 2),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-            Text(subtitle, style: TextStyle(color: Colors.grey.shade500, fontSize: 10)),
+            Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            ),
+            Text(
+              subtitle,
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
+            ),
           ],
         ),
       ),

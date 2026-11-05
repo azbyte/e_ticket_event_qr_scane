@@ -13,6 +13,7 @@ void main() {
 
     setUp(() {
       repo = OrganizerOperationsRepository.instance;
+      repo.resetMockData();
       ownerContext = OrganizerMembershipContext.owner(
         userId: 'usr-org-001',
         userName: 'Penyelenggara Tech (Owner)',
@@ -51,11 +52,17 @@ void main() {
       expect(attendee.email, isNot(equals(attendee.maskedEmail)));
 
       // Search by name
-      final searchResult = repo.getAttendeesForEvent('evt-001', search: 'Ahmad');
+      final searchResult = repo.getAttendeesForEvent(
+        'evt-001',
+        search: 'Ahmad',
+      );
       expect(searchResult.any((a) => a.name.contains('Ahmad')), isTrue);
 
       // Filter by check-in status
-      final checkedInOnly = repo.getAttendeesForEvent('evt-001', filterStatus: 'checked_in');
+      final checkedInOnly = repo.getAttendeesForEvent(
+        'evt-001',
+        filterStatus: 'checked_in',
+      );
       for (final a in checkedInOnly) {
         expect(a.checkedIn, isTrue);
       }
@@ -63,6 +70,11 @@ void main() {
       // Isolation from other events
       final otherEventAttendees = repo.getAttendeesForEvent('evt-999');
       expect(otherEventAttendees.isEmpty, isTrue);
+      final pendingPayment = repo.getAttendeesForEvent(
+        'evt-001',
+        filterPaymentStatus: 'pending',
+      );
+      expect(pendingPayment.every((a) => a.paymentStatus == 'pending'), isTrue);
     });
 
     test('2. Assisted Registration validation, VA creation, and pending status (FR-30-35)', () {
@@ -89,8 +101,16 @@ void main() {
         ticketType: 'Regular Pass',
         unitPrice: 350000,
         attendeeDetails: [
-          {'name': 'Peserta 1', 'email': 'same@example.com', 'phone': '081111111'},
-          {'name': 'Peserta 2', 'email': 'same@example.com', 'phone': '082222222'},
+          {
+            'name': 'Peserta 1',
+            'email': 'same@example.com',
+            'phone': '081111111',
+          },
+          {
+            'name': 'Peserta 2',
+            'email': 'same@example.com',
+            'phone': '082222222',
+          },
         ],
         actorId: ownerContext.userId,
         actorName: ownerContext.userName,
@@ -107,7 +127,11 @@ void main() {
         ticketType: 'Regular Pass',
         unitPrice: 350000,
         attendeeDetails: [
-          {'name': 'Bambang Sudiro', 'email': 'bambang.sudiro@example.com', 'phone': '081555667788'},
+          {
+            'name': 'Bambang Sudiro',
+            'email': 'bambang.sudiro@example.com',
+            'phone': '081555667788',
+          },
         ],
         actorId: ownerContext.userId,
         actorName: ownerContext.userName,
@@ -125,6 +149,32 @@ void main() {
       expect(createdAttendee.orderStatus, equals('pending'));
       expect(createdAttendee.checkedIn, isFalse);
       expect(createdAttendee.assistedBy, equals(ownerContext.userName));
+    });
+
+    test('assisted registration denies wrong event and missing permission', () {
+      final denied = repo.createAssistedRegistration(
+        eventId: 'evt-001',
+        context: OrganizerMembershipContext.staff(
+          eventId: 'evt-999',
+          permissions: {OrganizerPermission.assistRegistration},
+        ),
+        ordererName: 'Nadia',
+        ordererEmail: 'nadia@example.com',
+        ordererPhone: '081234567890',
+        ticketType: 'Regular Pass',
+        unitPrice: 350000,
+        attendeeDetails: [
+          {
+            'name': 'Nadia',
+            'email': 'nadia@example.com',
+            'phone': '081234567890',
+          },
+        ],
+        actorId: 'staff-1',
+        actorName: 'Staff',
+      );
+      expect(denied.isSuccess, isFalse);
+      expect(denied.createdAttendees, isEmpty);
     });
 
     test('3. Scanner validation & edge cases (valid, already used, wrong event, cancelled, invalid)', () {
@@ -182,7 +232,10 @@ void main() {
       expect(validResult.isSuccess, isTrue);
       expect(validResult.status, equals('VALID'));
       expect(validResult.attendee?.checkedIn, isTrue);
-      expect(validResult.attendee?.checkedInBy, equals(gateStaffContext.userName));
+      expect(
+        validResult.attendee?.checkedInBy,
+        equals(gateStaffContext.userName),
+      );
 
       // Re-scan same ticket must now fail
       final reScanResult = repo.validateAndCheckIn(
@@ -229,7 +282,10 @@ void main() {
       expect(report.paymentGatewayFee, greaterThan(0));
 
       // Strict PRD 13.3 math check: Organizer Proceeds = Gross - Commission - Gateway
-      final calculatedProceeds = report.grossSales - report.platformCommission - report.paymentGatewayFee;
+      final calculatedProceeds =
+          report.grossSales -
+          report.platformCommission -
+          report.paymentGatewayFee;
       expect(report.organizerProceeds, closeTo(calculatedProceeds, 0.01));
 
       // Package revenue is isolated
@@ -273,6 +329,60 @@ void main() {
           .first;
       expect(latest.action, equals('UPDATE_EVENT_SCHEDULE'));
       expect(latest.summary, contains('keynote'));
+    });
+
+    test('event scope and scan-only permission are enforced in repository', () {
+      final wrongEventContext = OrganizerMembershipContext.staff(
+        eventId: 'evt-999',
+        permissions: {
+          OrganizerPermission.scanTicket,
+          OrganizerPermission.checkInTicket,
+        },
+      );
+      final outOfScope = repo.validateAndCheckIn(
+        eventId: 'evt-001',
+        ticketCode: 'TK-TECH-003',
+        context: wrongEventContext,
+      );
+      expect(outOfScope.status, 'DENIED');
+
+      final scanOnly = OrganizerMembershipContext.staff(
+        eventId: 'evt-001',
+        permissions: {OrganizerPermission.scanTicket},
+      );
+      final validWithoutCheckIn = repo.validateAndCheckIn(
+        eventId: 'evt-001',
+        ticketCode: 'TK-TECH-003',
+        context: scanOnly,
+      );
+      expect(validWithoutCheckIn.status, 'VALID_SCAN_ONLY');
+      expect(validWithoutCheckIn.attendee?.checkedIn, isFalse);
+    });
+
+    test('report filters by ticket type and date range', () {
+      final vip = repo.getEventReport('evt-001', ticketType: 'VIP Pass');
+      expect(vip.tierBreakdown.keys, everyElement('VIP Pass'));
+      final emptyPeriod = repo.getEventReport(
+        'evt-001',
+        from: DateTime(2099),
+        through: DateTime(2099, 12, 31),
+      );
+      expect(emptyPeriod.totalTicketsSold, 0);
+      expect(emptyPeriod.grossSales, 0);
+    });
+
+    test('offline sync leaves other event queue entries untouched', () {
+      repo.toggleOfflineMode(true);
+      repo.validateAndCheckIn(
+        eventId: 'evt-001',
+        ticketCode: 'TK-TECH-004',
+        context: gateStaffContext,
+      );
+      final before = repo.offlineQueue.length;
+      repo.syncOfflineQueue('evt-999');
+      expect(repo.offlineQueue.length, before);
+      repo.syncOfflineQueue('evt-001');
+      repo.toggleOfflineMode(false);
     });
   });
 }

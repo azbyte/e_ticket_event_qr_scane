@@ -13,20 +13,17 @@ const String ownerId = OrganizerEventFixtures.demoOwnerId;
 MockOrganizerEventRepository buildRepository() =>
     MockOrganizerEventRepository(latency: Duration.zero);
 
-Widget wrap(Widget child) => MaterialApp(
-      theme: ThemeData(useMaterial3: true),
-      home: child,
-    );
+Widget wrap(Widget child) =>
+    MaterialApp(theme: ThemeData(useMaterial3: true), home: child);
 
 void main() {
   testWidgets('daftar menampilkan event milik Owner beserta status', (
     tester,
   ) async {
     final repository = buildRepository();
-    await tester.pumpWidget(wrap(EventManagementScreen(
-      repository: repository,
-      ownerId: ownerId,
-    )));
+    await tester.pumpWidget(
+      wrap(EventManagementScreen(repository: repository, ownerId: ownerId)),
+    );
     await tester.pumpAndSettle(const Duration(milliseconds: 2000));
 
     expect(find.text('Event Saya'), findsOneWidget);
@@ -38,10 +35,11 @@ void main() {
   });
 
   testWidgets('filter draft hanya menampilkan draft', (tester) async {
-    await tester.pumpWidget(wrap(EventManagementScreen(
-      repository: buildRepository(),
-      ownerId: ownerId,
-    )));
+    await tester.pumpWidget(
+      wrap(
+        EventManagementScreen(repository: buildRepository(), ownerId: ownerId),
+      ),
+    );
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
     // Tap chip "Draft" di bar filter (yang pertama)
@@ -53,10 +51,11 @@ void main() {
   });
 
   testWidgets('pencarian tanpa hasil menampilkan state empty', (tester) async {
-    await tester.pumpWidget(wrap(EventManagementScreen(
-      repository: buildRepository(),
-      ownerId: ownerId,
-    )));
+    await tester.pumpWidget(
+      wrap(
+        EventManagementScreen(repository: buildRepository(), ownerId: ownerId),
+      ),
+    );
     await tester.pumpAndSettle();
 
     await tester.enterText(
@@ -71,10 +70,14 @@ void main() {
   testWidgets('owner tanpa event melihat empty state dengan aksi buat', (
     tester,
   ) async {
-    await tester.pumpWidget(wrap(EventManagementScreen(
-      repository: MockOrganizerEventRepository.empty(),
-      ownerId: ownerId,
-    )));
+    await tester.pumpWidget(
+      wrap(
+        EventManagementScreen(
+          repository: MockOrganizerEventRepository.empty(),
+          ownerId: ownerId,
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Belum ada event'), findsOneWidget);
@@ -84,19 +87,21 @@ void main() {
   testWidgets('kegagalan muat menampilkan error dan dapat dicoba lagi', (
     tester,
   ) async {
-    final repository = buildRepository()..setFailure(value: true);
-    await tester.pumpWidget(wrap(EventManagementScreen(
-      repository: repository,
-      ownerId: ownerId,
-    )));
+    final repository = MockOrganizerEventRepository(
+      latency: const Duration(milliseconds: 1),
+    )..setFailure(value: true);
+    await tester.pumpWidget(
+      wrap(EventManagementScreen(repository: repository, ownerId: ownerId)),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Gagal memuat data'), findsOneWidget);
 
     repository.setFailure(value: false);
-    await tester.pump();
     await tester.tap(find.text('Coba lagi'));
-    await tester.pumpAndSettle(const Duration(seconds: 2));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 10));
+    await tester.pumpAndSettle();
 
     expect(find.text('Jakarta Music Fest 2026'), findsOneWidget);
   });
@@ -104,10 +109,14 @@ void main() {
   testWidgets('repository kosong menunjukkan empty state (bukan shared)', (
     tester,
   ) async {
-    await tester.pumpWidget(wrap(EventManagementScreen(
-      repository: MockOrganizerEventRepository.empty(),
-      ownerId: ownerId,
-    )));
+    await tester.pumpWidget(
+      wrap(
+        EventManagementScreen(
+          repository: MockOrganizerEventRepository.empty(),
+          ownerId: ownerId,
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Belum ada event'), findsOneWidget);
@@ -116,11 +125,15 @@ void main() {
   testWidgets('detail event menampilkan ringkasan dan kategori tiket', (
     tester,
   ) async {
-    await tester.pumpWidget(wrap(OrganizerEventDetailScreen(
-      eventId: 'evt-1001',
-      ownerId: ownerId,
-      repository: buildRepository(),
-    )));
+    await tester.pumpWidget(
+      wrap(
+        OrganizerEventDetailScreen(
+          eventId: 'evt-1001',
+          ownerId: ownerId,
+          repository: buildRepository(),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Jakarta Music Fest 2026'), findsOneWidget);
@@ -139,11 +152,15 @@ void main() {
   testWidgets('detail event milik owner lain menampilkan akses ditolak', (
     tester,
   ) async {
-    await tester.pumpWidget(wrap(OrganizerEventDetailScreen(
-      eventId: 'evt-9001',
-      ownerId: ownerId,
-      repository: buildRepository(),
-    )));
+    await tester.pumpWidget(
+      wrap(
+        OrganizerEventDetailScreen(
+          eventId: 'evt-9001',
+          ownerId: ownerId,
+          repository: buildRepository(),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Akses ditolak'), findsOneWidget);
@@ -154,24 +171,28 @@ void main() {
     tester,
   ) async {
     final repository = buildRepository();
-    await tester.pumpWidget(wrap(Builder(
-      builder: (context) => Scaffold(
-        body: Center(
-          child: ElevatedButton(
-            onPressed: () => Navigator.of(context).push<void>(
-              MaterialPageRoute<void>(
-                builder: (_) => EventFormScreen(
-                  eventId: 'evt-1004',
-                  repository: repository,
-                  ownerId: ownerId,
+    await tester.pumpWidget(
+      wrap(
+        Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) => EventFormScreen(
+                      eventId: 'evt-1004',
+                      repository: repository,
+                      ownerId: ownerId,
+                    ),
+                  ),
                 ),
+                child: const Text('Buka form'),
               ),
             ),
-            child: const Text('Buka form'),
           ),
         ),
       ),
-    )));
+    );
 
     await tester.tap(find.text('Buka form'));
     await tester.pumpAndSettle();
