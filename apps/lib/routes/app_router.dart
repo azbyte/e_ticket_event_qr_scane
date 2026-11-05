@@ -1,7 +1,8 @@
-/// Route generator.
+/// Route generator for routes package (PRD section 7).
 ///
-/// Routes are stubs pending UI implementation (PRD section 7). Each route
-/// returns a MaterialPageRoute to a placeholder screen.
+/// Centralized fallback & placeholder routing matching AppRoutes constants.
+library;
+
 import 'package:flutter/material.dart';
 
 import 'app_routes.dart';
@@ -17,6 +18,21 @@ class AppRouter {
         return _placeholder('Login');
       case AppRoutes.register:
         return _placeholder('Registrasi');
+      case AppRoutes.organizerDashboard:
+        return _placeholder('Dashboard Penyelenggara');
+      case AppRoutes.organizerTeam:
+        return _placeholder('Manajemen Tim Penyelenggara');
+      case AppRoutes.organizerPlans:
+      case AppRoutes.organizerPlanTransactions:
+        return _placeholder('Paket & Langganan');
+      case AppRoutes.organizerSupport:
+      case AppRoutes.organizerSupportNew:
+        return _placeholder('Pusat Bantuan & Pengaduan');
+      case AppRoutes.staffDashboard:
+      case AppRoutes.staffAssignedEvents:
+        return _placeholder('Dashboard Staf Event');
+      case AppRoutes.accessDenied:
+        return _placeholder('Akses Ditolak');
       default:
         return _placeholder('Halaman ${settings.name ?? '-'}');
     }
@@ -26,7 +42,7 @@ class AppRouter {
     return MaterialPageRoute(
       builder: (_) => Scaffold(
         appBar: AppBar(title: Text(title)),
-        body: Center(child: Text('Halaman $title belum diimplementasi.')),
+        body: Center(child: Text('Halaman $title')),
       ),
     );
   }

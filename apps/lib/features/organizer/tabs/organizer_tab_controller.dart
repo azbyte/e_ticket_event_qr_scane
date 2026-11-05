@@ -38,7 +38,7 @@ class _OrganizerTabControllerState extends State<OrganizerTabController> {
   Widget build(BuildContext context) {
     final screens = [
       OrganizerDashboardScreen(organizerProvider: _provider),
-      EventManagementScreen(organizerProvider: _provider),
+      const EventManagementScreen(),
       const AttendeeListScreen(),
       StaffManagementScreen(organizerProvider: _provider),
     ];

@@ -40,4 +40,13 @@ class AppRoutes {
   static const String adminDashboard = '/admin';
   static const String adminEventModeration = '/admin/events';
   static const String adminReports = '/admin/reports';
+
+  // Organizer extensions (FR-60-65, FR-76-79, FR-95-96)
+  static const String organizerPlans = '/organizer/plans';
+  static const String organizerPlanTransactions = '/organizer/plans/transactions';
+  static const String organizerSupport = '/organizer/support';
+  static const String organizerSupportNew = '/organizer/support/new';
+  static const String organizerTeam = '/organizer/team';
+  static const String staffAssignedEvents = '/staff/events';
+  static const String accessDenied = '/access-denied';
 }
