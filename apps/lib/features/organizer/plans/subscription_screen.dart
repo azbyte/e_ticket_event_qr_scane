@@ -19,7 +19,8 @@ class SubscriptionScreen extends StatefulWidget {
   State<SubscriptionScreen> createState() => _SubscriptionScreenState();
 }
 
-class _SubscriptionScreenState extends State<SubscriptionScreen> with SingleTickerProviderStateMixin {
+class _SubscriptionScreenState extends State<SubscriptionScreen>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   final OrganizerPlansService _service = OrganizerPlansService.instance;
 
@@ -31,7 +32,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with SingleTick
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this, initialIndex: widget.initialTab);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTab,
+    );
     _loadData();
   }
 
@@ -86,7 +91,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with SingleTick
                   children: [
                     const Icon(Icons.check, size: 14, color: Colors.green),
                     const SizedBox(width: 6),
-                    Expanded(child: Text(f, style: const TextStyle(fontSize: 12))),
+                    Expanded(
+                      child: Text(f, style: const TextStyle(fontSize: 12)),
+                    ),
                   ],
                 ),
               ),
@@ -94,7 +101,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with SingleTick
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
           FilledButton(
             onPressed: () async {
               Navigator.pop(ctx);
@@ -102,7 +112,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with SingleTick
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Paket berhasil dialihkan ke ${plan.name} (Simulasi).'),
+                    content: Text(
+                      'Paket berhasil dialihkan ke ${plan.name} (Simulasi).',
+                    ),
                     backgroundColor: Colors.green.shade800,
                   ),
                 );
@@ -129,16 +141,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with SingleTick
                   controller: _tabController,
                   tabs: const [
                     Tab(icon: Icon(Icons.stars), text: 'Paket & Fitur'),
-                    Tab(icon: Icon(Icons.receipt_long), text: 'Riwayat Transaksi'),
+                    Tab(
+                      icon: Icon(Icons.receipt_long),
+                      text: 'Riwayat Transaksi',
+                    ),
                   ],
                 ),
                 Expanded(
                   child: TabBarView(
                     controller: _tabController,
-                    children: [
-                      _buildPlansTab(),
-                      _buildTransactionsTab(),
-                    ],
+                    children: [_buildPlansTab(), _buildTransactionsTab()],
                   ),
                 ),
               ],
@@ -156,7 +168,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with SingleTick
           if (_subscription != null)
             Card(
               color: Colors.indigo.shade50,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Row(
@@ -175,23 +189,39 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with SingleTick
                             children: [
                               Text(
                                 'Paket Aktif: ${_subscription!.planName}',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
                               ),
                               const SizedBox(width: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.green,
                                   borderRadius: BorderRadius.circular(4),
                                 ),
-                                child: const Text('AKTIF', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                child: const Text(
+                                  'AKTIF',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 4),
                           Text(
                             'Sisa masa aktif: ${_subscription!.remainingDays} hari (hingga ${_subscription!.endDate.day}/${_subscription!.endDate.month}/${_subscription!.endDate.year})',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade700,
+                            ),
                           ),
                         ],
                       ),
@@ -204,7 +234,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with SingleTick
           const SizedBox(height: 20),
           Text(
             'Pilihan Paket Penyelenggara Acara:',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
 
@@ -231,12 +262,20 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with SingleTick
                       children: [
                         Text(
                           p.name,
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
-                            color: isCurrent ? Colors.indigo.shade50 : Colors.grey.shade100,
+                            color: isCurrent
+                                ? Colors.indigo.shade50
+                                : Colors.grey.shade100,
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -244,7 +283,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with SingleTick
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: isCurrent ? Colors.indigo : Colors.grey.shade700,
+                              color: isCurrent
+                                  ? Colors.indigo
+                                  : Colors.grey.shade700,
                             ),
                           ),
                         ),
@@ -253,7 +294,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with SingleTick
                     const SizedBox(height: 4),
                     Text(
                       p.priceDescription,
-                      style: TextStyle(fontSize: 13, color: Colors.grey.shade800, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade800,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     const Divider(height: 20),
                     ...p.features.map(
@@ -261,9 +306,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with SingleTick
                         padding: const EdgeInsets.only(bottom: 6),
                         child: Row(
                           children: [
-                            const Icon(Icons.check_circle, size: 16, color: Colors.green),
+                            const Icon(
+                              Icons.check_circle,
+                              size: 16,
+                              color: Colors.green,
+                            ),
                             const SizedBox(width: 8),
-                            Expanded(child: Text(f, style: const TextStyle(fontSize: 13))),
+                            Expanded(
+                              child: Text(
+                                f,
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -271,7 +325,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with SingleTick
                     const SizedBox(height: 12),
                     FilledButton.tonal(
                       onPressed: isCurrent ? null : () => _showUpgradeDialog(p),
-                      child: Text(isCurrent ? 'Sedang Digunakan' : 'Pilih Paket Ini'),
+                      child: Text(
+                        isCurrent ? 'Sedang Digunakan' : 'Pilih Paket Ini',
+                      ),
                     ),
                   ],
                 ),
@@ -289,7 +345,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with SingleTick
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey.shade400),
+            Icon(
+              Icons.receipt_long_outlined,
+              size: 64,
+              color: Colors.grey.shade400,
+            ),
             const SizedBox(height: 12),
             const Text('Belum ada riwayat transaksi paket.'),
           ],
@@ -305,14 +365,21 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with SingleTick
         final trx = _transactions[index];
         return Card(
           elevation: 1,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           child: ListTile(
             leading: const CircleAvatar(
               backgroundColor: Colors.teal,
               child: Icon(Icons.receipt, color: Colors.white),
             ),
-            title: Text(trx.planName, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('${trx.invoiceNumber}\n${trx.paymentMethod} • ${trx.transactionDate.day}/${trx.transactionDate.month}/${trx.transactionDate.year}'),
+            title: Text(
+              trx.planName,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(
+              '${trx.invoiceNumber}\n${trx.paymentMethod} • ${trx.transactionDate.day}/${trx.transactionDate.month}/${trx.transactionDate.year}',
+            ),
             isThreeLine: true,
             trailing: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -320,15 +387,28 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with SingleTick
               children: [
                 Text(
                   'Rp ${trx.amount.toInt()}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(4)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
                   child: Text(
                     trx.status.toUpperCase(),
-                    style: TextStyle(fontSize: 10, color: Colors.green.shade800, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.green.shade800,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],

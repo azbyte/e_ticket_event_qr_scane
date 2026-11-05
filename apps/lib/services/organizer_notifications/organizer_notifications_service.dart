@@ -88,3 +88,4 @@ class OrganizerNotificationService {
 
   int get unreadCount => _mockItems.where((n) => !n.isRead).length;
 }
+

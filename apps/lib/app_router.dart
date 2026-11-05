@@ -27,7 +27,9 @@ class AppRouter {
     final uri = Uri.tryParse(settings.name ?? '/');
     final path = uri?.path ?? '/';
     final parts = path.split('/').where((part) => part.isNotEmpty).toList();
-    final args = settings.arguments is Map ? settings.arguments as Map : const {};
+    final args = settings.arguments is Map
+        ? settings.arguments as Map
+        : const {};
     Widget page;
 
     switch (path) {
@@ -56,7 +58,8 @@ class AppRouter {
       case AppRoutes.organizerTeam:
         page = TeamManagementScreen(
           eventId: args['eventId']?.toString() ?? 'evt-001',
-          eventTitle: args['eventTitle']?.toString() ?? 'Tech Innovation Summit 2026',
+          eventTitle:
+              args['eventTitle']?.toString() ?? 'Tech Innovation Summit 2026',
         );
         break;
       case AppRoutes.organizerPlans:
@@ -137,16 +140,22 @@ class AppRouter {
       builder: (context) {
         final auth = context.read<AuthProvider>();
         final role = auth.user?.role.name;
-        final adminRoute = path == AppRoutes.adminDashboard || path.startsWith('/admin/');
-        final organizerRoute = path == AppRoutes.organizerDashboard || path.startsWith('/organizer/');
+        final adminRoute =
+            path == AppRoutes.adminDashboard || path.startsWith('/admin/');
+        final organizerRoute =
+            path == AppRoutes.organizerDashboard ||
+            path.startsWith('/organizer/');
 
         // Public / non-auth routes
         if (path == AppRoutes.initial ||
             path == AppRoutes.login ||
             path == AppRoutes.register ||
             path == AppRoutes.accessDenied) {
-          if ((path == AppRoutes.login || path == AppRoutes.register) && auth.isAuthenticated) {
-            return role == 'admin' ? const RoleGuard(admin: true) : const RoleGuard(admin: false);
+          if ((path == AppRoutes.login || path == AppRoutes.register) &&
+              auth.isAuthenticated) {
+            return role == 'admin'
+                ? const RoleGuard(admin: true)
+                : const RoleGuard(admin: false);
           }
           return page;
         }
@@ -160,7 +169,9 @@ class AppRouter {
         if (adminRoute && role != 'admin') {
           return AccessDeniedScreen(
             reason: 'Halaman ini khusus untuk Administrator Platform.',
-            returnRoute: role == 'organizer' ? AppRoutes.organizerDashboard : AppRoutes.home,
+            returnRoute: role == 'organizer'
+                ? AppRoutes.organizerDashboard
+                : AppRoutes.home,
           );
         }
 
