@@ -37,7 +37,10 @@ class _OrganizerTabControllerState extends State<OrganizerTabController> {
   @override
   Widget build(BuildContext context) {
     final screens = [
-
+      const OrganizerDashboardScreen(),
+      const EventManagementScreen(),
+      const AttendeeListScreen(),
+      const StaffManagementScreen(),
     ];
 
     return Scaffold(

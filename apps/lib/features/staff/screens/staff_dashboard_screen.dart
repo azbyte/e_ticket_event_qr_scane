@@ -1,5 +1,4 @@
 /// Staff dashboard screen — assigned events and check-in station (PRD sections 2.3, 7.5 A).
-
 library;
 
 import 'package:flutter/material.dart';
@@ -22,16 +21,69 @@ class StaffDashboardScreen extends StatefulWidget {
     this.eventId = 'evt-001',
   });
 
-
   final CheckInProvider? checkInProvider;
   final String staffName;
   final String assignedEventTitle;
   final String eventId;
 
-            ),
-          ],
-        ),
-      ),
+  @override
+  State<StaffDashboardScreen> createState() => _StaffDashboardScreenState();
+}
+
+class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
+  final OrganizerMembershipService _membershipService =
+      OrganizerMembershipService.instance;
+  List<EventMemberModel> _assignedEvents = [];
+  EventMemberModel? _selectedAssignment;
+  bool _isLoading = true;
+  bool _isOfflineMode = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStaffAssignments();
+  }
+
+  Future<void> _loadStaffAssignments() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final auth = context.read<AuthProvider>();
+      final user = auth.user;
+      final assignments = user == null
+          ? <EventMemberModel>[]
+          : await _membershipService.getAssignedActiveEvents(
+              user.id ?? user.email,
+            );
+      if (!mounted) return;
+      EventMemberModel? selected;
+      for (final assignment in assignments) {
+        if (assignment.eventId == widget.eventId) {
+          selected = assignment;
+          break;
+        }
+      }
+      setState(() {
+        _assignedEvents = assignments;
+        _selectedAssignment = selected ??
+            (assignments.isEmpty ? null : assignments.first);
+      });
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Penugasan gagal dimuat. Coba lagi.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  bool _hasPermission(OrganizerPermission permission) =>
+      _selectedAssignment?.hasPermission(permission) ?? false;
+
+  void _showPermissionDenied(String action) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Anda tidak memiliki izin untuk $action.')),
     );
   }
 
@@ -39,6 +91,7 @@ class StaffDashboardScreen extends StatefulWidget {
   Widget build(BuildContext context) {
     final auth = context.read<AuthProvider>();
     final displayName = auth.user?.name ?? widget.staffName;
+    final checkInProvider = widget.checkInProvider;
 
     return Scaffold(
       appBar: AppBar(
@@ -55,315 +108,174 @@ class StaffDashboardScreen extends StatefulWidget {
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _loadStaffAssignments,
-              child: SingleChildScrollView(
+              child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Profile Header Card
+                padding: const EdgeInsets.all(16),
+                children: [
+                  if (_error != null)
                     Card(
-                      color: Theme.of(context).colorScheme.primaryContainer,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      child: ListTile(
+                        leading: const Icon(Icons.error_outline),
+                        title: Text(_error!),
+                        trailing: TextButton(
+                          onPressed: _loadStaffAssignments,
+                          child: const Text('Coba lagi'),
+                        ),
+                      ),
+                    ),
+                  Card(
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    child: ListTile(
+                      leading: const CircleAvatar(child: Icon(Icons.badge)),
+                      title: Text(displayName),
+                      subtitle: const Text('Penugasan Staf Event'),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (_assignedEvents.isEmpty)
+                    const Card(
                       child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Row(
+                        padding: EdgeInsets.all(24),
+                        child: Column(
                           children: [
-                            CircleAvatar(
-                              radius: 28,
-                              backgroundColor: Theme.of(context).colorScheme.primary,
-                              child: const Icon(Icons.badge, size: 30, color: Colors.white),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    displayName,
-                                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                          color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Penugasan Staf Event (Event-Level Membership)',
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onPrimaryContainer
-                                              .withValues(alpha: 0.8),
-                                        ),
-                                  ),
-                                ],
+                            Icon(Icons.event_busy, size: 48),
+                            SizedBox(height: 12),
+                            Text('Belum ada penugasan event aktif'),
+                            Text('Hubungi penyelenggara untuk menerima undangan.'),
+                          ],
+                        ),
+                      ),
+                    )
+                  else ...[
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Pilih Event yang Ditugaskan'),
+                            const SizedBox(height: 8),
+                            DropdownButtonFormField<EventMemberModel>(
+                              isExpanded: true,
+                              initialValue: _selectedAssignment,
+                              items: _assignedEvents
+                                  .map(
+                                    (member) => DropdownMenuItem(
+                                      value: member,
+                                      child: Text(
+                                        member.eventTitle,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) => setState(
+                                () => _selectedAssignment = value,
                               ),
+                            ),
+                            const SizedBox(height: 12),
+                            const Text('Izin Anda pada event ini:'),
+                            Wrap(
+                              spacing: 6,
+                              children: (_selectedAssignment?.permissions ?? {})
+                                  .map((permission) => Chip(
+                                        label: Text(permission.label),
+                                      ))
+                                  .toList(),
                             ),
                           ],
                         ),
                       ),
                     ),
-
-                    const SizedBox(height: 16),
-
-                    // Empty state when staff has no active assignments
-                    if (_assignedEvents.isEmpty) ...[
-                      Card(
-                        elevation: 0,
-                        color: Colors.amber.shade50,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: Colors.amber.shade300),
+                    const SizedBox(height: 12),
+                    Card(
+                      child: SwitchListTile(
+                        title: Text(
+                          _isOfflineMode
+                              ? 'Mode offline (simulasi)'
+                              : 'Mode online (simulasi)',
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(24.0),
-                          child: Column(
-                            children: [
-                              Icon(Icons.event_busy, size: 48, color: Colors.amber.shade800),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Belum Ada Penugasan Event Aktif',
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.amber.shade900,
-                                    ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                'Anda belum ditugaskan pada event aktif apapun. Silakan hubungi Penyelenggara (Organizer) untuk menerima undangan dan izin staf.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.amber.shade900, fontSize: 13),
-                              ),
-                            ],
-                          ),
+                        subtitle: const Text(
+                          'Status check-in demo tidak diverifikasi oleh server.',
                         ),
+                        value: _isOfflineMode,
+                        onChanged: (value) {
+                          setState(() => _isOfflineMode = value);
+                          checkInProvider?.toggleOfflineMode(value);
+                        },
                       ),
-                    ] else ...[
-                      // Assigned Event Selector Card
-                      Card(
-                        elevation: 1,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(Icons.event_available, color: Theme.of(context).colorScheme.primary),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Pilih Event yang Ditugaskan',
-                                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                          color: Theme.of(context).colorScheme.primary,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      icon: const Icon(Icons.qr_code_scanner),
+                      label: const Text('Buka Pemindai QR Tiket'),
+                      onPressed: _hasPermission(OrganizerPermission.scanTicket)
+                          ? () => Navigator.push(
+                                context,
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const ScannerScreen(),
+                                ),
+                              )
+                          : () => _showPermissionDenied('memindai tiket'),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.people_outline),
+                          label: const Text('Check-in Manual'),
+                          onPressed: _hasPermission(
+                            OrganizerPermission.checkInTicket,
+                          )
+                              ? () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => const CheckInScreen(),
+                                    ),
+                                  )
+                              : () => _showPermissionDenied(
+                                    'mengonfirmasi check-in',
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-                              DropdownButtonFormField<EventMemberModel>(
-                                isExpanded: true,
-                                initialValue: _selectedAssignment,
-                                decoration: const InputDecoration(
-                                  border: OutlineInputBorder(),
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                ),
-                                items: _assignedEvents.map((member) {
-                                  return DropdownMenuItem<EventMemberModel>(
-                                    value: member,
-                                    child: Text(
-                                      member.eventTitle,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.history),
+                          label: const Text('Riwayat Scan'),
+                          onPressed: _hasPermission(
+                            OrganizerPermission.viewScanHistory,
+                          )
+                              ? () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          const CheckInHistoryScreen(),
                                     ),
-                                  );
-                                }).toList(),
-                                onChanged: (val) {
-                                  if (val != null) {
-                                    setState(() => _selectedAssignment = val);
-                                  }
-                                },
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Izin Anda pada Event ini:',
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 6),
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 6,
-                                children: (_selectedAssignment?.permissions ?? {}).map((perm) {
-                                  return Chip(
-                                    avatar: const Icon(Icons.check_circle, size: 14, color: Colors.green),
-                                    label: Text(perm.label, style: const TextStyle(fontSize: 11)),
-                                    padding: EdgeInsets.zero,
-                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    visualDensity: VisualDensity.compact,
-                                  );
-                                }).toList(),
-                              ),
-                            ],
-                          ),
+                                  )
+                              : () => _showPermissionDenied(
+                                    'melihat riwayat scan',
+                                  ),
                         ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Connection Mode & Offline Queue Control
-                      Card(
-                        color: _isOfflineMode ? Colors.orange.shade50 : Colors.teal.shade50,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(
-                            color: _isOfflineMode ? Colors.orange.shade300 : Colors.teal.shade300,
-                          ),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          child: Row(
-                            children: [
-                              Icon(
-                                _isOfflineMode ? Icons.wifi_off : Icons.wifi,
-                                color: _isOfflineMode ? Colors.orange.shade800 : Colors.teal.shade800,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _isOfflineMode ? 'Mode Offline Aktif (Simulasi)' : 'Mode Online Aktif',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: _isOfflineMode ? Colors.orange.shade900 : Colors.teal.shade900,
-                                      ),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.report_problem_outlined),
+                          label: const Text('Laporan Kendala'),
+                          onPressed: _hasPermission(
+                            OrganizerPermission.viewReports,
+                          )
+                              ? () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => const ReportListScreen(),
                                     ),
-                                    Text(
-                                      _isOfflineMode
-                                          ? 'Pemindaian disimpan ke antrean lokal'
-                                          : 'Verifikasi pemindaian langsung ke server',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: _isOfflineMode ? Colors.orange.shade800 : Colors.teal.shade800,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Switch(
-                                value: _isOfflineMode,
-                                activeThumbColor: Colors.orange.shade800,
-                                onChanged: (val) => setState(() => _isOfflineMode = val),
-                              ),
-                            ],
-                          ),
+                                  )
+                              : () => _showPermissionDenied(
+                                    'melihat laporan',
+                                  ),
                         ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Primary Action: QR Scanner Button (Gated by scanTicket)
-                      FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 18),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          backgroundColor: _hasPermission(OrganizerPermission.scanTicket)
-                              ? Theme.of(context).colorScheme.primary
-                              : Colors.grey.shade400,
-                        ),
-                        icon: const Icon(Icons.qr_code_scanner, size: 28),
-                        label: Text(
-                          _hasPermission(OrganizerPermission.scanTicket)
-                              ? 'Buka Pemindai QR Tiket'
-                              : 'Pemindai QR (Izin Terbatas)',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                        onPressed: () {
-                          if (!_hasPermission(OrganizerPermission.scanTicket)) {
-                            _showPermissionDenied('Pindai QR Tiket');
-                            return;
-                          }
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const ScannerScreen()),
-                          );
-                        },
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      // Quick Action Menu Grid (Gated)
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                              icon: const Icon(Icons.people_outline),
-                              label: const Text('Check-in Manual'),
-                              onPressed: () {
-                                if (!_hasPermission(OrganizerPermission.checkInTicket)) {
-                                  _showPermissionDenied('Konfirmasi Check-in');
-                                  return;
-                                }
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const CheckInScreen()),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                              icon: const Icon(Icons.history),
-                              label: const Text('Riwayat Scan'),
-                              onPressed: () {
-                                if (!_hasPermission(OrganizerPermission.viewScanHistory)) {
-                                  _showPermissionDenied('Melihat Riwayat Scan');
-                                  return;
-                                }
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const CheckInHistoryScreen()),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 8),
-
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        icon: const Icon(Icons.report_problem_outlined),
-                        label: const Text('Laporan Kendala Peserta'),
-                        onPressed: () {
-                          if (!_hasPermission(OrganizerPermission.viewReports)) {
-                            _showPermissionDenied('Melihat Laporan Kendala');
-                            return;
-                          }
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const ReportListScreen()),
-                          );
-                        },
-                      ),
-                    ],
+                      ],
+                    ),
                   ],
-                ),
+                ],
               ),
             ),
     );
