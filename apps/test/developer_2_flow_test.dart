@@ -11,10 +11,33 @@ import 'package:e_ticket_event_qr_scane/providers/order_provider.dart';
 import 'package:e_ticket_event_qr_scane/providers/payment_provider.dart';
 import 'package:e_ticket_event_qr_scane/providers/ticket_provider.dart';
 import 'package:e_ticket_event_qr_scane/services/event/event_service.dart';
+import 'package:e_ticket_event_qr_scane/services/mock/mock_attendee_repository.dart';
 import 'package:e_ticket_event_qr_scane/services/order/order_service.dart';
 import 'package:e_ticket_event_qr_scane/services/payment/payment_service.dart';
 import 'package:e_ticket_event_qr_scane/services/ticket/ticket_service.dart';
 import 'package:e_ticket_event_qr_scane/services/ticket/ticket_type_service.dart';
+
+/// Test-local mock for EventService to ensure Developer 2 unit tests
+/// execute fully in-memory without modifying Developer 1's EventService file.
+class _TestLocalEventService extends EventService {
+  final MockAttendeeRepository _mockRepo = MockAttendeeRepository.instance;
+
+  @override
+  Future<List<Map<String, dynamic>>> listEvents({Map<String, dynamic>? query}) async {
+    return _mockRepo
+        .getEvents(
+          query: query?['q']?.toString() ?? query?['search']?.toString(),
+          category: query?['category']?.toString(),
+        )
+        .map((e) => e.toJson())
+        .toList();
+  }
+
+  @override
+  Future<Map<String, dynamic>> getEvent(String id) async {
+    return _mockRepo.getEventById(id).toJson();
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -35,7 +58,7 @@ void main() {
     late TicketService ticketService;
 
     setUp(() {
-      eventService = EventService();
+      eventService = _TestLocalEventService();
       ticketTypeService = TicketTypeService();
       orderService = OrderService();
       paymentService = PaymentService();
@@ -128,7 +151,8 @@ void main() {
 
   group('Developer 2 - Provider State Management Tests', () {
     test('EventProvider memuat daftar event dan kategori tiket', () async {
-      final provider = EventProvider();
+      final ticketTypeService = TicketTypeService();
+      final provider = EventProvider(_TestLocalEventService(), ticketTypeService);
       expect(provider.events.isEmpty, isTrue);
 
       final success = await provider.loadEvents();

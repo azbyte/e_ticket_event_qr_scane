@@ -95,8 +95,11 @@ void main() {
 
       await tester.tap(find.byTooltip('Notifikasi'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Notifikasi'), findsOneWidget);
-      expect(find.text('Event Disetujui'), findsOneWidget);
+      expect(find.text('Notifikasi'), findsOneWidget);
+      expect(
+        find.text('Daftar notifikasi akan ditampilkan di sini.'),
+        findsOneWidget,
+      );
       await tester.pageBack();
       await tester.pumpAndSettle();
 

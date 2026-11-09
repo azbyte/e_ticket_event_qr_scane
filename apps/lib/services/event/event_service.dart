@@ -1,26 +1,15 @@
-import '../../core/config/app_config.dart';
-import '../../services/mock/mock_attendee_repository.dart';
 import '../api/api_service.dart';
 
 class EventService {
   EventService();
   final ApiService _api = ApiService();
-  final MockAttendeeRepository _mockRepo = MockAttendeeRepository.instance;
 
   Future<List<Map<String, dynamic>>> listEvents({Map<String, dynamic>? query}) async {
-    final events = _mockRepo.getEvents(
-      query: query?['q']?.toString() ?? query?['search']?.toString(),
-      category: query?['category']?.toString(),
-    );
-    if (AppConfig.mockMode) {
-      return events.map((event) => event.toJson()).toList(growable: false);
-    }
     final response = await _api.get('/events/public', query: query);
     return (response['events'] as List? ?? const []).cast<Map<String, dynamic>>();
   }
 
   Future<Map<String, dynamic>> getEvent(String id) async {
-    if (AppConfig.mockMode) return _mockRepo.getEventById(id).toJson();
     final response = await _api.get('/events/$id');
     return Map<String, dynamic>.from(response['event'] as Map);
   }
@@ -50,16 +39,7 @@ class EventService {
     final response = await _api.get('/events/$id/members');
     return (response['members'] as List? ?? const []).cast<Map<String, dynamic>>();
   }
-  Future<void> addMember(String id, String identity, {List<String> permissions = const ['VIEW_EVENT']}) async {
-    await _api.post('/events/$id/members', body: {
-      if (identity.contains('@')) 'email': identity.trim() else 'username': identity.trim(),
-      'permissions': permissions,
-    });
-  }
-
-  Future<void> updateMemberPermissions(String eventId, String userId, List<String> permissions) async {
-    await _api.put('/events/$eventId/members/$userId/permissions', body: {'permissions': permissions});
-  }
+  Future<void> addMember(String id, String identity) async { await _api.post('/events/$id/members', body: {'email': identity.trim()}); }
   Future<void> removeMember(String id, String userId) async { await _api.delete('/events/$id/members/$userId'); }
   Future<List<Map<String, dynamic>>> platformEvents() async {
     final response = await _api.get('/events');
