@@ -1,4 +1,6 @@
 /// Order state provider (PRD sections 4.4, 4.7).
+library;
+
 import 'package:flutter/foundation.dart';
 
 import '../models/order/order_model.dart';
@@ -64,13 +66,13 @@ class OrderProvider extends ChangeNotifier {
     _setLoading(true);
     _error = null;
     try {
-      final payload = {
+      final payload = <String, dynamic>{
         'event_id': eventId,
         'attendee_name': attendeeName,
         'attendee_email': attendeeEmail,
-        if (attendeePhone != null) 'attendee_phone': attendeePhone,
         'items': selectedTicketQuantities,
       };
+      if (attendeePhone != null) payload['attendee_phone'] = attendeePhone;
 
       final data = await _orderService.createOrder(payload);
       final newOrder = OrderModel.fromJson(data);

@@ -1,4 +1,6 @@
 /// Ticket service (PRD sections 4.6, 6.3).
+library;
+
 import '../../core/config/app_config.dart';
 import '../api/api_service.dart';
 import '../mock/mock_attendee_repository.dart';

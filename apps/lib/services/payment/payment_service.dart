@@ -1,6 +1,8 @@
 /// Payment service for simulated Virtual Account (PRD section 4.7).
 ///
 /// NOTE: Real payment gateway integration is postponed (PRD section 3.2).
+library;
+
 import '../../core/config/app_config.dart';
 import '../api/api_service.dart';
 import '../mock/mock_attendee_repository.dart';

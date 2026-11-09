@@ -2,6 +2,8 @@
 ///
 /// Mengikuti basis [AppException] yang sudah dipakai lapisan service lain agar
 /// provider/UI dapat menampilkan pesan yang konsisten.
+library;
+
 import '../../core/errors/app_exception.dart';
 
 /// Kegagalan umum pada alur event Organizer.

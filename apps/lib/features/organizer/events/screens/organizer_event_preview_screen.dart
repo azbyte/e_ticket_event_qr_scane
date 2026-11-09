@@ -3,6 +3,8 @@
 /// Screen publik `features/events/screens/event_detail_screen.dart` milik area
 /// Participant tidak diubah; adapter ini hanya menampilkan data fixture yang
 /// sama dalam konteks Organizer dan tidak mengklaim publikasi server.
+library;
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';

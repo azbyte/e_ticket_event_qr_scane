@@ -16,30 +16,23 @@ abstract class AppException implements Exception {
 
 /// Thrown when the request could not be authenticated or authorized.
 class AuthException extends AppException {
-  const AuthException(String message,
-      {int? statusCode, dynamic originalError})
-      : super(message, statusCode: statusCode, originalError: originalError);
+  const AuthException(super.message, {super.statusCode, super.originalError});
 }
 
 /// Thrown when the requested resource is not found.
 class NotFoundException extends AppException {
-  const NotFoundException(String message,
-      {int? statusCode, dynamic originalError})
-      : super(message, statusCode: statusCode, originalError: originalError);
+  const NotFoundException(super.message, {super.statusCode, super.originalError});
 }
 
 /// Thrown when the backend returns a validation error.
 class ValidationException extends AppException {
   final Map<String, List<String>>? fieldErrors;
 
-  const ValidationException(String message,
-      {this.fieldErrors, int? statusCode, dynamic originalError})
-      : super(message, statusCode: statusCode, originalError: originalError);
+  const ValidationException(super.message,
+      {this.fieldErrors, super.statusCode, super.originalError});
 }
 
 /// Thrown when the network is unavailable or the request fails.
 class NetworkException extends AppException {
-  const NetworkException(String message,
-      {int? statusCode, dynamic originalError})
-      : super(message, statusCode: statusCode, originalError: originalError);
+  const NetworkException(super.message, {super.statusCode, super.originalError});
 }

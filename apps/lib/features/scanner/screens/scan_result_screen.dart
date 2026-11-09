@@ -70,7 +70,7 @@ class ScanResultScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(24.0),
               decoration: BoxDecoration(
-                color: headerColor.withOpacity(0.12),
+                color: headerColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: headerColor, width: 2),
               ),

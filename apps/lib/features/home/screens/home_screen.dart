@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_drawer.dart';
-import '../../../services/mock/mock_attendee_repository.dart';
 import '../../../providers/event_provider.dart';
 import '../../admin/tabs/admin_tab_controller.dart';
 import '../../auth/screens/login_screen.dart';
@@ -24,8 +23,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final EventProvider _eventProvider = EventProvider.instance;
-  final MockAttendeeRepository _eventRepository =
-      MockAttendeeRepository.instance;
   @override
   void initState() {
     super.initState();

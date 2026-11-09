@@ -2,6 +2,8 @@
 ///
 /// Dipakai oleh form (inline error) dan repository mock (pertahanan terakhir),
 /// sehingga aturan hanya ditulis satu kali dan dapat diuji tanpa widget.
+library;
+
 import 'organizer_event_contract.dart';
 
 class OrganizerEventValidators {

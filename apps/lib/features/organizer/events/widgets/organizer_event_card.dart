@@ -2,6 +2,8 @@
 ///
 /// Menampilkan nama, tanggal, status, tiket terjual, peserta, dan status
 /// moderasi. Aksi yang tersedia mengikuti status event (PRD 5.3 + 5.4 aturan).
+library;
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/utils/date_utils.dart' as core;

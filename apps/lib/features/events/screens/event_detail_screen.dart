@@ -144,7 +144,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                               Image.network(
                                 event.posterUrl!,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) =>
+                                errorBuilder: (_, _, _) =>
                                     _buildHeaderFallback(),
                               )
                             else
@@ -180,8 +180,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: AppTheme.primaryColor.withOpacity(
-                                        0.12,
+                                      color: AppTheme.primaryColor.withValues(
+                                        alpha: 0.12,
                                       ),
                                       borderRadius: BorderRadius.circular(20),
                                     ),
@@ -341,7 +341,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
+                        color: Colors.black.withValues(alpha: 0.06),
                         offset: const Offset(0, -3),
                         blurRadius: 10,
                       ),
@@ -433,7 +433,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundColor: iconColor.withOpacity(0.12),
+            backgroundColor: iconColor.withValues(alpha: 0.12),
             child: Icon(icon, size: 18, color: iconColor),
           ),
           const SizedBox(width: 12),
@@ -476,7 +476,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         border: Border.all(
           color: isSoldOut
               ? Colors.grey.shade300
-              : AppTheme.primaryColor.withOpacity(0.3),
+              : AppTheme.primaryColor.withValues(alpha: 0.3),
         ),
       ),
       child: Row(

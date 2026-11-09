@@ -1,0 +1,133 @@
+name: Sync Development Branches After Merge to Main
+
+# Sinkronisasi otomatis seluruh branch pengembangan dan integrasi
+# HANYA setelah Pull Request ke main berhasil di-merge.
+#
+# Pemicu spesifik: pull_request dengan aktivitas closed, kemudian
+# difilter hanya jika merged == true dan base.ref == 'main'.
+#
+# Workflow ini sengaja TIDAK menggunakan on.push sehingga tidak akan
+# berjalan pada push/commit/PR/merge pada branch selain main.
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+permissions:
+  # Izin minimum yang diperlukan: push ke branch pengembangan/integrasi.
+  # Tidak ada izin force push, tidak ada izin ke main langsung.
+  contents: write
+
+jobs:
+  sync-branches:
+    name: Sinkronkan branch pengembangan dengan main
+    # Pastikan hanya berjalan saat PR ke main benar-benar di-merge
+    if: >
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Konfigurasi git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Sinkronkan seluruh branch pengembangan dengan main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          remote="origin"
+
+          # Ambil semua branch terbaru dari remote dan hapus referensi
+          # cabang yang sudah dihapus di server.
+          git fetch "$remote" --prune
+
+          # Pastikan lokal main sinkron dengan origin/main.
+          # Workflow ini tidak pernah push ke main, sehingga tidak
+          # melanggar perlindungan branch main.
+          git checkout main
+          git merge --ff-only "$remote/main"
+
+          # Kumpulkan daftar branch pengembangan secara dinamis dari remote,
+          # kecuali main dan HEAD. Tidak menggunakan daftar nama yang ditulis
+          # secara manual sehingga branch baru otomatis tercakup.
+          branches_to_sync=()
+          while IFS= read -r ref; do
+            [ -n "$ref" ] || continue
+            # ref berbentuk origin/<nama-branch>; hapus awalan origin/
+            branches_to_sync+=("${ref#origin/}")
+          done < <(
+            git for-each-ref --format='%(refname:short)' refs/remotes/origin/ \
+              | grep -v '^origin/HEAD$' \
+              | grep -v '^origin/main$'
+          )
+
+          success=()
+          failed=()
+
+          for branch in "${branches_to_sync[@]}"; do
+            echo "::group::Sinkronisasi branch $branch"
+
+            # Buat/switch ke branch lokal. Jika belum ada lokal, buat dari remote.
+            if git rev-parse --verify "refs/heads/$branch" >/dev/null 2>&1; then
+              git checkout "$branch"
+            else
+              git checkout -b "$branch" "$remote/$branch"
+            fi
+
+            # Integrasikan perubahan terbaru main ke branch pengembangan
+            # menggunakan strategi merge (bukan reset / rebase paksa).
+            # Riwayat commit dan pekerjaan developer dipertahankan.
+            if git merge --no-edit "$remote/main"; then
+              git push "$remote" "$branch"
+              success+=("$branch")
+              echo "Berhasil disinkronkan: $branch"
+            else
+              # Konflik terdeteksi: batalkan merge, jangan ubah isi branch,
+              # jangan memilih versi secara sembarangan, laporkan untuk
+              # diselesaikan manual. Kegagalan satu branch tidak menghentikan
+              # branch lain.
+              git merge --abort 2>/dev/null || true
+              git checkout "$branch" -- . 2>/dev/null || true
+              failed+=("$branch (konflik, perlu resolusi manual)")
+              echo "::warning::Gagal disinkronkan: $branch (konflik, perlu resolusi manual)"
+            fi
+            echo "::endgroup::"
+          done
+
+          # Kembali ke main agar workspace tidak tertinggal di branch lain
+          git checkout main
+
+          # Ringkasan hasil sinkronisasi
+          {
+            echo "## Hasil Sinkronisasi Branch setelah Merge ke Main"
+            echo ""
+            echo "Pull Request yang memicu: #${{ github.event.pull_request.number }}"
+            echo "Branch tujuan: main"
+            echo ""
+            if [ ${#success[@]} -gt 0 ]; then
+              echo "### Berhasil disinkronkan"
+              for b in "${success[@]}"; do echo "- $b"; done
+              echo ""
+            fi
+            if [ ${#failed[@]} -gt 0 ]; then
+              echo "### Gagal disinkronkan (perlu perhatian manual)"
+              for b in "${failed[@]}"; do echo "- $b"; done
+              echo ""
+            fi
+            if [ ${#success[@]} -eq 0 ] && [ ${#failed[@]} -eq 0 ]; then
+              echo "Tidak ada branch pengembangan yang tersedia untuk disinkronkan."
+              echo ""
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

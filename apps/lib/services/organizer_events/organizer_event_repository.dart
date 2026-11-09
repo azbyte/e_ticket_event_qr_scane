@@ -3,6 +3,8 @@
 /// Consumer (Developer 2/3) hanya boleh memakai signature di sini dan tidak
 /// mengedit implementasinya. Implementasi mock Tahap 0 berada pada
 /// [MockOrganizerEventRepository]; seluruh operasi bersifat lokal (tanpa HTTP).
+library;
+
 import '../../models/event/event_model.dart';
 import '../../models/event/ticket_type_model.dart';
 import 'organizer_event_contract.dart';

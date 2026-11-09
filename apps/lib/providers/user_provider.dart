@@ -1,6 +1,8 @@
 /// User profile state provider (PRD sections 2, 4.1).
 ///
 /// Requires package `provider` added to pubspec.yaml (PRD section 8.1).
+library;
+
 import 'package:flutter/foundation.dart';
 // ignore: unused_import
 import 'package:provider/provider.dart';

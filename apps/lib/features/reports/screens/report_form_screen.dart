@@ -138,7 +138,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Card(
-                color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: const Padding(
                   padding: EdgeInsets.all(16.0),
@@ -185,7 +185,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
               const SizedBox(height: 14),
 
               DropdownButtonFormField<String>(
-                value: _category,
+                initialValue: _category,
                 decoration: const InputDecoration(
                   labelText: 'Kategori Kendala *',
                   prefixIcon: Icon(Icons.category_outlined),

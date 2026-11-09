@@ -209,7 +209,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       itemCount: OrganizerEventFilter.values.length,
-      separatorBuilder: (_, __) => const SizedBox(width: 8),
+      separatorBuilder: (_, _) => const SizedBox(width: 8),
       itemBuilder: (context, index) {
         final filter = OrganizerEventFilter.values[index];
         return ChoiceChip(
