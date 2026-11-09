@@ -33,7 +33,7 @@ sesuai; file skill berada di `.agents/skills/<nama>/SKILL.md`.
 - UI Flutter dan design system: `flutter-ui`; endpoint/security/data backend:
   `backend-api`.
 - Bug yang perlu direproduksi: `debug`; review diff: `review`; paket validasi/
-  penerimaan: `verification`.
+  penerimaan: `verification`; pemeriksaan kualitas sebelum PR: `pr-quality-gate`.
 
 Requirement sumber adalah `prd.md` serta migration/source aktual; PRD UI prototype
 memiliki batas cakupan tersendiri. Jika permintaan menyentuh backend, cek konteks
