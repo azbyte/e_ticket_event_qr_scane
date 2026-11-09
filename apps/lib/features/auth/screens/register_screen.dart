@@ -49,7 +49,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               TextFormField(controller: _password, obscureText: true,
                 decoration: const InputDecoration(labelText: 'Kata sandi'), validator: InputValidator.password),
               const SizedBox(height: 20),
-              Consumer<AuthProvider>(builder: (_, auth, __) => FilledButton(
+              Consumer<AuthProvider>(builder: (_, auth, _) => FilledButton(
                 onPressed: auth.isLoading ? null : _submit,
                 child: auth.isLoading ? const CircularProgressIndicator() : const Text('Daftar'),
               )),

@@ -1,4 +1,6 @@
 /// Order service (PRD sections 4.4, 4.7).
+library;
+
 import '../../core/config/app_config.dart';
 import '../api/api_service.dart';
 import '../mock/mock_attendee_repository.dart';

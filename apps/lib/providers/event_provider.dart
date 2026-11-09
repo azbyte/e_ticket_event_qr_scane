@@ -6,6 +6,8 @@
 /// Sumber data adalah [OrganizerEventRepository] (mock in-memory), bukan
 /// [EventService] yang melakukan HTTP. `EventService` tetap dipertahankan untuk
 /// fase integrasi backend berikutnya dan tidak dipakai pada alur prototipe ini.
+library;
+
 import 'package:flutter/foundation.dart';
 
 import '../models/event/event_model.dart';

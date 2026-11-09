@@ -2,6 +2,8 @@
 ///
 /// Semua angka berasal dari fixture lokal (simulasi) dan tidak mengklaim
 /// pendapatan platform, fee, maupun komisi (PRD 7.3).
+library;
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';

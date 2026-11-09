@@ -55,7 +55,7 @@ class _TicketListScreenState extends State<TicketListScreen> {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: fg.withOpacity(0.3)),
+        border: Border.all(color: fg.withValues(alpha: 0.3)),
       ),
       child: Text(
         label,
@@ -155,7 +155,7 @@ class _TicketListScreenState extends State<TicketListScreen> {
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: tickets.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 14),
+              separatorBuilder: (_, _) => const SizedBox(height: 14),
               itemBuilder: (context, index) {
                 final ticket = tickets[index];
 

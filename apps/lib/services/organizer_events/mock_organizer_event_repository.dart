@@ -2,6 +2,8 @@
 ///
 /// Tidak ada HTTP/backend/database: seluruh state hidup di memori proses dan
 /// hilang saat aplikasi ditutup. Nilai order/peserta/check-in adalah simulasi.
+library;
+
 import '../../models/event/event_model.dart';
 import '../../models/event/ticket_type_model.dart';
 import 'organizer_event_contract.dart';

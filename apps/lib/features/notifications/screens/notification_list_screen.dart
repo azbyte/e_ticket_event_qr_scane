@@ -2,7 +2,6 @@
 ///
 
 library;
-
 import 'package:flutter/material.dart';
 
 import '../../../providers/notification_provider.dart';
@@ -136,7 +135,7 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     CircleAvatar(
-                                      backgroundColor: _getColorForType(type).withOpacity(0.12),
+                                      backgroundColor: _getColorForType(type).withValues(alpha: 0.12),
                                       child: Icon(
                                         _getIconForType(type),
                                         color: _getColorForType(type),

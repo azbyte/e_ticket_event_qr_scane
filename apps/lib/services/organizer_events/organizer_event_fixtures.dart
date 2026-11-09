@@ -2,6 +2,8 @@
 ///
 /// Semua tanggal bersifat tetap (deterministik) agar test dan demo stabil, dan
 /// seluruh nilai operasional adalah data simulasi, bukan transaksi nyata.
+library;
+
 import '../../models/event/event_model.dart';
 import '../../models/event/ticket_type_model.dart';
 import 'organizer_event_contract.dart';

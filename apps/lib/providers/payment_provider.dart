@@ -1,4 +1,6 @@
 /// Payment state provider for simulated Virtual Account (PRD section 4.7).
+library;
+
 import 'package:flutter/foundation.dart';
 
 import '../core/constants/app_constants.dart';

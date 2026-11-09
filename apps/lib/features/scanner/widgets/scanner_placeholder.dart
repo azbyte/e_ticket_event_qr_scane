@@ -121,7 +121,7 @@ class _ScannerPlaceholderState extends State<ScannerPlaceholder>
                         color: Colors.redAccent,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.redAccent.withOpacity(0.8),
+                            color: Colors.redAccent.withValues(alpha: 0.8),
                             blurRadius: 8,
                             spreadRadius: 2,
                           ),

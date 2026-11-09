@@ -2,6 +2,8 @@
 ///
 /// Tab Peserta/Tim/Scanner/Laporan/Aktivitas dimiliki Developer 2/3 dan dapat
 /// disisipkan lewat [extraTabs] tanpa mengubah file ini.
+library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 

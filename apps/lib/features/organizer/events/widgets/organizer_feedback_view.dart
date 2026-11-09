@@ -2,6 +2,8 @@
 ///
 /// Menyediakan loading, empty (dengan langkah berikutnya), error + retry, dan
 /// akses ditolak tanpa membocorkan data event.
+library;
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';

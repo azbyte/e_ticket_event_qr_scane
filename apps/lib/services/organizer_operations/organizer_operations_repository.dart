@@ -326,21 +326,26 @@ class OrganizerOperationsRepository extends ChangeNotifier {
       // Status filter
       if (filterStatus == 'checked_in' && !a.checkedIn) return false;
       if (filterStatus == 'pending' &&
-          (a.checkedIn || a.ticketStatus == 'cancelled'))
+          (a.checkedIn || a.ticketStatus == 'cancelled')) {
         return false;
-      if (filterStatus == 'cancelled' && a.ticketStatus != 'cancelled')
+      }
+      if (filterStatus == 'cancelled' && a.ticketStatus != 'cancelled') {
         return false;
+      }
 
       // Method filter
-      if (filterMethod != 'all' && a.registrationMethod != filterMethod)
+      if (filterMethod != 'all' && a.registrationMethod != filterMethod) {
         return false;
+      }
 
       // Ticket tier filter
-      if (filterTicketType != 'all' && a.ticketType != filterTicketType)
+      if (filterTicketType != 'all' && a.ticketType != filterTicketType) {
         return false;
+      }
       if (filterPaymentStatus != 'all' &&
-          a.paymentStatus != filterPaymentStatus)
+          a.paymentStatus != filterPaymentStatus) {
         return false;
+      }
 
       // Search query filter
       if (query.isNotEmpty) {

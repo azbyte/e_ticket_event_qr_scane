@@ -1,4 +1,6 @@
 /// Ticket state provider (PRD sections 4.6, 6.3).
+library;
+
 import 'package:flutter/foundation.dart';
 
 import '../models/ticket/ticket_model.dart';

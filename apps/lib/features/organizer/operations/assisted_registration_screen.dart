@@ -264,8 +264,9 @@ class _AssistedRegistrationScreenState
                 prefixIcon: Icon(Icons.email),
               ),
               validator: (v) {
-                if (v == null || v.trim().isEmpty)
+                if (v == null || v.trim().isEmpty) {
                   return 'Email pemesan wajib diisi';
+                }
                 if (!v.contains('@')) return 'Format email tidak valid';
                 return null;
               },
@@ -378,10 +379,12 @@ class _AssistedRegistrationScreenState
                           labelText: 'Email Peserta *',
                         ),
                         validator: (v) {
-                          if (v == null || v.trim().isEmpty)
+                          if (v == null || v.trim().isEmpty) {
                             return 'Email peserta wajib';
-                          if (!v.contains('@'))
+                          }
+                          if (!v.contains('@')) {
                             return 'Format email tidak valid';
+                          }
                           return null;
                         },
                       ),

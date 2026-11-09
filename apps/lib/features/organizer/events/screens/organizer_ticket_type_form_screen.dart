@@ -3,6 +3,8 @@
 /// Aturan kuota: `terjual + tertahan` tidak boleh melebihi kuota baru sehingga
 /// order historis tetap terlindungi. Penghapusan kategori bertransaksi ditolak
 /// di repository; di sini hanya disediakan tombol nonaktifkan.
+library;
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';

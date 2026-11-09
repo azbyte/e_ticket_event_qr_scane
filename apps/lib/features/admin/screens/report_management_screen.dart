@@ -113,13 +113,14 @@ class _ReportManagementScreenState extends State<ReportManagementScreen> {
             FilledButton(
               onPressed: () async {
                 Navigator.pop(ctx);
+                final messenger = ScaffoldMessenger.of(context);
                 final ok = await _provider.updateStatus(
                   reportId: report.id,
                   status: selectedStatus,
                   note: noteController.text.trim(),
                 );
                 if (mounted && ok) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(
                       content: Text('Status laporan ${report.ticketNumber} berhasil diperbarui.'),
                       backgroundColor: Colors.green.shade800,
