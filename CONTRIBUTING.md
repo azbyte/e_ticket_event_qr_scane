@@ -10,5 +10,8 @@
    pemeriksaan frontend/backend yang relevan menurut `README.md` dan
    laporkan perintah serta hasilnya. Untuk bug, sertakan langkah reproduksi dan
    regression test jika memungkinkan.
-5. Tinjau diff, dokumentasi dan status Git sebelum membuat PR. PR menjelaskan
+5. Sebelum membuat PR, jalankan PR Quality Gate melalui AI di VS Code
+   (skill `pr-quality-gate`) atau jalankan pemeriksaan secara manual menurut
+   `PR_QUALITY_GATE.md`. Pastikan semua pemeriksaan wajib berhasil.
+6. Tinjau diff, dokumentasi dan status Git sebelum membuat PR. PR menjelaskan
    risiko, pengujian, integrasi yang tidak diuji dan screenshot UI bila relevan.

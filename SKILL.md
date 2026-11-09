@@ -13,6 +13,7 @@ perlu menjalankan semua skill untuk setiap perubahan.
 | [backend-api](.agents/skills/backend-api/SKILL.md) | Express/API, auth, role, Supabase |
 | [review](.agents/skills/review/SKILL.md) | Review perubahan dan risiko |
 | [verification](.agents/skills/verification/SKILL.md) | Rencana dan eksekusi validasi |
+| [pr-quality-gate](.agents/skills/pr-quality-gate/SKILL.md) | Pemeriksaan kualitas lokal sebelum Pull Request, sinkron dengan CI/CD |
 | [debug](.agents/skills/debug/SKILL.md) | Reproduksi dan diagnosis bug |
 | [requirements](.agents/skills/requirements/SKILL.md) | Klarifikasi requirement, role, dan perubahan kontrak |
 | [workspace](.agents/skills/workspace/SKILL.md) | Memelihara instruksi, skill, tooling dan dokumentasi developer |
