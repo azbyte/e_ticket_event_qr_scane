@@ -60,17 +60,22 @@ jobs:
           git merge --ff-only "$remote/main"
 
           # Kumpulkan daftar branch pengembangan secara dinamis dari remote,
-          # kecuali main dan HEAD. Tidak menggunakan daftar nama yang ditulis
-          # secara manual sehingga branch baru otomatis tercakup.
+          # kecuali main, HEAD, dan nama remote itu sendiri (origin). Nama branch
+          # diambil secara struktural dengan %(refname:strip=3) yang menghapus
+          # awalan refs/remotes/origin/ secara utuh, bukan dengan parsing teks
+          # awalan "origin/". Dengan demikian remote "origin" tidak pernah masuk
+          # ke daftar sebagai nama branch, dan nama branch yang mengandung "/"
+          # (contoh: update/organizer, feature/login) tetap utuh serta terdeteksi
+          # secara dinamis, termasuk branch baru yang belum pernah ada lokal.
           branches_to_sync=()
           while IFS= read -r ref; do
             [ -n "$ref" ] || continue
-            # ref berbentuk origin/<nama-branch>; hapus awalan origin/
-            branches_to_sync+=("${ref#origin/}")
+            branches_to_sync+=("$ref")
           done < <(
-            git for-each-ref --format='%(refname:short)' refs/remotes/origin/ \
-              | grep -v '^origin/HEAD$' \
-              | grep -v '^origin/main$'
+            git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin/ \
+              | grep -v '^HEAD$' \
+              | grep -v '^main$' \
+              | grep -v '^origin$'
           )
 
           success=()
