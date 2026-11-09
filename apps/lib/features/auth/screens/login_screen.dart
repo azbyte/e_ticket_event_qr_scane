@@ -65,7 +65,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           onPressed: () => setState(() => _obscure = !_obscure))),
                       validator: (value) => InputValidator.required(value, field: 'Kata sandi')),
                     const SizedBox(height: 24),
-                    Consumer<AuthProvider>(builder: (_, auth, __) => FilledButton(
+                    Consumer<AuthProvider>(builder: (_, auth, _) => FilledButton(
                       onPressed: auth.isLoading ? null : _submit,
                       child: auth.isLoading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Masuk'),
                     )),

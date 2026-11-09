@@ -1,4 +1,6 @@
 /// Shared divider widget used across auth screens.
+library;
+
 import 'package:flutter/material.dart';
 
 class AuthDivider extends StatelessWidget {

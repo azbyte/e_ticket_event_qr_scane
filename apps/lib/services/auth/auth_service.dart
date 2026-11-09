@@ -68,8 +68,9 @@ class AuthService {
       },
     );
     final token = response['token'] as String?;
-    if (token == null || token.isEmpty)
+    if (token == null || token.isEmpty) {
       throw const FormatException('Token autentikasi tidak ditemukan.');
+    }
     await _session.saveToken(token);
     return Map<String, dynamic>.from(response['user'] as Map);
   }
@@ -89,8 +90,9 @@ class AuthService {
       body: {'name': name.trim(), 'email': email.trim(), 'password': password},
     );
     final token = response['token'] as String?;
-    if (token == null || token.isEmpty)
+    if (token == null || token.isEmpty) {
       throw const FormatException('Token autentikasi tidak ditemukan.');
+    }
     await _session.saveToken(token);
     return Map<String, dynamic>.from(response['user'] as Map);
   }

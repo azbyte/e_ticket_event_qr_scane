@@ -2,6 +2,8 @@
 ///
 /// Backend fields are placeholders pending the final API contract
 /// (PRD section 15).
+library;
+
 import 'user_role.dart';
 
 class UserModel {

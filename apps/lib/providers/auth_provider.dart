@@ -1,6 +1,8 @@
 /// Authentication state provider (PRD section 4.1).
 ///
 /// Requires package `provider` added to pubspec.yaml (PRD section 8.1).
+library;
+
 import 'package:flutter/foundation.dart';
 import '../models/user/user_model.dart';
 import '../services/auth/auth_service.dart';

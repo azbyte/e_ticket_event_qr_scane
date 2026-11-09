@@ -32,11 +32,12 @@ class _AccountManagementScreenState extends State<AccountManagementScreen> {
           title: Text(account['name']?.toString() ?? 'Akun'),
           subtitle: Text('${account['email'] ?? ''} · ${account['role'] ?? ''}${isDisabled ? ' · Dinonaktifkan' : ''}'),
           trailing: account['role'] == 'admin' || isSelf ? null : Switch(value: !isDisabled, onChanged: (enabled) async {
+            final messenger = ScaffoldMessenger.of(context);
             try {
               await ApiClient().put('/admin/accounts/${account['id']}/status', body: {'disabled': !enabled});
               if (mounted) setState(_reload);
             } catch (error) {
-              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal mengubah status akun: $error')));
+              if (mounted) messenger.showSnackBar(SnackBar(content: Text('Gagal mengubah status akun: $error')));
             }
           }),
         );

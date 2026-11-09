@@ -1,0 +1,979 @@
+================================================================================
+PEMBAGIAN TUGAS 3 DEVELOPER — ROLE ORGANIZER DAN ROLE ADMIN (FRONTEND apps)
+Proyek: E-Ticket Event & QR Scanner
+File: PEMBAGIAN_TUGAS_3.txt (direktori utama proyek)
+Batasan: HANYA analisis dan pembagian tugas. TIDAK ADA perubahan kode/file.
+================================================================================
+
+--------------------------------------------------------------------------------
+BAGIAN 1 – INFORMASI DAN KONDISI PROYEK
+--------------------------------------------------------------------------------
+
+1.1 Kondisi proyek
+- Pengembangan saat ini berfokus pada frontend Flutter di folder `apps`.
+- Backend belum dibuat dan baru akan dikembangkan setelah seluruh fitur Organizer
+  dan Admin selesai. Folder `backend/` ada di workspace sebagai artefak, tapi
+  TIDAK dalam ruang lingkup tugas ini.
+- Seluruh fitur saat ini menggunakan data dummy (mock service/repository),
+  tidak ada integrasi API nyata. `MOCK_MODE=false` di `AppConfig` belum
+  diimplementasikan untuk semua fitur.
+- API service, repository, model, konstanta endpoint, dan pengelolaan data
+  yang berada di dalam `apps/lib` TETAPI termasuk ruang lingkup pembagian tugas
+  ini.
+- Pengujian nantinya menggunakan data dummy. Backend dan database bukan bagian
+  dari pengerjaan saat ini.
+- Struktur frontend yang dikerjakan harus memungkinkan integrasi backend pada
+  tahap berikutnya (pisahkan service/repository dari widget, gunakan model
+  DTO, pola loading/error/empty/success).
+
+1.2 Batasan pengerjaan (mutlak)
+- DILARANG mengubah kode program, membuat/ubah komponen, halaman, fungsi, API,
+  konfigurasi, atau struktur folder.
+- DILARANG membuat file baru selain `PEMBAGIAN_TUGAS_3.txt`.
+- DILARANG menghapus, memindahkan, mengganti nama file, mengubah `prd.md`,
+  refactoring, memperbaiki bug, menginstal/menghapus package.
+- DIPERBOLEHKAN membaca dan menganalisis file, mengidentifikasi bug/kekurangan
+  tanpa memperbaiki, menyusun daftar pekerjaan dan kontrak integrasi, membuat
+  hanya dokumen `PEMBAGIAN_TUGAS_3.txt`.
+- Jika ditemukan masalah, catat sebagai pekerjaan developer yang bertanggung
+  jawab, jangan perbaiki sendiri.
+
+1.3 Tujuan akhir dokumen
+- Menyusun pembagian tugas yang jelas untuk 3 developer sehingga seluruh fitur
+  Role Organizer dan Role Admin sesuai `prd.md` selesai pada frontend `apps`.
+- Setiap pekerjaan memiliki satu developer penanggung jawab (OWNER), tanpa
+  tanggung jawab tumpang tindih antara Developer 2 dan Developer 3.
+- Kontrak integrasi antardeveloper jelas terdefinisi.
+- Dokumen dapat langsung digunakan sebagai pedoman pengerjaan tanpa analisis
+  ulang dari awal.
+
+
+--------------------------------------------------------------------------------
+BAGIAN 2 – ANALISIS KEBUTUHAN PRD
+--------------------------------------------------------------------------------
+
+2.1 Kebutuhan Role Organizer (berdasarkan prd.md bagian 3-6, 11, FR-09 s.d. FR-79)
+
+a) Manajemen Event (FR-09, FR-10, FR-11)
+   - Owner dapat membuat dan mengedit event.
+   - Event baru berstatus DRAFT.
+   - Owner dapat mengajukan event untuk moderasi (DRAFT -> PENDING_REVIEW).
+   - Owner dapat mengajukan ulang setelah revisi/penolakan.
+
+b) Kategori Tiket dan Kuota (FR-17, FR-18, FR-19, FR-20, FR-21, FR-22)
+   - Owner dapat membuat beberapa TicketType (nama, deskripsi, harga, kuota,
+     periode penjualan, status).
+   - Sistem membatasi pemesanan berdasarkan kuota.
+   - Beberapa tiket dalam satu Order.
+   - Perubahan harga tidak mengubah Order lama.
+
+c) Dashboard Organizer (FR-66 s.d. FR-73)
+   - Statistik event milik Organizer.
+   - Daftar peserta, Order, Payment, check-in.
+   - Pencarian dan filter peserta.
+   - Pencatatan metode registrasi mandiri/dibantu.
+   - Laporan penjualan dan kehadiran.
+   - Ekspor CSV sesuai prioritas dan hak paket.
+   - Aktivitas event.
+   - Staff hanya melihat menu/data sesuai permission.
+
+d) Manajemen Staff (FR-60 s.d. FR-65)
+   - Undang Staff melalui email/tautan aman dengan masa berlaku.
+   - Staff menerima undangan.
+   - Owner mengatur permission per Staff.
+   - Owner mencabut akses.
+   - Staff hanya mengakses event yang ditugaskan (bukan role global).
+
+e) Scanner dan Check-in (FR-50 s.d. FR-59)
+   - Owner membuka scanner pada event miliknya.
+   - Staff dengan permission scanner.
+   - Simulasi scan/check-in, hasil valid/digunakan/tidak valid/salah event/
+     dibatalkan/gangguan jaringan.
+   - Mode offline terbatas.
+
+f) Registrasi Dibantu (FR-30, FR-31, FR-32, FR-33)
+   - Owner membantu registrasi peserta.
+   - Staff dengan permission ASSIST_REGISTRATION membantu registrasi.
+   - Kedua metode menggunakan alur Order/Payment/Ticket yang sama (disimulasi).
+
+g) Paket dan Langganan Organizer (FR-77, FR-78, FR-79)
+   - Organizer melihat paket dan langganan sendiri.
+   - Backend memeriksa batas fitur paket (disimulasi di frontend).
+   - Riwayat perubahan paket/langganan disimpan.
+
+h) Dukungan Organizer (FR-95, FR-96)
+   - Organizer mengirim keluhan terkait platform.
+   - Sistem membuat nomor laporan dan token status aman.
+
+i) Profil dan Notifikasi
+   - Halaman profil Organizer, edit profil, logout.
+   - Daftar notifikasi.
+
+2.2 Kebutuhan Role Admin (berdasarkan prd.md bagian 6, 11, FR-74 s.d. FR-106)
+
+a) Dashboard Bisnis Admin (FR-80 s.d. FR-85)
+   - Total event, event aktif, mendatang, selesai, menunggu moderasi.
+   - Jumlah Organizer dan Participant.
+   - Jumlah Order dan tiket.
+   - Transaksi dan pendapatan platform.
+   - Filter berdasarkan periode.
+   - Grafik perkembangan event, pengguna, penjualan, pendapatan.
+
+b) Manajemen Event Global (FR-86)
+   - Admin melihat dan mengelola semua event.
+
+c) Manajemen Akun (FR-87, FR-88)
+   - Admin melihat dan mengelola akun sesuai kewenangan.
+   - Penangguhan event/akun menyimpan alasan dan AuditLog.
+
+d) Moderasi Event (FR-12, FR-16)
+   - Admin menyetujui, menolak, atau meminta revisi event.
+   - Admin menangguhkan event dengan alasan dan audit log.
+
+e) Paket Layanan (FR-74, FR-75, FR-76)
+   - Admin membuat, mengubah, mengaktifkan, menonaktifkan, mengarsipkan paket.
+   - Paket gratis dan berbayar.
+   - Fitur dan batas penggunaan per paket.
+
+f) Langganan Organizer (FR-79)
+   - Admin melihat semua langganan, filter paket/status, riwayat, pembayaran.
+
+g) Transaksi dan Pendapatan (FR-89 s.d. FR-93)
+   - Admin melihat transaksi tiket dan pembayaran paket.
+   - Memisahkan gross ticket sales dari platform revenue.
+   - Nilai komisi sebagai snapshot transaksi.
+   - Pendapatan paket dan komisi tiket ditampilkan terpisah.
+
+h) Keluhan dan Support Center (FR-97 s.d. FR-101)
+   - Admin mencari, memfilter, dan membuka laporan.
+   - Admin mengatur prioritas dan status.
+   - Admin membalas pelapor dan membuat catatan internal.
+   - Riwayat aktivitas laporan disimpan.
+   - Catatan internal tidak terlihat pelapor.
+
+i) Pengaturan dan Audit Log (FR-102 s.d. FR-106)
+   - Admin mengelola pengaturan platform yang diizinkan.
+   - Perubahan komisi/biaya tercatat.
+   - Tindakan administratif penting dicatat di AuditLog.
+   - AuditLog tidak dapat diubah pengguna biasa.
+   - Admin mencari dan memfilter audit log.
+
+j) Profil Admin
+   - Halaman profil Admin (route `/admin/profile` sudah ada di `app_routes.dart`
+     tetapi BELUM ada screen-nya).
+
+2.3 Status implementasi aktual (berdasarkan audit prd.md bagian 20 dan baca kode)
+
+Organizer — SUDAH ADA (tapi perlu diselesaikan/ditetapkan):
+- features/organizer/screens/organizer_dashboard_screen.dart — ada, pakai
+  OrganizerShellService, perlu loading/error/empty state lengkap.
+- features/organizer/screens/event_management_screen.dart — ada, CRUD event
+  melalui MockOrganizerEventRepository.
+- features/organizer/screens/event_form_screen.dart — ada, form buat/edit
+  event dengan validasi.
+- features/organizer/events/screens/organizer_event_detail_screen.dart — ada,
+  detail event + tiket, mendukung extraTabs untuk ekstensi lain.
+- features/organizer/events/screens/organizer_event_preview_screen.dart — ada,
+  pratinjau publik (read-only).
+- features/organizer/screens/attendee_list_screen.dart — ada, daftar peserta
+  dengan search/filter/export CSV.
+- features/organizer/screens/staff_management_screen.dart +
+  features/organizer/membership/team_management_screen.dart — ada, undang/
+  cabut staff, pengaturan permission.
+- features/organizer/operations/assisted_registration_screen.dart — ada,
+  registrasi dibantu dengan simulasi VA.
+- features/organizer/operations/organizer_activity_log_screen.dart — ada,
+  riwayat aktivitas.
+- features/organizer/operations/organizer_attendee_detail_screen.dart — ada,
+  detail peserta dengan data disamarkan.
+- features/organizer/operations/organizer_report_screen.dart — ada, laporan
+  keuangan event + export.
+- features/organizer/operations/organizer_scanner_screen.dart — ada, simulasi
+  scan/check-in.
+- features/organizer/plans/subscription_screen.dart — ada, paket/langganan.
+- features/organizer/support/organizer_support_screen.dart — ada, keluhan
+  organizer.
+- features/organizer/screens/organizer_profile_screen.dart — ada, profil +
+  logout.
+- features/organizer/shell/organizer_shell.dart — ada, layout responsif
+  sidebar/bottom nav.
+
+
+- services/organizer_events/organizer_event_repository.dart +
+  organizer_event_contract.dart + mock_organizer_event_repository.dart — ada,
+  kontrak domain event.
+- services/organizer_operations/organizer_operations_repository.dart +
+  organizer_permission.dart + event_activity_service.dart — ada, operasi
+  operasional.
+- services/organizer_membership/organizer_membership_service.dart — ada,
+  keanggotaan staff per event.
+- services/organizer_plans/organizer_plans_service.dart — ada, paket/
+  langganan organizer.
+- services/organizer_support/organizer_support_service.dart — ada, keluhan
+  organizer.
+- services/organizer_notifications/organizer_notifications_service.dart — ada.
+- services/organizer_shell/organizer_shell_service.dart — ada, metrik
+  dashboard.
+- providers/organizer_provider.dart — ada, tapi menggunakan OrganizerService
+  (berbasis ApiService), paralel dengan repository-based EventProvider.
+- models/event/event_model.dart + ticket_type_model.dart — ada.
+- models/order/*, models/ticket/*, models/payment/*, models/check_in/* — ada.
+- core/constants/app_constants.dart — ada (status event, order, tiket,
+  pembayaran, laporan).
+- core/validators/input_validator.dart — ada.
+- routes/app_routes.dart — ada, konstanta route Organizer dan Admin (parsial).
+- apps/lib/app_router.dart — KOSONG (0 baris), generator routing utama tidak
+  terimplementasi.
+- apps/lib/app.dart — ada, AuthGate dan RoleGuard hanya membedakan
+  admin/organizer; role attendee/staff tidak diarahkan dengan benar.
+
+Organizer — BELUM / MASIH MASALAH:
+1. Duplikasi enum OrganizerPermission di
+   services/organizer_operations/organizer_permission.dart DAN
+   services/organizer_membership/organizer_membership_service.dart (nilai sama,
+   file berbeda) — potensi inkonsistensi.
+2. Dua pendekatan state management: OrganizerProvider (pakai OrganizerService)
+   vs EventProvider (pakai MockOrganizerEventRepository) — perlu disatukan
+   atau diklarifikasi pemakaiannya.
+3. Beberapa screen belum terhubung ke routing lengkap (generator app_router.dart
+   kosong).
+4. Loading/empty/error/success state belum konsisten di seluruh screen Organizer.
+5. Tidak ada widget test yang mencakup seluruh alur Organizer.
+
+Admin — SUDAH ADA (parsial):
+- features/admin/screens/admin_dashboard_screen.dart — ada, menampilkan event
+  + jumlah organizer, BELUM memiliki metrik lengkap (FR-80 s.d. FR-85), BELUM
+  ada grafik/filter periode.
+- features/admin/screens/account_management_screen.dart — ada, daftar akun +
+  toggle nonaktif via ApiClient (HTTP), BELUM audit log alasan penangguhan.
+- features/admin/screens/event_moderation_screen.dart — ada, setujui/tolak/
+  revisi via OrganizerProvider, perlu konsistensi status moderasi.
+- features/admin/screens/report_management_screen.dart — ada, daftar laporan +
+  ubah status, BELUM prioritas, catatan internal, riwayat aktivitas, balasan.
+- features/admin/tabs/admin_tab_controller.dart — ada, menggabungkan 3 screen,
+  status placeholder.
+- services/report/report_service.dart + providers/report_provider.dart — ada.
+- services/event/event_service.dart — ada, dipakai admin dashboard.
+
+Admin — BELUM ADA / BELUM TERIMPLEMENTASI:
+1. Manajemen paket layanan Admin (FR-74, FR-75, FR-76) — BELUM ada screen.
+2. Manajemen langganan Organizer dari sisi Admin (FR-79) — BELUM ada screen.
+3. Transaksi dan pendapatan platform (FR-89 s.d. FR-93) — BELUM ada screen.
+4. Pengaturan platform (FR-102, FR-103) — BELUM ada screen.
+5. Audit Log (FR-104, FR-105, FR-106) — BELUM ada screen.
+6. Halaman profil Admin (/admin/profile) — route ada di app_routes.dart,
+   BELUM ada screen.
+7. Manajemen event global Admin selain moderasi (FR-86) — BELUM ada screen
+   terpisah.
+8. Admin service/repository layer — BELUM ada (admin screen memanggil
+   EventService/ApiClient langsung).
+9. Loading/empty/error/success state di seluruh screen Admin belum konsisten.
+
+2.4 Ketidaksesuaian implementasi dengan PRD (item penting untuk catatan)
+- UserRole enum mencakup staff sebagai role global, sedangkan PRD menetapkan
+  tiga role global (Participant, Organizer, Admin); Staff adalah membership
+  per-event. Item sinkronisasi, jangan diubah tanpa keputusan.
+- AuthGate/_homeForRole tidak mengarahkan role attendee/staff ke halaman
+  yang sesuai.
+- Dua file generator routing (apps/lib/app_router.dart kosong dan
+  apps/lib/routes/app_routes.dart) menyebabkan peta route terpecah.
+- Dua model laporan berbeda: SupportReportModel (pakai admin/report) dan
+  OrganizerComplaintModel (pakai organizer support) — perlu konsistensi tipe
+  data (nomor laporan, token status, status).
+- Admin belum memiliki modul paket, transaksi, pengaturan, audit log meskipun
+  wajib dalam PRD.
+
+2.5 Hubungan dan ketergantungan antarfitur
+- Organizer event moderation bergantung pada status event di EventModel dan
+  AppConstants (dikelola Developer 1).
+- Admin moderation memakai OrganizerProvider (Developer 1) untuk updateEvent().
+- Admin report management memakai ReportProvider/ReportService (Developer 2).
+- Admin support center (prioritas, catatan internal, riwayat) perlu memperluas
+  ReportManagementScreen dan SupportReportModel (koordinasi Dev 2 dan Dev 3).
+- Semua admin screen menggunakan AppRoutes untuk navigasi (Developer 1 OWNER).
+- Semua role menggunakan AuthProvider + UserModel + UserRole (Developer 1 OWNER,
+  Dev 2 & 3 READ ONLY).
+- Data dummy ID konsisten (evt-001, org-001, rpt-001, dll.) di semua mock
+  service (koordinasi seluruh developer).
+
+2.6 File berpotensi Konflik ketika dikerjakan beberapa developer
+- apps/lib/routes/app_routes.dart — route konstanta, digunakan semua developer.
+- apps/lib/app.dart — AuthGate/RoleGuard, routing role.
+- apps/lib/core/constants/app_constants.dart — status global.
+- apps/lib/core/validators/input_validator.dart — validasi form global.
+- apps/lib/providers/auth_provider.dart — state auth global.
+- apps/lib/services/auth/auth_service.dart — auth service.
+- apps/lib/models/user/user_model.dart + user_role.dart — model user.
+- apps/lib/services/organizer_events/organizer_event_contract.dart —
+  kontrak event yang dipakai Developer 1, 2, dan 3.
+- apps/lib/services/organizer_operations/organizer_permission.dart dan
+  apps/lib/services/organizer_membership/organizer_membership_service.dart —
+  duplikasi enum OrganizerPermission.
+- apps/lib/services/report/report_service.dart +
+  providers/report_provider.dart — digunakan Admin report dan bisa diperluas
+  Developer 3.
+- apps/lib/features/admin/screens/report_management_screen.dart — milik Dev 2,
+  Dev 3 perlu menambahkan fitur (prioritas, catatan internal, riwayat).
+
+
+--------------------------------------------------------------------------------
+BAGIAN 3 – PEMBAGIAN TUGAS DEVELOPER
+--------------------------------------------------------------------------------
+
+3.1 Developer 1 — Tahap 1: Penyelesaian Role Organizer
+
+Ruang lingkup: Menyelesaikan seluruh fitur Organizer sesuai PRD pada frontend
+`apps`. Semua pekerjaan menggunakan data dummy, tanpa backend.
+
+Pekerjaan spesifik:
+a) Selesaikan dan lengkapi semua layar Organizer yang sudah ada:
+   - Dashboard, daftar/buat/edit/detail event, pratinjau publik.
+   - Kategori tiket (create/edit/delete/nonaktifkan).
+   - Daftar peserta dengan pencarian, filter, detail peserta.
+   - Registrasi dibantu (assisted registration) dengan simulasi VA.
+   - Manajemen staff (undang, atur permission, cabut akses).
+   - Scanner/check-in simulasi (valid, sudah digunakan, tidak valid, salah
+     event, dibatalkan, offline).
+   - Laporan event (penjualan, kehadiran, keuangan, export CSV).
+   - Riwayat aktivitas event.
+   - Paket dan langganan Organizer (lihat paket, simulasi upgrade, riwayat
+     transaksi).
+   - Dukungan/keluhan Organizer (kirim laporan, lihat status, balasan admin).
+   - Profil Organizer dan logout.
+b) Selesaikan navigasi dan routing Organizer:
+   - Pastikan semua named route di app_routes.dart terhubung ke screen yang
+     benar melalui generator routing (apps/lib/app_router.dart).
+   - Pastikan OrganizerShell (sidebar/bottom nav) mencakup semua menu Organizer.
+c) Selesaikan state management:
+   - Klarifikasi pemakaian OrganizerProvider vs EventProvider; pilih satu
+     sumber kebenaran per domain atau dokumentasikan pemisahan dengan jelas.
+   - Pastikan loading, empty, error, success state di semua screen Organizer.
+d) Selesaikan data dummy:
+   - Pastikan data dummy konsisten di semua mock service/repository Organizer
+     (ID event, ticket type, attendee, staff, order, transaksi paket).
+e) Perbaikan identifikasi (catatan, tidak diperbaiki dalam tugas ini,
+   dijadwalkan sebagai pekerjaan):
+   - Duplikasi enum OrganizerPermission di dua file harus diunifikasi atau
+     difungsikan dengan jelas (kontrak integrasi).
+f) Pengujian dengan data dummy:
+   - Uji seluruh alur Organizer tanpa backend (MOCK_MODE=true).
+   - Uji perbedaan tampilan Owner vs Staff (permission).
+
+
+3.2 Developer 2 — Admin Bagian 1 (Operasional & Moderasi)
+
+Ruang lingkup: Modul Admin yang berhubungan langsung dengan operasi event,
+akun, moderasi, dan laporan support. Pilihan modul ini karena batas
+tanggung jawab jelas dan tidak tumpang tindih dengan modul bisnis/paket
+Developer 3.
+
+Pekerjaan spesifik:
+a) Selesaikan AdminDashboardScreen:
+   - Tambahkan metrik lengkap FR-80 s.d. FR-85 (total event, aktif, mendatang,
+     selesai, menunggu moderasi, jumlah organizer/participant, order, tiket,
+     transaksi, pendapatan).
+   - Tambahkan filter periode dan placeholder grafik (data dummy).
+b) Selesaikan AccountManagementScreen:
+   - Lengkapi manajemen akun (lihat semua akun, nonaktifkan/aktifkan dengan
+     alasan, data dummy konsisten).
+   - Pastikan aksi penangguhan mencatat alasan (siap untuk audit log nanti).
+c) Selesaikan EventModerationScreen:
+   - Pastikan setujui/tolak/minta revisi berfungsi dengan status event yang
+     konsisten dengan OrganizerEventStatus (Developer 1).
+   - Tampilkan catatan revisi dari admin.
+d) Selesaikan ReportManagementScreen (versi dasar):
+   - Daftar laporan, pencarian, filter status, buka detail, ubah status.
+   - Data dummy konsisten dengan SupportReportModel.
+e) Selesaikan AdminTabController:
+   - Gabungkan dashboard, moderasi, dan laporan dalam navigasi tab Admin.
+   - Pastikan tab tidak placeholder dan navigasi antar tab berfungsi.
+f) Tambahkan konstanta route Admin yang belum ada ke app_routes.dart
+   (melalui Developer 1 sebagai OWNER file; Developer 2 menyampaikan kebutuhan).
+g) Data dummy Admin bagian 1 konsisten dengan data dummy Organizer
+   (ID admin, akun, event, laporan).
+h) Pengujian dengan data dummy:
+   - Uji alur moderasi event (ajukan -> setujui/tolak/revisi -> ajukan ulang).
+   - Uji manajemen akun (nonaktif/aktif).
+   - Uji alur laporan (buat -> lihat -> ubah status).
+
+
+3.3 Developer 3 — Admin Bagian 2 (Bisnis, Paket, Transaksi, Pengaturan, Audit)
+
+Ruang lingkup: Modul Admin yang berhubungan dengan monetisasi, pengaturan
+platform, dan audit. Tidak tumpang tindih dengan Developer 2.
+
+Pekerjaan spesifik (membuat file BARU, tidak mengubah file Developer 2):
+a) Manajemen Paket Layanan Admin (FR-74, FR-75, FR-76):
+   - Buat package_management_screen.dart: daftar paket, buat/edit paket,
+     aktifkan/nonaktifkan, arsipkan paket, atur fitur dan batas penggunaan.
+   - Buat service dan provider untuk paket (data dummy).
+b) Manajemen Langganan Organizer dari sisi Admin (FR-79):
+   - Buat subscription_management_screen.dart: lihat semua langganan,
+     filter paket/status, lihat riwayat, lihat pembayaran paket.
+   - Buat service dan provider untuk langganan (data dummy).
+c) Transaksi dan Pendapatan (FR-89 s.d. FR-93):
+   - Buat transaction_revenue_screen.dart: daftar transaksi tiket dan
+     pembayaran paket, pisahkan gross ticket sales dari platform revenue,
+     tampilkan komisi sebagai snapshot, pisahkan pendapatan paket dan komisi.
+   - Buat service dan provider untuk transaksi (data dummy).
+d) Pengaturan Platform (FR-102, FR-103):
+   - Buat admin_settings_screen.dart: kelola pengaturan platform,
+     catat perubahan komisi/biaya.
+   - Buat service dan provider untuk pengaturan (data dummy).
+e) Audit Log (FR-104, FR-105, FR-106):
+   - Buat audit_log_screen.dart: lihat audit log, cari dan filter,
+     tampilkan tindakan administratif penting.
+   - Buat service dan provider untuk audit log (data dummy).
+f) Halaman Profil Admin (/admin/profile):
+   - Buat admin_profile_screen.dart (route sudah ada di app_routes.dart).
+g) Request penambahan route Admin ke app_routes.dart
+   (melalui Developer 1 sebagai OWNER file).
+h) Data dummy Admin bagian 2 konsisten dengan data dummy Developer 1 dan 2.
+i) Pengujian dengan data dummy:
+   - Uji CRUD paket, langganan, transaksi, pengaturan, audit log.
+   - Uji pemisahan gross sales vs platform revenue.
+
+3.4 Developer 1 — Tahap 2: Finalisasi Role Admin
+
+Dilakukan SETELAH Developer 2 dan Developer 3 menyelesaikan pekerjaan
+masing-masing.
+
+Tanggung jawab:
+a) Memeriksa seluruh hasil pekerjaan Developer 2 dan Developer 3.
+b) Mengintegrasikan seluruh fitur Admin ke dalam navigasi utama
+   (app_routes.dart, generator routing, AdminTabController atau shell baru
+   jika diperlukan).
+c) Memeriksa konsistensi antarmodul (status event, model laporan, model user,
+   konstanta, data dummy).
+d) Mengidentifikasi dan memperbaiki konflik integrasi (sebagai OWNER file
+   bersama, Developer 1 boleh mengubah file shared).
+e) Memastikan seluruh alur Admin berjalan (dashboard -> moderasi -> akun ->
+   paket -> transaksi -> pengaturan -> audit log -> profil).
+f) Memeriksa konsistensi data dummy antara Developer 1, 2, dan 3.
+g) Melakukan pengujian menyeluruh seluruh fitur Admin dengan data dummy.
+h) Memastikan seluruh kebutuhan Admin dalam PRD (FR-74 s.d. FR-106) terpenuhi.
+i) Memastikan struktur frontend siap untuk integrasi backend tahap berikutnya.
+
+
+--------------------------------------------------------------------------------
+BAGIAN 4 – DAFTAR KEPEMILIKAN FILE
+--------------------------------------------------------------------------------
+
+4.1 Tabel kepemilikan file
+
+| File/Folder | Developer 1 | Developer 2 | Developer 3 | Aturan |
+|---|---|---|---|---|
+| apps/lib/app.dart | OWNER | READ ONLY | READ ONLY | AuthGate/RoleGuard; Dev 1 ubah, Dev 2/3 request route |
+| apps/lib/main.dart | OWNER | NOT ALLOWED | NOT ALLOWED | Entry point, tidak diubah Dev 2/3 |
+| apps/lib/app_router.dart | OWNER | READ ONLY | READ ONLY | Generator routing utama (kosong); Dev 1 ubah |
+| apps/lib/routes/app_routes.dart | OWNER | READ ONLY | READ ONLY | Konstanta route; Dev 2/3 request tambahan route |
+| apps/lib/core/config/app_config.dart | OWNER | READ ONLY | READ ONLY | MOCK_MODE, base URL; tidak diubah Dev 2/3 |
+| apps/lib/core/constants/app_constants.dart | OWNER | READ ONLY | READ ONLY | Status global; Dev 2/3 gunakan, tidak ubah |
+| apps/lib/core/errors/app_exception.dart | OWNER | READ ONLY | READ ONLY | Error app; tidak diubah Dev 2/3 |
+| apps/lib/core/network/api_client.dart | OWNER | READ ONLY | READ ONLY | HTTP client; tidak diubah Dev 2/3 |
+| apps/lib/core/services/session_service.dart | OWNER | READ ONLY | READ ONLY | Session; tidak diubah Dev 2/3 |
+| apps/lib/core/theme/app_theme.dart | OWNER | READ ONLY | READ ONLY | Tema; tidak diubah Dev 2/3 |
+| apps/lib/core/utils/date_utils.dart | OWNER | READ ONLY | READ ONLY | Utilitas tanggal; tidak diubah Dev 2/3 |
+| apps/lib/core/validators/input_validator.dart | OWNER | READ ONLY | READ ONLY | Validasi form global; Dev 2/3 gunakan, tidak ubah |
+| apps/lib/core/widgets/app_drawer.dart | OWNER | READ ONLY | READ ONLY | Drawer bersama; tidak diubah Dev 2/3 |
+| apps/lib/models/user/user_model.dart | OWNER | READ ONLY | READ ONLY | Model user; Dev 2/3 gunakan, tidak ubah |
+| apps/lib/models/user/user_role.dart | OWNER | READ ONLY | READ ONLY | Enum role global; Dev 2/3 gunakan, tidak ubah |
+| apps/lib/models/event/event_model.dart | OWNER | READ ONLY | READ ONLY | Model event; Dev 2 gunakan untuk moderasi |
+| apps/lib/models/event/ticket_type_model.dart | OWNER | READ ONLY | READ ONLY | Model tiket; Dev 1 ubah |
+| apps/lib/models/order/order_model.dart | OWNER | READ ONLY | READ ONLY | Model order; Dev 1 ubah |
+| apps/lib/models/order/order_item_model.dart | OWNER | READ ONLY | READ ONLY | Model order item; Dev 1 ubah |
+| apps/lib/models/ticket/ticket_model.dart | OWNER | READ ONLY | READ ONLY | Model tiket; Dev 1 ubah |
+| apps/lib/models/payment/payment_model.dart | OWNER | READ ONLY | READ ONLY | Model pembayaran; Dev 1 ubah |
+| apps/lib/models/check_in/check_in_model.dart | OWNER | READ ONLY | READ ONLY | Model check-in; Dev 1 ubah |
+| apps/lib/models/report/support_report_model.dart | READ ONLY | OWNER | READ ONLY | Model laporan support; Dev 2 ubah, Dev 3 request |
+| apps/lib/models/report/report_activity_model.dart | READ ONLY | OWNER | READ ONLY | Model aktivitas laporan; Dev 2 ubah |
+
+| apps/lib/providers/auth_provider.dart | OWNER | READ ONLY | READ ONLY | State auth global; Dev 2/3 gunakan, tidak ubah |
+| apps/lib/providers/organizer_provider.dart | OWNER | READ ONLY | READ ONLY | State organizer; Dev 2 gunakan untuk moderasi |
+| apps/lib/providers/event_provider.dart | OWNER | READ ONLY | READ ONLY | State event detail; Dev 1 ubah |
+| apps/lib/providers/report_provider.dart | READ ONLY | OWNER | READ ONLY | State laporan admin; Dev 2 ubah |
+| apps/lib/providers/order_provider.dart | OWNER | READ ONLY | READ ONLY | State order; Dev 1 ubah |
+| apps/lib/providers/ticket_provider.dart | OWNER | READ ONLY | READ ONLY | State tiket; Dev 1 ubah |
+| apps/lib/providers/payment_provider.dart | OWNER | READ ONLY | READ ONLY | State pembayaran; Dev 1 ubah |
+| apps/lib/providers/notification_provider.dart | OWNER | READ ONLY | READ ONLY | State notifikasi; Dev 1 ubah |
+| apps/lib/providers/check_in_provider.dart | OWNER | READ ONLY | READ ONLY | State check-in; Dev 1 ubah |
+| apps/lib/providers/user_provider.dart | OWNER | READ ONLY | READ ONLY | State user; Dev 1 ubah |
+| apps/lib/services/api/api_service.dart | OWNER | READ ONLY | READ ONLY | Service API; tidak diubah Dev 2/3 |
+| apps/lib/services/auth/auth_service.dart | OWNER | READ ONLY | READ ONLY | Service auth; tidak diubah Dev 2/3 |
+| apps/lib/services/event/event_service.dart | OWNER | READ ONLY | READ ONLY | Service event; Dev 1 ubah, Dev 2 gunakan |
+| apps/lib/services/check_in/check_in_service.dart | OWNER | READ ONLY | READ ONLY | Service check-in; Dev 1 ubah |
+| apps/lib/services/notification/notification_service.dart | OWNER | READ ONLY | READ ONLY | Service notifikasi; Dev 1 ubah |
+| apps/lib/services/order/order_service.dart | OWNER | READ ONLY | READ ONLY | Service order; Dev 1 ubah |
+| apps/lib/services/payment/payment_service.dart | OWNER | READ ONLY | READ ONLY | Service pembayaran; Dev 1 ubah |
+| apps/lib/services/scanner/scanner_service.dart | OWNER | READ ONLY | READ ONLY | Service scanner; Dev 1 ubah |
+| apps/lib/services/ticket/ticket_service.dart | OWNER | READ ONLY | READ ONLY | Service tiket; Dev 1 ubah |
+| apps/lib/services/ticket/ticket_type_service.dart | OWNER | READ ONLY | READ ONLY | Service jenis tiket; Dev 1 ubah |
+| apps/lib/services/mock/mock_attendee_repository.dart | OWNER | READ ONLY | READ ONLY | Mock attendee; Dev 1 ubah |
+| apps/lib/services/organizer/organizer_service.dart | OWNER | READ ONLY | READ ONLY | Service organizer lama; Dev 1 ubah |
+| apps/lib/services/organizer_events/* (semua file) | OWNER | READ ONLY | READ ONLY | Kontrak domain event; Dev 1 ubah |
+| apps/lib/services/organizer_operations/* (semua file) | OWNER | READ ONLY | READ ONLY | Operasi organizer; Dev 1 ubah |
+| apps/lib/services/organizer_membership/* (semua file) | OWNER | READ ONLY | READ ONLY | Keanggotaan staff; Dev 1 ubah |
+| apps/lib/services/organizer_notifications/* (semua file) | OWNER | READ ONLY | READ ONLY | Notifikasi organizer; Dev 1 ubah |
+| apps/lib/services/organizer_plans/* (semua file) | OWNER | READ ONLY | READ ONLY | Paket organizer; Dev 1 ubah |
+| apps/lib/services/organizer_support/* (semua file) | OWNER | READ ONLY | READ ONLY | Support organizer; Dev 1 ubah |
+| apps/lib/services/organizer_shell/* (semua file) | OWNER | READ ONLY | READ ONLY | Shell organizer; Dev 1 ubah |
+| apps/lib/services/report/report_service.dart | READ ONLY | OWNER | READ ONLY | Service laporan admin; Dev 2 ubah |
+
+| apps/lib/features/admin/screens/admin_dashboard_screen.dart | READ ONLY | OWNER | READ ONLY | Dashboard admin; Dev 2 ubah |
+| apps/lib/features/admin/screens/account_management_screen.dart | READ ONLY | OWNER | READ ONLY | Manajemen akun; Dev 2 ubah |
+| apps/lib/features/admin/screens/event_moderation_screen.dart | READ ONLY | OWNER | READ ONLY | Moderasi event; Dev 2 ubah |
+| apps/lib/features/admin/screens/report_management_screen.dart | READ ONLY | OWNER | READ ONLY | Laporan support admin (dasar); Dev 2 ubah |
+| apps/lib/features/admin/tabs/admin_tab_controller.dart | READ ONLY | OWNER | READ ONLY | Tab admin; Dev 2 ubah |
+| apps/lib/features/admin/screens/package_management_screen.dart (BARU) | NOT ALLOWED | NOT ALLOWED | OWNER | Paket admin; Dev 3 buat baru |
+| apps/lib/features/admin/screens/subscription_management_screen.dart (BARU) | NOT ALLOWED | NOT ALLOWED | OWNER | Langganan admin; Dev 3 buat baru |
+| apps/lib/features/admin/screens/transaction_revenue_screen.dart (BARU) | NOT ALLOWED | NOT ALLOWED | OWNER | Transaksi/revenue; Dev 3 buat baru |
+| apps/lib/features/admin/screens/admin_settings_screen.dart (BARU) | NOT ALLOWED | NOT ALLOWED | OWNER | Pengaturan; Dev 3 buat baru |
+| apps/lib/features/admin/screens/audit_log_screen.dart (BARU) | NOT ALLOWED | NOT ALLOWED | OWNER | Audit log; Dev 3 buat baru |
+| apps/lib/features/admin/screens/admin_profile_screen.dart (BARU) | NOT ALLOWED | NOT ALLOWED | OWNER | Profil admin; Dev 3 buat baru |
+| apps/lib/features/admin/screens/* (baru Dev 3, service/provider/model) | NOT ALLOWED | NOT ALLOWED | OWNER | Semua file baru modul Dev 3 |
+| apps/lib/services/admin/* (baru Dev 3) | NOT ALLOWED | NOT ALLOWED | OWNER | Service admin baru Dev 3 |
+| apps/lib/providers/admin_*_provider.dart (baru Dev 3) | NOT ALLOWED | NOT ALLOWED | OWNER | Provider admin baru Dev 3 |
+| apps/lib/models/admin/* (baru Dev 3) | NOT ALLOWED | NOT ALLOWED | OWNER | Model admin baru Dev 3 |
+| apps/lib/features/organizer/** (semua file) | OWNER | READ ONLY | READ ONLY | Semua file Organizer; Dev 1 ubah |
+| apps/lib/features/auth/* (semua file) | OWNER | READ ONLY | READ ONLY | Auth screen; Dev 1 ubah |
+| apps/lib/features/events/* (semua file) | OWNER | READ ONLY | READ ONLY | Event publik; Dev 1 ubah |
+| apps/lib/features/home/* (semua file) | OWNER | READ ONLY | READ ONLY | Beranda publik; Dev 1 ubah |
+| apps/lib/features/orders/* (semua file) | OWNER | READ ONLY | READ ONLY | Order; Dev 1 ubah |
+| apps/lib/features/payments/* (semua file) | OWNER | READ ONLY | READ ONLY | Pembayaran; Dev 1 ubah |
+| apps/lib/features/registration/* (semua file) | OWNER | READ ONLY | READ ONLY | Registrasi; Dev 1 ubah |
+| apps/lib/features/reports/* (semua file) | OWNER | READ ONLY | READ ONLY | Laporan publik; Dev 1 ubah |
+| apps/lib/features/scanner/* (semua file) | OWNER | READ ONLY | READ ONLY | Scanner publik; Dev 1 ubah |
+| apps/lib/features/tickets/* (semua file) | OWNER | READ ONLY | READ ONLY | Tiket; Dev 1 ubah |
+| apps/lib/features/check_in/* (semua file) | OWNER | READ ONLY | READ ONLY | Check-in publik; Dev 1 ubah |
+| apps/lib/features/notifications/* (semua file) | OWNER | READ ONLY | READ ONLY | Notifikasi publik; Dev 1 ubah |
+| apps/lib/features/staff/* (semua file) | OWNER | READ ONLY | READ ONLY | Staff dashboard; Dev 1 ubah |
+| backend/** | NOT ALLOWED | NOT ALLOWED | NOT ALLOWED | Backend tidak dalam ruang lingkup |
+| prd.md | NOT ALLOWED | NOT ALLOWED | NOT ALLOWED | Tidak diubah |
+| README.md, AGENTS.md, SKILL.md, docs/* | NOT ALLOWED | NOT ALLOWED | NOT ALLOWED | Dokumentasi, tidak diubah |
+
+
+4.2 Aturan perubahan file bersama (SHARED / OWNER dengan pembaca)
+- Developer 1 adalah OWNER dari semua file shared (routing, konstanta, model
+  user/event, auth, core). Developer 2 dan Developer 3 HANYA READ ONLY pada
+  file ini.
+- Jika Developer 2 atau Developer 3 perlu perubahan pada file yang OWNER-nya
+  Developer 1, mereka harus menyampaikan kebutuhan perubahan kepada Developer 1.
+  Developer 1 yang melakukan perubahan, bukan Developer 2 atau Developer 3.
+- apps/lib/services/report/report_service.dart dan
+  apps/lib/providers/report_provider.dart adalah OWNER Developer 2.
+  Developer 3 READ ONLY dan harus menyampaikan kebutuhan perluasan (prioritas,
+  catatan internal, riwayat aktivitas) kepada Developer 2.
+- File yang owned oleh Developer 3 (paket, langganan, transaksi, pengaturan,
+  audit log, profil admin) tidak boleh diubah Developer 2.
+- File owned oleh Developer 2 (dashboard, moderasi, akun, laporan dasar, tab)
+  tidak boleh diubah Developer 3.
+- Jika terjadi overlaps (mis. Developer 3 perlu menambahkan field pada
+  SupportReportModel), Developer 3 minta Developer 2 untuk menambahkannya;
+  Developer 2 OWNER yang melakukan perubahan.
+
+
+--------------------------------------------------------------------------------
+BAGIAN 5 – KONTRAK INTEGRASI ANTARDEVELOPER
+--------------------------------------------------------------------------------
+
+[INTEGRATION CONTRACT: ROLE_AUTH_AND_USER_MODEL]
+1. Modul yang saling berhubungan: Auth (Developer 1) <-> Semua role
+   (Developer 1, 2, 3).
+2. Developer yang bertanggung jawab: Developer 1 (OWNER). Developer 2 & 3
+   READ ONLY.
+3. File yang terlibat:
+   - apps/lib/providers/auth_provider.dart
+   - apps/lib/services/auth/auth_service.dart
+   - apps/lib/models/user/user_model.dart
+   - apps/lib/models/user/user_role.dart
+   - apps/lib/app.dart (AuthGate, RoleGuard)
+4. Struktur data / interface yang harus disepakati:
+   - UserRole enum: attendee, organizer, staff, admin (tidak boleh ditambah
+     role global tanpa keputusan PRD).
+   - UserModel: id, name, email, username, role, emailVerified, phone,
+     avatarUrl, createdAt.
+   - AuthProvider: user, isAuthenticated, isLoading, error, login(),
+     register(), logout(), restoreSession(), updateProfile().
+   - Role name string: 'admin', 'organizer', 'attendee', 'staff'.
+5. Fungsi dan parameter yang harus konsisten:
+   - auth.user!.role.name digunakan untuk pemeriksaan role di app.dart
+     RoleGuard dan AdminDashboardScreen.
+   - auth.logout() di semua screen profil (organizer dan admin).
+6. Aturan penggunaan oleh developer lain:
+   - Developer 2 dan 3 hanya boleh MEMBAKA dan MEMGUNAKAN AuthProvider/
+     UserModel.
+   - Tidak boleh menambah field ke UserModel atau enum ke UserRole tanpa
+     persetujuan Developer 1.
+7. Urutan pengerjaan berdasarkan dependensi:
+   - Developer 1 menyelesaikan Tahap 1 (Organizer) terlebih dahulu, termasuk
+     AuthGate/RoleGuard. Developer 2 dan 3 mengandalkan auth yang sudah ada.
+
+[INTEGRATION CONTRACT: ROUTE_CONSTANTS_AND_NAVIGATION]
+1. Modul yang saling berhubungan: Routing (Developer 1) <-> Semua screen Admin
+   (Developer 2, 3) dan Organizer (Developer 1).
+2. Developer yang bertanggung jawab: Developer 1 (OWNER app_routes.dart dan
+   app_router.dart). Developer 2 & 3 REQUEST route tambahan.
+3. File yang terlibat:
+   - apps/lib/routes/app_routes.dart
+   - apps/lib/app_router.dart
+   - apps/lib/app.dart
+4. Struktur data / interface yang harus disepakati:
+   - Named route konstanta (static const String) di app_routes.dart.
+   - Route yang sudah ada: adminDashboard, adminEventModeration, adminReports,
+     organizerDashboard, organizerEvents, organizerEventForm,
+     organizerAttendees, organizerStaff, organizerPlans, organizerSupport,
+     organizerTeam, staffDashboard, staffScanner, accessDenied, adminProfile.
+   - Route yang PERLU ditambahkan (Developer 3 minta via Developer 1):
+     adminPackages, adminSubscriptions, adminTransactions, adminSettings,
+     adminAuditLog, adminProfile.
+5. Fungsi dan parameter yang harus konsisten:
+   - Navigator.pushNamed(context, AppRoutes.xxx).
+   - Navigator.pushReplacementNamed untuk shell navigation.
+   - Route parameter (eventId, orderId, reportId) sesuai kebutuhan screen.
+6. Aturan penggunaan oleh developer lain:
+   - Developer 2 dan 3 TIDAK BOLEH mengedit app_routes.dart secara langsung.
+   - Developer 2 dan 3 menyampaikan daftar route yang diperlukan kepada
+     Developer 1; Developer 1 menambahkan konstanta dan entri routing.
+7. Urutan pengerjaan berdasarkan dependensi:
+   - Developer 1 Tahap 1 menyusun route Organizer. Developer 2 dan 3 menyampaikan
+     route Admin saat memulai. Developer 1 Tahap 2 memastikan semua route Admin
+     terintegrasi.
+
+
+[INTEGRATION CONTRACT: EVENT_MODEL_AND_STATUS]
+1. Modul yang saling berhubungan: Organizer Event domain (Developer 1) <-> Admin
+   Moderasi (Developer 2).
+2. Developer yang bertanggung jawab: Developer 1 (OWNER).
+3. File yang terlibat:
+   - apps/lib/models/event/event_model.dart
+   - apps/lib/services/organizer_events/organizer_event_contract.dart
+   - apps/lib/core/constants/app_constants.dart
+   - apps/lib/features/admin/screens/event_moderation_screen.dart (Dev 2)
+4. Struktur data / interface yang harus disepakati:
+   - Status event: draft, pending_review, revision_required, approved, published,
+     rejected, completed, cancelled, suspended (OrganizerEventStatus).
+   - EventModel: id, organizerId, title, status, isPublic, publicUrl,
+     reviewNote, submittedAt, createdAt, updatedAt.
+   - AppConstants.eventStatusDraft, PendingReview, RevisionRequired, Approved,
+     Published, Rejected, Completed, Cancelled.
+5. Fungsi dan parameter yang harus konsisten:
+   - OrganizerProvider.updateEvent(EventModel) — dipakai EventModerationScreen
+     (Dev 2) untuk menyetujui/menolak event.
+   - OrganizerEventStatus.canSubmit(status), canResubmit(status), canDelete(),
+     isEditable(status) — aturan transisi status.
+6. Aturan penggunaan oleh developer lain:
+   - Developer 2 hanya boleh MEMBAKA dan MEMGUNAKAN EventModel + status konstanta.
+   - Developer 2 tidak boleh menambah status event baru tanpa persetujuan
+     Developer 1.
+   - Owner (organizer) tidak boleh mengubah reviewNote/status moderasi secara
+     langsung (hanya via simulateModeratorDecision untuk demo).
+7. Urutan pengerjaan berdasarkan dependensi:
+   - Developer 1 mendefinisikan status event terlebih dahulu. Developer 2
+     mengimplementasikan moderasi berdasarkan status tersebut.
+
+[INTEGRATION CONTRACT: ORGANIZER_PERMISSION_MODEL]
+1. Modul yang saling berhubungan: Domain organizer (Developer 1) <-> Admin
+   (Developer 2, 3 untuk referensi permission staff).
+2. Developer yang bertanggung jawab: Developer 1 (OWNER).
+3. File yang terlibat:
+   - apps/lib/services/organizer_operations/organizer_permission.dart
+   - apps/lib/services/organizer_membership/organizer_membership_service.dart
+   - (DUPLIKASI: enum OrganizerPermission ada di keduanya, nilai sama)
+4. Struktur data / interface yang harus disepakati:
+   - OrganizerPermission enum: viewEvent, viewParticipants, assistRegistration,
+     viewOrders, scanTicket, checkInTicket, viewScanHistory, viewReports,
+     exportParticipants (kode: VIEW_EVENT, VIEW_PARTICIPANTS,
+     ASSIST_REGISTRATION, VIEW_ORDERS, SCAN_TICKET, CHECK_IN_TICKET,
+     VIEW_SCAN_HISTORY, VIEW_REPORTS, EXPORT_PARTICIPANTS).
+   - OrganizerMembershipContext: eventId, userId, userName, role ('owner'|'staff'),
+     permissions (Set<OrganizerPermission>), hasPermission().
+5. Fungsi dan parameter yang harus konsisten:
+   - contextScope.hasPermission(OrganizerPermission.scanTicket) dll. di semua
+     screen operasi organizer.
+   - OrganizerMembershipContext.owner(...) dan .staff(...) factory.
+6. Aturan penggunaan oleh developer lain:
+   - Developer 2 dan 3 READ ONLY pada kedua file. Tidak boleh menambah enum
+     baru tanpa persetujuan Developer 1.
+   - HARAP DICATAT: dua file mendefinasi enum yang sama. Developer 1 harus
+     menyatukan atau mendokumentasikan pemisahan dengan jelas selama Tahap 1.
+7. Urutan pengerjaan berdasarkan dependensi:
+   - Developer 1 menyelesaikan Tahap 1. Developer 2 dan 3 mengandalkan permission
+     yang sudah ada.
+
+
+[INTEGRATION CONTRACT: REPORT_MODEL_AND_PROVIDER]
+1. Modul yang saling berhubungan: Admin Report Management (Developer 2) <-> Admin
+   Support Center enhancements (Developer 3).
+2. Developer yang bertanggung jawab: Developer 2 (OWNER report_service.dart,
+   report_provider.dart, support_report_model.dart). Developer 3 REQUEST
+   perluasan.
+3. File yang terlibat:
+   - apps/lib/models/report/support_report_model.dart
+   - apps/lib/models/report/report_activity_model.dart
+   - apps/lib/services/report/report_service.dart
+   - apps/lib/providers/report_provider.dart
+   - apps/lib/features/admin/screens/report_management_screen.dart (Dev 2)
+   - apps/lib/features/organizer/support/organizer_support_service.dart (Dev 1)
+   - apps/lib/features/organizer/support/organizer_support_screen.dart (Dev 1)
+   - apps/lib/features/organizer/support/ (OrganizerComplaintModel — model laporan
+     organizer, berbeda dari SupportReportModel)
+4. Struktur data / interface yang harus disepakati:
+   - SupportReportModel: id, userId, contactEmail, orderReference, category,
+     description, status (open, in_progress, waiting_for_user, resolved, closed),
+     ticketNumber, statusToken, createdAt, updatedAt, handledBy.
+   - Kategori laporan: REGISTRATION, PAYMENT, E_TICKET, SCANNER, EVENT, ACCOUNT,
+     SUBSCRIPTION, TRANSACTION, OTHER.
+   - Status: OPEN, IN_PROGRESS, WAITING_FOR_USER, RESOLVED, CLOSED.
+   - OrganizerComplaintModel (Dev 1): ticketNumber, statusToken, organizerId,
+     organizerEmail, category, subject, description, status, internalNotes
+     (disembunyikan dari organizer), replies.
+5. Fungsi dan parameter yang harus konsisten:
+   - ReportService.createReport(payload), listReports(query), getReport(id),
+     updateReportStatus(reportId, status, note, handledBy).
+   - ReportProvider.loadReports(), updateReportStatus().
+   - OrganizerSupportService.submitComplaint(...), listComplaints(organizerId).
+6. Aturan penggunaan oleh developer lain:
+   - Developer 3 READ ONLY pada report_service.dart, report_provider.dart,
+     support_report_model.dart. Jika perlu menambahkan field (prioritas,
+     catatan internal, riwayat aktivitas, balasan), Developer 3 minta Developer 2
+     untuk menambahkannya; Developer 2 OWNER melakukan perubahan.
+   - internalNotes pada OrganizerComplaintModel (Dev 1) adalah pola referensi
+     untuk catatan internal yang disembunyikan dari pelapor.
+7. Urutan pengerjaan berdasarkan dependensi:
+   - Developer 2 menyelesaikan report management dasar terlebih dahulu.
+   - Developer 3 menyampaikan kebutuhan perluasan (prioritas, catatan internal,
+     riwayat) kepada Developer 2 sebelum atau selama implementasi modul Admin
+     bagian 2.
+
+[INTEGRATION CONTRACT: DATA_DUMMY_CONSISTENCY]
+1. Modul yang saling berhubungan: Semua mock service/repository
+   (Developer 1, 2, 3).
+2. Developer yang bertanggung jawab: Developer 1 (koordinator data dummy
+   Organizer), Developer 2 (data dummy Admin bagian 1), Developer 3 (data dummy
+   Admin bagian 2). Semua harus menyetujui ID referensi bersama.
+3. File yang terlibat: Semua file mock/fixture di services/* dan providers/*.
+4. Struktur data yang harus disepakati:
+   - ID event: evt-001, evt-002, evt-003 (organizer id: org-001).
+   - ID akun admin: admin@event.com, organizer@event.com (demo akun dari README).
+   - ID laporan: rpt-001, rpt-002, rpt-003 (SupportReportModel);
+     RPT-ORG-2026-001 (OrganizerComplaintModel).
+   - ID tiket, order, pembayaran, paket, langganan, audit log — harus menggunakan
+     awalan yang konsisten per domain.
+   - Nomor laporan dan token status harus aman dan unik.
+5. Fungsi dan parameter yang harus konsisten:
+   - Semua mock service harus menggunakan AppConfig.mockMode dan Future.delayed
+     untuk simulasi jaringan.
+   - Data dummy harus memuat loading, empty, error, success state.
+6. Aturan penggunaan oleh developer lain:
+   - Developer 2 dan 3 tidak boleh mengubah data dummy milik Developer 1.
+   - Developer 2 dan 3 harus membuat data dummy baru dengan ID yang tidak
+     bertabrakan dengan data dummy Developer 1.
+   - Semua developer menyinkronkan ID referensi lintas domain (mis. eventId yang
+     sama digunakan di organizer dan admin moderation).
+7. Urutan pengerjaan berdasarkan dependensi:
+   - Developer 1 menetapkan pola data dummy Organizer di Tahap 1.
+   - Developer 2 dan 3 menyesuaikan data dummy Admin agar konsisten.
+
+[INTEGRATION CONTRACT: APP_CONSTANTS_AND_VALIDATORS]
+1. Modul yang saling berhubungan: Core constants/validators (Developer 1) <-> Semua
+   fitur (Developer 1, 2, 3).
+2. Developer yang bertanggung jawab: Developer 1 (OWNER).
+3. File yang terlibat:
+   - apps/lib/core/constants/app_constants.dart
+   - apps/lib/core/validators/input_validator.dart
+4. Struktur data yang harus disepakati:
+   - Role strings: roleAttendee, roleOrganizer, roleStaff, roleAdmin.
+   - Event statuses, order statuses, ticket statuses, payment statuses,
+     report statuses.
+   - Limits: maxTicketsPerOrder, defaultPageSize.
+   - Validators: email, required, dan lainnya.
+5. Fungsi dan parameter yang harus konsisten:
+   - AppConstants.eventStatusPublished dll. digunakan di semua screen.
+   - InputValidator.email, InputValidator.required digunakan di semua form.
+6. Aturan penggunaan oleh developer lain:
+   - Developer 2 dan 3 READ ONLY. Tidak boleh menambah konstanta atau validator
+     tanpa persetujuan Developer 1.
+7. Urutan pengerjaan berdasarkan dependensi:
+   - Developer 1 siapkan konstanta dan validator di Tahap 1. Developer 2 dan 3
+     gunakan segera.
+
+
+--------------------------------------------------------------------------------
+BAGIAN 6 – URUTAN PENGERJAAN
+--------------------------------------------------------------------------------
+
+Tahap 1 (Developer 1 — Role Organizer):
+  1.1 Analisis ulang semua screen Organizer yang sudah ada, tandai selesai/
+      parsial/stub.
+  1.2 Selesaikan navigasi dan routing Organizer (hubungkan named route ke screen).
+  1.3 Selesaikan state management (klarifikasi OrganizerProvider vs
+      EventProvider).
+  1.4 Selesaikan data dummy dan mock service Organizer.
+  1.5 Selesaikan loading/empty/error/success state di semua screen Organizer.
+  1.6 Catat duplikasi enum OrganizerPermission sebagai pekerjaan yang dijadwalkan.
+  1.7 Pengujian seluruh alur Organizer dengan data dummy.
+  1.8 Laporan selesai Tahap 1 kepada Developer 2 dan Developer 3.
+
+Tahap 2 (Developer 2 — Admin Bagian 1, paralel dengan Tahap 3 Developer 3):
+  2.1 Selesaikan AdminDashboardScreen (metrik lengkap FR-80 s.d. FR-85).
+  2.2 Selesaikan AccountManagementScreen (FR-87, FR-88).
+  2.3 Selesaikan EventModerationScreen (FR-12, FR-16, bergantung pada Developer 1
+       event status).
+  2.4 Selesaikan ReportManagementScreen dasar (FR-97).
+  2.5 Selesaikan AdminTabController.
+  2.6 Sampaikan kebutuhan route Admin kepada Developer 1.
+  2.7 Pengujian alur Admin bagian 1 dengan data dummy.
+  2.8 Laporan selesai Admin bagian 1 kepada Developer 1.
+
+Tahap 3 (Developer 3 — Admin Bagian 2, paralel dengan Tahap 2 Developer 2):
+  3.1 Buat package_management_screen.dart + service + provider (FR-74, FR-75, FR-76).
+  3.2 Buat subscription_management_screen.dart + service + provider (FR-79).
+  3.3 Buat transaction_revenue_screen.dart + service + provider (FR-89 s.d. FR-93).
+  3.4 Buat admin_settings_screen.dart + service + provider (FR-102, FR-103).
+  3.5 Buat audit_log_screen.dart + service + provider (FR-104, FR-105, FR-106).
+  3.6 Buat admin_profile_screen.dart (route /admin/profile sudah ada).
+  3.7 Sampaikan kebutuhan route Admin kepada Developer 1.
+  3.8 Request perluasan SupportReportModel (prioritas, catatan internal, riwayat)
+       kepada Developer 2 jika diperlukan.
+  3.9 Pengujian alur Admin bagian 2 dengan data dummy.
+  3.10 Laporan selesai Admin bagian 2 kepada Developer 1.
+
+Tahap 4 (Developer 1 — Finalisasi Admin, setelah Developer 2 dan 3 selesai):
+  4.1 Terima hasil Developer 2 dan Developer 3.
+  4.2 Integrasikan semua fitur Admin ke routing utama (app_routes.dart,
+       generator routing, AdminTabController atau shell admin).
+  4.3 Periksa konsistensi antarmodul (status, model, konstanta, data dummy).
+  4.4 Perbaiki konflik integrasi (Developer 1 OWNER file shared).
+  4.5 Periksa konsistensi data dummy Developer 1, 2, dan 3.
+  4.6 Pengujian menyeluruh seluruh fitur Admin dengan data dummy.
+  4.7 Pastikan seluruh kebutuhan Admin PRD (FR-74 s.d. FR-106) terpenuhi.
+  4.8 Pastikan struktur frontend siap untuk integrasi backend.
+
+
+--------------------------------------------------------------------------------
+BAGIAN 7 – CHECKLIST PENGUJIAN
+--------------------------------------------------------------------------------
+
+7.1 Checklist Organizer (Developer 1 Tahap 1)
+- [ ] Dashboard Organizer menampilkan statistik event (draft, review, published,
+      tiket terjual, peserta, check-in).
+- [ ] Buat event baru berstatus DRAFT, simpan draft, ubah event, hapus draft.
+- [ ] Ajukan event ke moderasi (DRAFT -> PENDING_REVIEW), ajukan ulang setelah
+      revisi/penolakan.
+- [ ] Buat/ubah/hapus/nonaktifkan kategori tiket (TicketType).
+- [ ] Daftar peserta dengan pencarian, filter status check-in, filter metode
+      registrasi (mandiri/dibantu).
+- [ ] Detail peserta dengan data disamarkan (masked email/phone).
+- [ ] Registrasi dibantu (assisted registration) dengan simulasi VA.
+- [ ] Undang staff, atur permission, cabut akses staff.
+- [ ] Scanner simulasi: tiket valid, sudah digunakan, tidak valid, salah event,
+      dibatalkan, offline.
+- [ ] Laporan event (penjualan, kehadiran, keuangan), export CSV.
+- [ ] Riwayat aktivitas event.
+- [ ] Paket/langganan Organizer (lihat paket, simulasi upgrade, riwayat transaksi).
+- [ ] Kirim keluhan organizer, lihat status dan balasan.
+- [ ] Profil organizer dan logout.
+- [ ] Navigasi sidebar/bottom nav Organizer berfungsi di mobile dan desktop.
+- [ ] Loading, empty, error, success state di semua screen.
+- [ ] Perbedaan tampilan Owner vs Staff berdasarkan permission.
+- [ ] Semua uji menggunakan data dummy, tanpa backend.
+
+7.2 Checklist Admin Bagian Developer 2
+- [ ] Admin Dashboard menampilkan total event, aktif, mendatang, selesai,
+      menunggu moderasi, jumlah organizer/participant, order, tiket.
+- [ ] Admin Dashboard menampilkan transaksi dan pendapatan platform (dasar).
+- [ ] Filter periode pada dashboard.
+- [ ] Manajemen akun: lihat semua akun, nonaktifkan/aktifkan dengan alasan.
+- [ ] Moderasi event: setujui, tolak, minta revisi; tampilkan catatan revisi.
+- [ ] Status event konsisten dengan OrganizerEventStatus (Developer 1).
+- [ ] Laporan support: daftar, pencarian, filter status, buka detail, ubah status.
+- [ ] Admin Tab Controller: navigasi antar tab dashboard/moderasi/laporan.
+- [ ] Route Admin terdefinisi di app_routes.dart (via Developer 1).
+- [ ] Semua uji menggunakan data dummy, tanpa backend.
+
+7.3 Checklist Admin Bagian Developer 3
+- [ ] Manajemen paket: daftar, buat/edit, aktifkan/nonaktifkan, arsipkan paket.
+- [ ] Paket gratis dan berbayar dengan fitur dan batas penggunaan.
+- [ ] Langganan Organizer dari sisi Admin: daftar, filter paket/status,
+      riwayat, pembayaran paket.
+- [ ] Transaksi tiket dan pembayaran paket: daftar, pisahkan gross ticket sales
+      dari platform revenue.
+- [ ] Komisi sebagai snapshot transaksi.
+- [ ] Pendapatan paket dan komisi tiket ditampilkan terpisah.
+- [ ] Pengaturan platform: kelola pengaturan, catat perubahan komisi/biaya.
+- [ ] Audit log: lihat, cari, filter audit log tindakan admin.
+- [ ] Halaman profil Admin (/admin/profile).
+- [ ] Semua screen Admin bagian 2 menggunakan data dummy, tanpa backend.
+- [ ] Tidak ada modifikasi langsung pada file milik Developer 2.
+
+7.4 Checklist Integrasi Admin (Developer 1 Tahap 2)
+- [ ] Semua fitur Admin Developer 2 dan 3 terintegrasi ke routing utama.
+- [ ] Navigasi antar modul Admin berfungsi (dashboard -> moderasi -> akun ->
+      paket -> transaksi -> pengaturan -> audit log -> profil).
+- [ ] Konsistensi status event antara Organizer dan Admin moderasi.
+- [ ] Konsistensi model laporan antara report management dan support center.
+- [ ] Konsistensi data dummy Developer 1, 2, dan 3.
+- [ ] Tidak ada konflik file (Developer 2 dan 3 tidak mengubah file yang sama).
+- [ ] Semua alur Admin berjalan dengan data dummy.
+
+7.5 Checklist Pengujian Akhir Keduanya Role (Developer 1 Tahap 2)
+- [ ] Seluruh kebutuhan Organizer PRD (FR-09 s.d. FR-79) terpenuhi.
+- [ ] Seluruh kebutuhan Admin PRD (FR-74 s.d. FR-106) terpenuhi.
+- [ ] Navigasi antar role (organizer <-> admin <-> auth) berfungsi.
+- [ ] AuthGate/RoleGuard membatasi akses dashboard berdasarkan role.
+- [ ] Struktur frontend siap untuk integrasi backend (service/repository terpisah
+      dari widget).
+- [ ] Tidak ada file yang diubah di luar tanggung jawab masing-masing developer.
+- [ ] Laporan akhir: file yang berubah, fitur selesai, hasil pengujian, pekerjaan
+      belum selesai.
+
+
+--------------------------------------------------------------------------------
+BAGIAN 8 – KRITERIA SELESAI
+--------------------------------------------------------------------------------
+
+8.1 Kriteria selesai Role Organizer (Developer 1 Tahap 1)
+- Semua layar Organizer dalam daftar file Bagian 4 dapat dibuka dan berfungsi.
+- CRUD event, kategori tiket, peserta, staff, registrasi dibantu, scanner,
+  laporan, paket, keluhan, profil berfungsi dengan data dummy.
+- Navigasi dan routing Organizer terhubung lengkap.
+- Loading, empty, error, success state tersedia di semua screen.
+- Data dummy konsisten di semua mock service Organizer.
+- Telah diuji dengan data dummy (checklist 7.1 terpenuhi).
+- Tidak ada integrasi backend.
+
+8.2 Kriteria selesai Role Admin (Developer 2 + Developer 3 + Developer 1 Tahap 2)
+- Semua layar Admin dalam daftar file Bagian 4 dapat dibuka dan berfungsi.
+- Dashboard bisnis (FR-80 s.d. FR-85), moderasi (FR-12, FR-16), akun (FR-87,
+  FR-88), paket (FR-74, FR-75, FR-76), langganan (FR-79), transaksi/pendapatan
+  (FR-89 s.d. FR-93), support (FR-97 s.d. FR-101), pengaturan (FR-102, FR-103),
+  audit log (FR-104, FR-105, FR-106), profil admin terpenuhi.
+- Semua fitur Admin terintegrasi ke navigasi utama.
+- Data dummy konsisten antara Developer 1, 2, dan 3.
+- Telah diuji dengan data dummy (checklist 7.2, 7.3, 7.4 terpenuhi).
+- Tidak ada integrasi backend.
+
+8.3 Kriteria selesai keseluruhan frontend (Developer 1 Tahap 2)
+- Role Organizer dan Role Admin kedua selesai menurut kriteria 8.1 dan 8.2.
+- Navigasi antar role dan auth berfungsi dengan benar.
+- Tidak ada file yang diubah oleh developer selain OWNER-nya.
+- Kontrak integrasi Bagian 5 semua terpenuhi.
+- Struktur frontend siap diintegrasikan dengan backend pada tahap berikutnya.
+- Laporan akhir diserahkan: daftar file yang diubah, fitur selesai, hasil
+  pengujian, pekerjaan yang belum selesai (jika ada).
+
+8.4 Catatan kelengkapan (BELUM DIKETAHUI / PERLU DIKONFIRMASI)
+- Apakah organizer_ticket_type_form_screen.dart sudah sepenuhnya
+  terimplementasi atau masih placeholder (file ada dalam daftar namun isi perlu
+  diverifikasi).
+- Apakah organizer_notifications_service.dart dan organizer_shell_service.dart
+  sudah terintegrasi ke semua screen yang membutuhkannya.
+- Apakah ada widget test yang perlu ditambahkan untuk Organizer dan Admin
+  (saat ini hanya apps/test/widget_test.dart yang mencakup sebagian alur).
+- Jeda waktu pembayaran Order, harga paket final, dan durasi paket masih BELUM
+  DIKETAHUI (prd.md bagian 17), tidak perlu diimplementasikan dalam prototype.
+
+--------------------------------------------------------------------------------
+AKHIR DOKUMEN PEMBAGIAN TUGAS 3
+--------------------------------------------------------------------------------
+

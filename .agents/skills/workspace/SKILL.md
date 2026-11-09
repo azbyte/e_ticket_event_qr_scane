@@ -5,8 +5,8 @@ description: Memelihara instruksi AI, skill, workflow, tools, dan dokumentasi de
 
 # Skill pemeliharaan workspace
 
-Baca `AGENTS.md`, katalog `SKILL.md`, `CONTRIBUTING.md`, README, status Git dan
-file konfigurasi yang terkait. Tujuan hasil adalah workflow yang benar-benar
+Baca `AGENTS.md`, katalog root `SKILL.md`, `CONTRIBUTING.md`, README, status Git
+dan file konfigurasi yang terkait. Tujuan hasil adalah workflow yang benar-benar
 dapat dipakai; bukan sekadar membuat banyak file.
 
 1. Inventaris perubahan tracked/untracked dan manifest; bedakan hasil generate,

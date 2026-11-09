@@ -1,15 +1,16 @@
 /// Order state provider (PRD sections 4.4, 4.7).
-///
-/// Requires package `provider` added to pubspec.yaml (PRD section 8.1).
+library;
+
 import 'package:flutter/foundation.dart';
-// ignore: unused_import
-import 'package:provider/provider.dart';
 
 import '../models/order/order_model.dart';
 import '../services/order/order_service.dart';
 
 class OrderProvider extends ChangeNotifier {
-  OrderProvider(this._orderService);
+  OrderProvider([OrderService? orderService])
+      : _orderService = orderService ?? OrderService();
+
+  static final OrderProvider instance = OrderProvider();
 
   final OrderService _orderService;
 
@@ -50,6 +51,38 @@ class OrderProvider extends ChangeNotifier {
     } catch (e) {
       _error = e.toString();
       return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<OrderModel?> createOrder({
+    required String eventId,
+    required String attendeeName,
+    required String attendeeEmail,
+    String? attendeePhone,
+    required Map<String, int> selectedTicketQuantities,
+  }) async {
+    _setLoading(true);
+    _error = null;
+    try {
+      final payload = <String, dynamic>{
+        'event_id': eventId,
+        'attendee_name': attendeeName,
+        'attendee_email': attendeeEmail,
+        'items': selectedTicketQuantities,
+      };
+      if (attendeePhone != null) payload['attendee_phone'] = attendeePhone;
+
+      final data = await _orderService.createOrder(payload);
+      final newOrder = OrderModel.fromJson(data);
+      _orders.insert(0, newOrder);
+      _selectedOrder = newOrder;
+      notifyListeners();
+      return newOrder;
+    } catch (e) {
+      _error = e.toString();
+      return null;
     } finally {
       _setLoading(false);
     }
