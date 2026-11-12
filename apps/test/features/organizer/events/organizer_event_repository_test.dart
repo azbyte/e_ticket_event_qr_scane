@@ -104,9 +104,10 @@ void main() {
         ownerId: ownerId,
         filter: OrganizerEventFilter.draft,
       );
-      expect(drafts.map((e) => e.status), everyElement(
-        OrganizerEventStatus.draft,
-      ));
+      expect(
+        drafts.map((e) => e.status),
+        everyElement(OrganizerEventStatus.draft),
+      );
 
       final filtered = await repo.listEvents(
         ownerId: ownerId,
@@ -292,7 +293,7 @@ void main() {
         repo.createTicketType(
           ownerId: ownerId,
           eventId: 'evt-1001',
-          draft: buildTicketDraft(name: 'reguler'),
+          draft: buildTicketDraft(name: 'regular pass'),
         ),
         throwsA(isA<OrganizerEventValidationException>()),
       );
@@ -365,7 +366,7 @@ void main() {
       expect(summary.status, OrganizerEventStatus.published);
       expect(summary.ticketsSold, 320 + 87);
       expect(summary.ticketsRemaining, (500 - 320 - 15) + (100 - 87 - 4));
-      expect(summary.grossSales, 320 * 250000 + 87 * 750000);
+      expect(summary.grossSales, 320 * 350000 + 87 * 750000);
     });
 
     test('overview hanya merangkum event milik Owner', () async {

@@ -1,20 +1,26 @@
 /// Organizer shell and dashboard aggregation service (FR-66).
 ///
-/// Collects and summarizes organizer-owned metrics (gross sales, tickets sold,
-/// pending orders, check-in counts, moderation alerts) without exposing platform revenue.
+/// Dashboard values are derived from the same local event repository used by
+/// Event Management; they are not platform revenue or backend data.
 library;
 
-import '../../core/config/app_config.dart';
+import 'package:flutter/foundation.dart';
+
+import '../organizer_events/organizer_event_contract.dart';
+import '../organizer_events/organizer_event_repository.dart';
+import '../organizer_events/mock_organizer_event_repository.dart';
 
 class OrganizerDashboardMetrics {
   final int totalEvents;
   final int draftEvents;
   final int pendingReviewEvents;
+  final int revisionEvents;
   final int publishedEvents;
   final int totalTicketsSold;
   final int pendingOrders;
+  final int totalParticipants;
   final int attendeesCheckedIn;
-  final double grossSales; // Own-event gross sales, NOT platform revenue
+  final double grossSales;
   final double checkInRate;
   final List<Map<String, dynamic>> recentEvents;
   final List<String> moderationAlerts;
@@ -23,9 +29,11 @@ class OrganizerDashboardMetrics {
     required this.totalEvents,
     required this.draftEvents,
     required this.pendingReviewEvents,
+    required this.revisionEvents,
     required this.publishedEvents,
     required this.totalTicketsSold,
     required this.pendingOrders,
+    required this.totalParticipants,
     required this.attendeesCheckedIn,
     required this.grossSales,
     required this.checkInRate,
@@ -35,61 +43,76 @@ class OrganizerDashboardMetrics {
 }
 
 class OrganizerShellService {
-  OrganizerShellService._internal();
-  static final OrganizerShellService instance = OrganizerShellService._internal();
-  factory OrganizerShellService() => instance;
+  OrganizerShellService._(this._repository);
 
-  static const OrganizerDashboardMetrics _mockMetrics = OrganizerDashboardMetrics(
-    totalEvents: 3,
-    draftEvents: 1,
-    pendingReviewEvents: 1,
-    publishedEvents: 1,
-    totalTicketsSold: 205,
-    pendingOrders: 12,
-    attendeesCheckedIn: 156,
-    grossSales: 58500000.0, // Organizer gross ticket revenue
-    checkInRate: 0.76,
-    moderationAlerts: [
-      'Event "Workshop Flutter & Backend Modern" sedang menunggu moderasi admin platform.',
-    ],
-    recentEvents: [
-      {
-        'id': 'evt-001',
-        'title': 'Tech Innovation Summit 2026',
-        'category': 'Teknologi',
-        'status': 'published',
-        'start_date': '14 Nov 2026',
-        'tickets_sold': 205,
-        'location': 'Grand Ballroom Hotel Indonesia',
-      },
-      {
-        'id': 'evt-002',
-        'title': 'Workshop Flutter & Backend Modern',
-        'category': 'Edukasi',
-        'status': 'pending_review',
-        'start_date': '21 Nov 2026',
-        'tickets_sold': 30,
-        'location': 'Auditorium Fasilkom UI',
-      },
-      {
-        'id': 'evt-003',
-        'title': 'Festival Musik Indie Nusantara',
-        'category': 'Seni & Musik',
-        'status': 'draft',
-        'start_date': '30 Des 2026',
-        'tickets_sold': 0,
-        'location': 'GBK Park Jakarta',
-      },
-    ],
+  static final OrganizerShellService instance = OrganizerShellService._(
+    MockOrganizerEventRepository.shared(),
   );
 
-  /// Loads aggregated dashboard metrics for an organizer.
-  Future<OrganizerDashboardMetrics> getDashboardMetrics(String organizerId) async {
-    if (AppConfig.mockMode) {
-      await Future<void>.delayed(const Duration(milliseconds: 250));
-      return _mockMetrics;
-    }
-    return _mockMetrics;
+  @Deprecated('Use OrganizerShellService.instance in the Organizer UI.')
+  factory OrganizerShellService() => instance;
+
+  @visibleForTesting
+  OrganizerShellService.forRepository(OrganizerEventRepository repository)
+    : _repository = repository;
+
+  final OrganizerEventRepository _repository;
+
+  /// Loads a local summary for events owned by [organizerId].
+  Future<OrganizerDashboardMetrics> getDashboardMetrics(
+    String organizerId,
+  ) async {
+    final events = await _repository.listEvents(ownerId: organizerId);
+    final summaries = await _repository.eventSummaries(ownerId: organizerId);
+    final overview = await _repository.overview(ownerId: organizerId);
+
+    return OrganizerDashboardMetrics(
+      totalEvents: events.length,
+      draftEvents: overview.draftCount,
+      pendingReviewEvents: overview.pendingReviewCount,
+      revisionEvents: overview.revisionCount,
+      publishedEvents: overview.publishedCount,
+      totalTicketsSold: overview.ticketsSold,
+      pendingOrders: overview.pendingOrders,
+      totalParticipants: overview.participants,
+      attendeesCheckedIn: overview.checkedIn,
+      grossSales: overview.grossSales,
+      checkInRate: overview.participants == 0
+          ? 0
+          : overview.checkedIn / overview.participants,
+      recentEvents: overview.recentEvents
+          .map((event) {
+            final summary = summaries[event.id];
+            return <String, dynamic>{
+              'id': event.id,
+              'title': event.title,
+              'category': event.category ?? '',
+              'status': event.status,
+              'start_date': event.startDateTime
+                  .toLocal()
+                  .toString()
+                  .split(' ')
+                  .first,
+              'tickets_sold': summary?.ticketsSold ?? 0,
+              'participants': summary?.participants ?? 0,
+              'location': event.location ?? event.onlineUrl ?? '-',
+            };
+          })
+          .toList(growable: false),
+      moderationAlerts: events
+          .where(
+            (event) =>
+                event.status == OrganizerEventStatus.pendingReview ||
+                event.status == OrganizerEventStatus.revisionRequested ||
+                event.status == OrganizerEventStatus.rejected,
+          )
+          .map((event) {
+            final note = event.reviewNote;
+            return note == null || note.trim().isEmpty
+                ? 'Event "${event.title}" berstatus ${event.statusLabel}.'
+                : 'Event "${event.title}": $note';
+          })
+          .toList(growable: false),
+    );
   }
 }
-

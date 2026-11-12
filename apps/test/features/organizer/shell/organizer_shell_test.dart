@@ -14,9 +14,10 @@ void main() {
     test('Organizer metrics only displays gross sales and strictly excludes platform commission', () async {
       final metrics = await shellService.getDashboardMetrics('org-001');
 
-      expect(metrics.totalEvents, equals(3));
+      expect(metrics.totalEvents, equals(4));
       expect(metrics.publishedEvents, equals(1));
       expect(metrics.pendingReviewEvents, equals(1));
+      expect(metrics.revisionEvents, equals(1));
       expect(metrics.draftEvents, equals(1));
 
       // Financials: Gross sales is tracked for organizer
@@ -30,7 +31,9 @@ void main() {
   });
 
   group('AccessDeniedScreen Widget Safety Test', () {
-    testWidgets('Renders safe message without leaking confidential data', (tester) async {
+    testWidgets('Renders safe message without leaking confidential data', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: AccessDeniedScreen(
@@ -41,7 +44,10 @@ void main() {
 
       // Verify header and safe error reason
       expect(find.text('Akses Ditolak'), findsOneWidget);
-      expect(find.text('Halaman ini khusus untuk Administrator Platform.'), findsOneWidget);
+      expect(
+        find.text('Halaman ini khusus untuk Administrator Platform.'),
+        findsOneWidget,
+      );
       expect(find.byIcon(Icons.lock_outline), findsOneWidget);
       expect(find.text('Kembali ke Halaman Utama'), findsOneWidget);
 

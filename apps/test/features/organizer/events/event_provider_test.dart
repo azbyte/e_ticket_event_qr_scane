@@ -54,8 +54,12 @@ void main() {
     expect(provider.status, EventLoadStatus.ready);
     expect(provider.events, hasLength(1));
     expect(provider.events.single.id, 'evt-9001');
-    expect(provider.events.every((event) =>
-        event.organizerId == OrganizerEventFixtures.otherOwnerId), isTrue);
+    expect(
+      provider.events.every(
+        (event) => event.organizerId == OrganizerEventFixtures.otherOwnerId,
+      ),
+      isTrue,
+    );
   });
 
   test('state empty terdeteksi pada repository kosong', () async {
@@ -242,9 +246,9 @@ void main() {
       eventId: 'evt-1001',
       ticketTypeId: 'tt-2001',
       draft: const OrganizerTicketTypeDraft(
-        name: 'Reguler',
-        price: 250000,
-        quota: 10,
+        name: 'Regular Pass',
+        price: 350000,
+        quota: 2,
       ),
     );
     expect(rejected, isNull);

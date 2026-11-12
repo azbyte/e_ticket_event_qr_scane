@@ -9,7 +9,9 @@ import 'features/events/screens/event_detail_screen.dart';
 import 'features/events/screens/event_list_screen.dart';
 import 'features/organizer/membership/team_management_screen.dart';
 import 'features/organizer/plans/subscription_screen.dart';
+import 'features/organizer/events/screens/organizer_event_detail_screen.dart';
 import 'features/organizer/screens/attendee_list_screen.dart';
+import 'features/organizer/screens/event_form_screen.dart';
 import 'features/organizer/screens/event_management_screen.dart';
 import 'features/organizer/screens/organizer_profile_screen.dart';
 import 'features/organizer/screens/staff_management_screen.dart';
@@ -54,6 +56,9 @@ class AppRouter {
         break;
       case AppRoutes.organizerEvents:
         page = const EventManagementScreen();
+        break;
+      case AppRoutes.organizerEventCreate:
+        page = const EventFormScreen();
         break;
       case AppRoutes.organizerTeam:
         page = TeamManagementScreen(
@@ -106,6 +111,10 @@ class AppRouter {
           page = EventDetailScreen(eventId: parts[1]);
         } else if (parts.length == 2 && parts[0] == 'tickets') {
           page = TicketDetailScreen(ticketId: parts[1]);
+        } else if (parts.length == 3 &&
+            parts[0] == 'organizer' &&
+            parts[1] == 'events') {
+          page = OrganizerEventDetailScreen(eventId: parts[2]);
         } else if (parts.length == 4 &&
             parts[0] == 'organizer' &&
             parts[1] == 'events' &&

@@ -26,6 +26,8 @@ class AppRoutes {
   static const String profileEdit = '/profile/edit';
   static const String adminProfile = '/admin/profile';
   static const String organizerEvents = '/organizer/events';
+  static const String organizerEventCreate = '/organizer/events/create';
+  static const String organizerEventDetail = '/organizer/events/:id';
   static const String organizerEventForm = '/organizer/events/:id/edit';
   static const String organizerAttendees = '/organizer/events/:id/attendees';
   static const String organizerStaff = '/organizer/events/:id/staff';

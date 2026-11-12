@@ -43,7 +43,7 @@ void main() {
     await tester.pumpAndSettle(const Duration(seconds: 10));
 
     expect(find.text('Lari Komunitas 5K'), findsOneWidget);
-    expect(find.text('Jakarta Music Fest 2026'), findsNothing);
+    expect(find.text('Tech Innovation Summit 2026'), findsNothing);
   });
 
   testWidgets('pencarian tanpa hasil menampilkan state empty', (tester) async {
@@ -130,15 +130,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Jakarta Music Fest 2026'), findsOneWidget);
+    expect(find.text('Tech Innovation Summit 2026'), findsOneWidget);
     expect(find.text('Tiket terjual'), findsOneWidget);
     expect(find.text('Peserta terdaftar'), findsOneWidget);
 
     await tester.tap(find.text('Tiket'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Reguler'), findsOneWidget);
-    expect(find.text('VIP'), findsOneWidget);
+    expect(find.text('Regular Pass'), findsOneWidget);
+    expect(find.text('VIP Pass'), findsOneWidget);
     expect(find.text('Terjual 320'), findsOneWidget);
     expect(find.text('Tertahan 15'), findsOneWidget);
   });

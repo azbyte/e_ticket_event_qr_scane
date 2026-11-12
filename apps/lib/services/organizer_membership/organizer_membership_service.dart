@@ -4,7 +4,6 @@
 /// acceptance, granular permission management, and revocation without global role pollution.
 library;
 
-import '../../core/config/app_config.dart';
 import '../organizer_operations/organizer_permission.dart';
 
 /// Event member entity representing Owner or Staff membership on an event.
@@ -41,7 +40,8 @@ class EventMemberModel {
   bool get isStaff => memberRole == 'staff';
   bool get isPending => status == 'pending';
   bool get isAccepted => status == 'accepted';
-  bool get isExpired => status == 'expired' || DateTime.now().isAfter(expiresAt);
+  bool get isExpired =>
+      status == 'expired' || DateTime.now().isAfter(expiresAt);
 
   bool hasPermission(OrganizerPermission permission) {
     if (isOwner) return true;
@@ -72,7 +72,8 @@ class EventMemberModel {
 
 class OrganizerMembershipService {
   OrganizerMembershipService._internal();
-  static final OrganizerMembershipService instance = OrganizerMembershipService._internal();
+  static final OrganizerMembershipService instance =
+      OrganizerMembershipService._internal();
   factory OrganizerMembershipService() => instance;
 
   // In-memory mock database for event memberships
@@ -151,7 +152,7 @@ class OrganizerMembershipService {
     EventMemberModel(
       id: 'mem-005',
       eventId: 'evt-002',
-      eventTitle: 'Workshop Flutter & Backend Modern',
+      eventTitle: 'Webinar Produk Digital 2026',
       userId: 'usr-staff-01',
       email: 'budi.santoso@eventcrew.id',
       name: 'Budi Santoso',
@@ -171,11 +172,10 @@ class OrganizerMembershipService {
 
   /// Lists all members (Owner and Staff) for a given event.
   Future<List<EventMemberModel>> listMembers(String eventId) async {
-    if (AppConfig.mockMode) {
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      return _mockMembers.where((m) => m.eventId == eventId).toList();
-    }
-    return _mockMembers.where((m) => m.eventId == eventId).toList();
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    return List<EventMemberModel>.unmodifiable(
+      _mockMembers.where((m) => m.eventId == eventId),
+    );
   }
 
   /// Invites a new staff member with specified permissions and 7-day expiration.
@@ -187,26 +187,23 @@ class OrganizerMembershipService {
     required Set<OrganizerPermission> permissions,
     int expiryDays = 7,
   }) async {
-    if (AppConfig.mockMode) {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-      final newMember = EventMemberModel(
-        id: 'mem-${DateTime.now().millisecondsSinceEpoch}',
-        eventId: eventId,
-        eventTitle: eventTitle,
-        userId: '',
-        email: email,
-        name: name.isNotEmpty ? name : email.split('@').first,
-        memberRole: 'staff',
-        status: 'pending',
-        permissions: permissions,
-        invitedAt: DateTime.now(),
-        joinedAt: null,
-        expiresAt: DateTime.now().add(Duration(days: expiryDays)),
-      );
-      _mockMembers.add(newMember);
-      return newMember;
-    }
-    throw UnimplementedError('API mode is not enabled in Phase 0.');
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    final newMember = EventMemberModel(
+      id: 'mem-${DateTime.now().microsecondsSinceEpoch}',
+      eventId: eventId,
+      eventTitle: eventTitle,
+      userId: '',
+      email: email,
+      name: name.isNotEmpty ? name : email.split('@').first,
+      memberRole: 'staff',
+      status: 'pending',
+      permissions: Set<OrganizerPermission>.unmodifiable(permissions),
+      invitedAt: DateTime.now(),
+      joinedAt: null,
+      expiresAt: DateTime.now().add(Duration(days: expiryDays)),
+    );
+    _mockMembers.add(newMember);
+    return newMember;
   }
 
   /// Updates staff permissions for an event.
@@ -215,16 +212,17 @@ class OrganizerMembershipService {
     required String memberId,
     required Set<OrganizerPermission> permissions,
   }) async {
-    if (AppConfig.mockMode) {
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      final idx = _mockMembers.indexWhere((m) => m.id == memberId && m.eventId == eventId);
-      if (idx != -1 && !_mockMembers[idx].isOwner) {
-        _mockMembers[idx] = _mockMembers[idx].copyWith(permissions: permissions);
-        return true;
-      }
-      return false;
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    final idx = _mockMembers.indexWhere(
+      (m) => m.id == memberId && m.eventId == eventId,
+    );
+    if (idx != -1 && !_mockMembers[idx].isOwner && _mockMembers[idx].isStaff) {
+      _mockMembers[idx] = _mockMembers[idx].copyWith(
+        permissions: Set<OrganizerPermission>.unmodifiable(permissions),
+      );
+      return true;
     }
-    return true;
+    return false;
   }
 
   /// Revokes staff access from an event.
@@ -232,28 +230,29 @@ class OrganizerMembershipService {
     required String eventId,
     required String memberId,
   }) async {
-    if (AppConfig.mockMode) {
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      final idx = _mockMembers.indexWhere((m) => m.id == memberId && m.eventId == eventId);
-      if (idx != -1 && !_mockMembers[idx].isOwner) {
-        _mockMembers.removeAt(idx);
-        return true;
-      }
-      return false;
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    final idx = _mockMembers.indexWhere(
+      (m) => m.id == memberId && m.eventId == eventId,
+    );
+    if (idx != -1 && !_mockMembers[idx].isOwner && _mockMembers[idx].isStaff) {
+      _mockMembers.removeAt(idx);
+      return true;
     }
-    return true;
+    return false;
   }
 
   /// Returns active events where user is assigned as Staff.
-  Future<List<EventMemberModel>> getAssignedActiveEvents(String userEmailOrId) async {
-    if (AppConfig.mockMode) {
-      await Future<void>.delayed(const Duration(milliseconds: 250));
-      return _mockMembers.where((m) {
-        final matchesUser = m.userId == userEmailOrId || m.email == userEmailOrId;
+  Future<List<EventMemberModel>> getAssignedActiveEvents(
+    String userEmailOrId,
+  ) async {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    return List<EventMemberModel>.unmodifiable(
+      _mockMembers.where((m) {
+        final matchesUser =
+            m.userId == userEmailOrId || m.email == userEmailOrId;
         return matchesUser && m.isStaff && m.isAccepted && !m.isExpired;
-      }).toList();
-    }
-    return [];
+      }),
+    );
   }
 
   /// Checks if user has a specific permission on an event.
@@ -271,4 +270,3 @@ class OrganizerMembershipService {
     return false;
   }
 }
-
