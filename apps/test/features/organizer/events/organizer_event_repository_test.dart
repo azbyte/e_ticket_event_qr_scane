@@ -104,9 +104,10 @@ void main() {
         ownerId: ownerId,
         filter: OrganizerEventFilter.draft,
       );
-      expect(drafts.map((e) => e.status), everyElement(
-        OrganizerEventStatus.draft,
-      ));
+      expect(
+        drafts.map((e) => e.status),
+        everyElement(OrganizerEventStatus.draft),
+      );
 
       final filtered = await repo.listEvents(
         ownerId: ownerId,
@@ -121,6 +122,41 @@ void main() {
         ..setFailure(value: true);
       await expectLater(
         repo.listEvents(ownerId: ownerId),
+        throwsA(isA<OrganizerEventException>()),
+      );
+    });
+  });
+
+  group('MockOrganizerEventRepository — integrasi moderasi Admin', () {
+    test('Admin membaca store bersama dan keputusan terlihat oleh Owner', () async {
+      final repo = MockOrganizerEventRepository(latency: Duration.zero);
+      final platformEvents = await repo.listPlatformEvents();
+
+      expect(platformEvents.map((event) => event.id), contains('evt-9001'));
+      expect(platformEvents.map((event) => event.id), contains('evt-1002'));
+
+      final updated = await repo.simulatePlatformModeration(
+        eventId: 'evt-1002',
+        status: OrganizerEventStatus.revisionRequested,
+        note: 'Lengkapi informasi venue.',
+      );
+      final ownerEvents = await repo.listEvents(ownerId: ownerId);
+      final ownerEvent = ownerEvents.firstWhere(
+        (event) => event.id == updated.id,
+      );
+
+      expect(ownerEvent.status, OrganizerEventStatus.revisionRequested);
+      expect(ownerEvent.reviewNote, 'Lengkapi informasi venue.');
+    });
+
+    test('Admin wajib memberi alasan untuk menangguhkan event tayang', () async {
+      final repo = MockOrganizerEventRepository(latency: Duration.zero);
+
+      await expectLater(
+        repo.simulatePlatformModeration(
+          eventId: 'evt-1001',
+          status: OrganizerEventStatus.suspended,
+        ),
         throwsA(isA<OrganizerEventException>()),
       );
     });
@@ -292,7 +328,7 @@ void main() {
         repo.createTicketType(
           ownerId: ownerId,
           eventId: 'evt-1001',
-          draft: buildTicketDraft(name: 'reguler'),
+          draft: buildTicketDraft(name: 'regular pass'),
         ),
         throwsA(isA<OrganizerEventValidationException>()),
       );
@@ -365,7 +401,7 @@ void main() {
       expect(summary.status, OrganizerEventStatus.published);
       expect(summary.ticketsSold, 320 + 87);
       expect(summary.ticketsRemaining, (500 - 320 - 15) + (100 - 87 - 4));
-      expect(summary.grossSales, 320 * 250000 + 87 * 750000);
+      expect(summary.grossSales, 320 * 350000 + 87 * 750000);
     });
 
     test('overview hanya merangkum event milik Owner', () async {

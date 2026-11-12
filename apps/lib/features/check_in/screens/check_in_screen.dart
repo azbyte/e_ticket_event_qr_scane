@@ -10,7 +10,7 @@ class CheckInScreen extends StatefulWidget {
   const CheckInScreen({
     super.key,
     this.checkInProvider,
-    this.eventId = 'evt-001',
+    this.eventId = 'evt-1001',
     this.staffId = 'stf-001',
     this.staffName = 'Budi Santoso',
   });

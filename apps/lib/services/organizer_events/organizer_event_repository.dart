@@ -19,6 +19,19 @@ abstract class OrganizerEventRepository {
     OrganizerEventFilter filter = OrganizerEventFilter.all,
   });
 
+  /// Daftar seluruh event untuk layar Admin pada prototipe lokal.
+  Future<List<EventModel>> listPlatformEvents({
+    String search = '',
+    OrganizerEventFilter filter = OrganizerEventFilter.all,
+  });
+
+  /// Simulasi keputusan Admin yang memperbarui event pada store bersama.
+  Future<EventModel> simulatePlatformModeration({
+    required String eventId,
+    required String status,
+    String? note,
+  });
+
   /// Membaca satu event; melempar `OrganizerEventAccessDeniedException` bila
   /// event bukan milik [ownerId].
   Future<EventModel> getEvent({

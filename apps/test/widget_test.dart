@@ -126,7 +126,7 @@ void main() {
         child: const MaterialApp(home: AdminDashboardScreen()),
       ),
     );
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.byTooltip('Profil'), findsOneWidget);
     expect(find.byTooltip('Notifikasi'), findsOneWidget);

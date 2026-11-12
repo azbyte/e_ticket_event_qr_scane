@@ -115,6 +115,111 @@ class MockOrganizerEventRepository implements OrganizerEventRepository {
   }
 
   @override
+  Future<List<EventModel>> listPlatformEvents({
+    String search = '',
+    OrganizerEventFilter filter = OrganizerEventFilter.all,
+  }) async {
+    await _settle();
+    final keyword = search.trim().toLowerCase();
+    final events = _events.where((event) {
+      if (!filter.matches(event.status)) return false;
+      if (keyword.isEmpty) return true;
+      final haystack = <String?>[
+        event.title,
+        event.location,
+        event.category,
+        event.organizerName,
+      ].whereType<String>().join(' ').toLowerCase();
+      return haystack.contains(keyword);
+    }).toList(growable: false);
+
+    return events;
+  }
+
+  @override
+  Future<EventModel> simulatePlatformModeration({
+    required String eventId,
+    required String status,
+    String? note,
+  }) async {
+    await _settle();
+    final matches = _events.where((event) => event.id == eventId);
+    if (matches.isEmpty) throw const OrganizerEventNotFoundException();
+    final existing = matches.first;
+    final trimmedNote = _trimToNull(note);
+    const adminStatuses = <String>{
+      OrganizerEventStatus.approved,
+      OrganizerEventStatus.revisionRequested,
+      OrganizerEventStatus.rejected,
+      OrganizerEventStatus.suspended,
+    };
+
+    if (!adminStatuses.contains(status)) {
+      throw const OrganizerEventException(
+        'Status tersebut bukan keputusan moderasi Admin.',
+      );
+    }
+    if ((status == OrganizerEventStatus.revisionRequested ||
+            status == OrganizerEventStatus.rejected ||
+            status == OrganizerEventStatus.suspended) &&
+        trimmedNote == null) {
+      throw const OrganizerEventException(
+        'Catatan wajib diisi untuk keputusan ini.',
+      );
+    }
+    if (status == OrganizerEventStatus.suspended &&
+        !OrganizerEventStatus.isPublishedLike(existing.status)) {
+      throw const OrganizerEventException(
+        'Hanya event yang sudah disetujui yang dapat ditangguhkan.',
+      );
+    }
+    if (status == OrganizerEventStatus.approved &&
+        existing.status == OrganizerEventStatus.suspended) {
+      // Reopening a suspended event is an explicit admin action.
+    } else if (status == OrganizerEventStatus.approved &&
+        existing.status != OrganizerEventStatus.pendingReview &&
+        existing.status != OrganizerEventStatus.revisionRequested) {
+      throw const OrganizerEventException(
+        'Event ini tidak berada pada status yang dapat disetujui.',
+      );
+    } else if (status != OrganizerEventStatus.approved &&
+        existing.status != OrganizerEventStatus.pendingReview &&
+        existing.status != OrganizerEventStatus.revisionRequested &&
+        !(status == OrganizerEventStatus.suspended &&
+            OrganizerEventStatus.isPublishedLike(existing.status))) {
+      throw const OrganizerEventException(
+        'Event ini tidak berada pada status yang dapat dimoderasi.',
+      );
+    }
+
+    final now = _clock();
+    final moderated = existing.copyWith(
+      status: status,
+      reviewNote: status == OrganizerEventStatus.approved ? null : trimmedNote,
+      clearReviewNote: status == OrganizerEventStatus.approved,
+      isPublic: status == OrganizerEventStatus.approved,
+      publicUrl: status == OrganizerEventStatus.approved
+          ? existing.publicUrl ?? 'https://demo.eticket.local/e/${existing.id}'
+          : null,
+      registrationQrUrl: status == OrganizerEventStatus.approved
+          ? existing.registrationQrUrl ??
+              'https://demo.eticket.local/qr/${existing.id}'
+          : null,
+      clearPublicUrl: status != OrganizerEventStatus.approved &&
+          status != OrganizerEventStatus.suspended,
+      updatedAt: now,
+    );
+    _replaceEvent(moderated);
+    await _log(
+      moderated.id,
+      'admin-demo',
+      OrganizerActivityActions.eventModerated,
+      'Simulasi moderasi Admin: ${OrganizerEventStatus.label(status)} untuk "${moderated.title}".',
+    );
+    return moderated;
+  }
+
+  @override
   Future<EventModel> getEvent({
     required String ownerId,
     required String eventId,

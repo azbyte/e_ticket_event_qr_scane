@@ -82,7 +82,7 @@ class CheckInProvider extends ChangeNotifier {
     String token, {
     required String staffId,
     String staffName = 'Staf Event',
-    String eventId = 'evt-001',
+    String eventId = 'evt-1001',
   }) async {
     _setLoading(true);
     _error = null;
@@ -180,7 +180,7 @@ class CheckInProvider extends ChangeNotifier {
   }
 
   /// Submits pending offline check-ins.
-  Future<int> syncPendingCheckIns({String eventId = 'evt-001'}) async {
+  Future<int> syncPendingCheckIns({String eventId = 'evt-1001'}) async {
     _setLoading(true);
     _error = null;
     try {

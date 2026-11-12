@@ -26,6 +26,8 @@ class AppRoutes {
   static const String profileEdit = '/profile/edit';
   static const String adminProfile = '/admin/profile';
   static const String organizerEvents = '/organizer/events';
+  static const String organizerEventCreate = '/organizer/events/create';
+  static const String organizerEventDetail = '/organizer/events/:id';
   static const String organizerEventForm = '/organizer/events/:id/edit';
   static const String organizerAttendees = '/organizer/events/:id/attendees';
   static const String organizerStaff = '/organizer/events/:id/staff';
@@ -38,8 +40,14 @@ class AppRoutes {
   static const String reportStatus = '/reports/:ticketNumber/status';
   static const String notificationList = '/notifications';
   static const String adminDashboard = '/admin';
+  static const String adminAccounts = '/admin/accounts';
   static const String adminEventModeration = '/admin/events';
   static const String adminReports = '/admin/reports';
+  static const String adminPackages = '/admin/packages';
+  static const String adminSubscriptions = '/admin/subscriptions';
+  static const String adminTransactions = '/admin/transactions';
+  static const String adminSettings = '/admin/settings';
+  static const String adminAuditLog = '/admin/audit-log';
 
   // Organizer extensions (FR-60-65, FR-76-79, FR-95-96)
   static const String organizerPlans = '/organizer/plans';

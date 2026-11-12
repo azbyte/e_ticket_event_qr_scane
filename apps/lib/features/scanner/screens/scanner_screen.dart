@@ -17,7 +17,7 @@ class ScannerScreen extends StatefulWidget {
     this.checkInProvider,
     this.staffId = 'stf-001',
     this.staffName = 'Budi Santoso',
-    this.eventId = 'evt-001',
+    this.eventId = 'evt-1001',
   });
 
   final CheckInProvider? checkInProvider;

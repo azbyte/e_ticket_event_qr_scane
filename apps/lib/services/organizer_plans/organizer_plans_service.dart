@@ -4,8 +4,6 @@
 /// plan upgrade/downgrade simulation, and transaction payment history.
 library;
 
-import '../../core/config/app_config.dart';
-
 class OrganizerPlanModel {
   final String id;
   final String name;
@@ -80,7 +78,8 @@ class PlanTransactionModel {
 
 class OrganizerPlansService {
   OrganizerPlansService._internal();
-  static final OrganizerPlansService instance = OrganizerPlansService._internal();
+  static final OrganizerPlansService instance =
+      OrganizerPlansService._internal();
   factory OrganizerPlansService() => instance;
 
   static final List<OrganizerPlanModel> _availablePlans = [
@@ -141,16 +140,17 @@ class OrganizerPlansService {
     ),
   ];
 
-  static OrganizerSubscriptionModel _currentSubscription = OrganizerSubscriptionModel(
-    id: 'sub-2026-001',
-    organizerId: 'org-001',
-    planId: 'plan-pro',
-    planName: 'Professional',
-    status: 'active',
-    startDate: DateTime.now().subtract(const Duration(days: 15)),
-    endDate: DateTime.now().add(const Duration(days: 45)),
-    autoRenew: true,
-  );
+  static OrganizerSubscriptionModel _currentSubscription =
+      OrganizerSubscriptionModel(
+        id: 'sub-2026-001',
+        organizerId: 'org-001',
+        planId: 'plan-pro',
+        planName: 'Professional',
+        status: 'active',
+        startDate: DateTime.now().subtract(const Duration(days: 15)),
+        endDate: DateTime.now().add(const Duration(days: 45)),
+        autoRenew: true,
+      );
 
   static final List<PlanTransactionModel> _mockTransactions = [
     PlanTransactionModel(
@@ -175,67 +175,55 @@ class OrganizerPlansService {
 
   /// Gets list of all available tiers.
   Future<List<OrganizerPlanModel>> getAvailablePlans() async {
-    if (AppConfig.mockMode) {
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      return _availablePlans;
-    }
-    return _availablePlans;
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    return List<OrganizerPlanModel>.unmodifiable(_availablePlans);
   }
 
   /// Gets active subscription for current organizer.
   Future<OrganizerSubscriptionModel> getCurrentSubscription() async {
-    if (AppConfig.mockMode) {
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      return _currentSubscription;
-    }
+    await Future<void>.delayed(const Duration(milliseconds: 200));
     return _currentSubscription;
   }
 
   /// Changes or upgrades the current plan.
   Future<bool> changePlan(String newPlanId) async {
-    if (AppConfig.mockMode) {
-      await Future<void>.delayed(const Duration(milliseconds: 400));
-      final selected = _availablePlans.firstWhere(
-        (p) => p.id == newPlanId,
-        orElse: () => _availablePlans[1],
-      );
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    final selectedIndex = _availablePlans.indexWhere(
+      (plan) => plan.id == newPlanId,
+    );
+    if (selectedIndex < 0) return false;
+    final selected = _availablePlans[selectedIndex];
 
-      _currentSubscription = OrganizerSubscriptionModel(
-        id: 'sub-${DateTime.now().millisecondsSinceEpoch}',
-        organizerId: 'org-001',
-        planId: selected.id,
-        planName: selected.name,
-        status: 'active',
-        startDate: DateTime.now(),
-        endDate: DateTime.now().add(const Duration(days: 30)),
-        autoRenew: true,
-      );
+    _currentSubscription = OrganizerSubscriptionModel(
+      id: 'sub-${DateTime.now().millisecondsSinceEpoch}',
+      organizerId: 'org-001',
+      planId: selected.id,
+      planName: selected.name,
+      status: 'active',
+      startDate: DateTime.now(),
+      endDate: DateTime.now().add(const Duration(days: 30)),
+      autoRenew: true,
+    );
 
-      _mockTransactions.insert(
-        0,
-        PlanTransactionModel(
-          id: 'trx-${DateTime.now().millisecondsSinceEpoch}',
-          invoiceNumber: 'INV-PLAN-${DateTime.now().millisecondsSinceEpoch}',
-          planName: '${selected.name} (Simulasi Upgrade)',
-          amount: selected.priceMonthly,
-          paymentMethod: 'Simulasi Saldo / VA',
-          status: 'success',
-          transactionDate: DateTime.now(),
-        ),
-      );
+    _mockTransactions.insert(
+      0,
+      PlanTransactionModel(
+        id: 'trx-${DateTime.now().millisecondsSinceEpoch}',
+        invoiceNumber: 'INV-PLAN-${DateTime.now().millisecondsSinceEpoch}',
+        planName: '${selected.name} (Simulasi Upgrade)',
+        amount: selected.priceMonthly,
+        paymentMethod: 'Simulasi Saldo / VA',
+        status: 'success',
+        transactionDate: DateTime.now(),
+      ),
+    );
 
-      return true;
-    }
     return true;
   }
 
   /// Gets transaction payment history for subscription packages.
   Future<List<PlanTransactionModel>> getTransactionHistory() async {
-    if (AppConfig.mockMode) {
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      return _mockTransactions;
-    }
-    return _mockTransactions;
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    return List<PlanTransactionModel>.unmodifiable(_mockTransactions);
   }
 }
-

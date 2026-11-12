@@ -10,7 +10,7 @@ class CheckInHistoryScreen extends StatefulWidget {
   const CheckInHistoryScreen({
     super.key,
     this.checkInProvider,
-    this.eventId = 'evt-001',
+    this.eventId = 'evt-1001',
   });
 
   final CheckInProvider? checkInProvider;

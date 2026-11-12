@@ -195,7 +195,7 @@ class OrganizerOperationsRepository extends ChangeNotifier {
     _attendees.addAll([
       OrganizerAttendee(
         id: 'att-001',
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         name: 'Ahmad Fauzi',
         email: 'ahmad.fauzi@example.com',
         phone: '081234567890',
@@ -213,7 +213,7 @@ class OrganizerOperationsRepository extends ChangeNotifier {
       ),
       OrganizerAttendee(
         id: 'att-002',
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         name: 'Dewi Lestari',
         email: 'dewi.lestari@example.com',
         phone: '081298765432',
@@ -231,7 +231,7 @@ class OrganizerOperationsRepository extends ChangeNotifier {
       ),
       OrganizerAttendee(
         id: 'att-003',
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         name: 'Rian Pratama',
         email: 'rian.pratama@example.com',
         phone: '081311223344',
@@ -247,7 +247,7 @@ class OrganizerOperationsRepository extends ChangeNotifier {
       ),
       OrganizerAttendee(
         id: 'att-004',
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         name: 'Siti Nurhaliza',
         email: 'siti.nurhaliza@example.com',
         phone: '081555667788',
@@ -264,7 +264,7 @@ class OrganizerOperationsRepository extends ChangeNotifier {
       ),
       OrganizerAttendee(
         id: 'att-005',
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         name: 'Eko Prasetyo',
         email: 'eko.prasetyo@example.com',
         phone: '081777889900',
@@ -281,7 +281,7 @@ class OrganizerOperationsRepository extends ChangeNotifier {
       ),
       OrganizerAttendee(
         id: 'att-006',
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         name: 'Hendra Gunawan',
         email: 'hendra.gunawan@example.com',
         phone: '081999001122',

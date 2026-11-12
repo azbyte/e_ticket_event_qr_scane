@@ -19,7 +19,7 @@ class StaffDashboardScreen extends StatefulWidget {
     this.checkInProvider,
     this.staffName = 'Budi Santoso',
     this.assignedEventTitle = 'Tech Innovation Summit 2026',
-    this.eventId = 'evt-001',
+    this.eventId = 'evt-1001',
   });
 
   final CheckInProvider? checkInProvider;
@@ -214,7 +214,10 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                           ? () => Navigator.push(
                                 context,
                                 MaterialPageRoute<void>(
-                                  builder: (_) => const ScannerScreen(),
+                                  builder: (_) => ScannerScreen(
+                                    eventId:
+                                        _selectedAssignment!.eventId,
+                                  ),
                                 ),
                               )
                           : () => _showPermissionDenied('memindai tiket'),
@@ -233,7 +236,10 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                               ? () => Navigator.push(
                                     context,
                                     MaterialPageRoute<void>(
-                                      builder: (_) => const CheckInScreen(),
+                                      builder: (_) => CheckInScreen(
+                                        eventId:
+                                            _selectedAssignment!.eventId,
+                                      ),
                                     ),
                                   )
                               : () => _showPermissionDenied(
@@ -249,8 +255,10 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                               ? () => Navigator.push(
                                     context,
                                     MaterialPageRoute<void>(
-                                      builder: (_) =>
-                                          const CheckInHistoryScreen(),
+                                      builder: (_) => CheckInHistoryScreen(
+                                        eventId:
+                                            _selectedAssignment!.eventId,
+                                      ),
                                     ),
                                   )
                               : () => _showPermissionDenied(

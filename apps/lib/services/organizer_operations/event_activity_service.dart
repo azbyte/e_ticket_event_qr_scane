@@ -68,7 +68,7 @@ class EventActivityLogger extends ChangeNotifier {
     _entries.addAll([
       EventActivityEntry(
         id: 'act-001',
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         actorId: 'usr-org-001',
         actorName: 'Penyelenggara Tech',
         action: 'CREATE_EVENT',
@@ -77,7 +77,7 @@ class EventActivityLogger extends ChangeNotifier {
       ),
       EventActivityEntry(
         id: 'act-002',
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         actorId: 'usr-org-001',
         actorName: 'Penyelenggara Tech',
         action: 'ADD_TICKET_TYPE',
@@ -86,7 +86,7 @@ class EventActivityLogger extends ChangeNotifier {
       ),
       EventActivityEntry(
         id: 'act-003',
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         actorId: 'usr-org-001',
         actorName: 'Penyelenggara Tech',
         action: 'SUBMIT_REVIEW',
@@ -95,7 +95,7 @@ class EventActivityLogger extends ChangeNotifier {
       ),
       EventActivityEntry(
         id: 'act-004',
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         actorId: 'usr-org-001',
         actorName: 'Penyelenggara Tech',
         action: 'STAFF_INVITATION',
@@ -104,7 +104,7 @@ class EventActivityLogger extends ChangeNotifier {
       ),
       EventActivityEntry(
         id: 'act-005',
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         actorId: 'usr-stf-001',
         actorName: 'Budi Santoso (Staf)',
         action: 'CHECK_IN_SUCCESS',
@@ -113,7 +113,7 @@ class EventActivityLogger extends ChangeNotifier {
       ),
       EventActivityEntry(
         id: 'act-006',
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         actorId: 'usr-stf-001',
         actorName: 'Budi Santoso (Staf)',
         action: 'CHECK_IN_SUCCESS',

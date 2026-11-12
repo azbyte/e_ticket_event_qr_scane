@@ -15,7 +15,7 @@ import '../shell/organizer_shell.dart';
 class TeamManagementScreen extends StatefulWidget {
   const TeamManagementScreen({
     super.key,
-    this.eventId = 'evt-001',
+    this.eventId = 'evt-1001',
     this.eventTitle = 'Tech Innovation Summit 2026',
   });
 
@@ -27,9 +27,11 @@ class TeamManagementScreen extends StatefulWidget {
 }
 
 class _TeamManagementScreenState extends State<TeamManagementScreen> {
-  final OrganizerMembershipService _service = OrganizerMembershipService.instance;
+  final OrganizerMembershipService _service =
+      OrganizerMembershipService.instance;
   List<EventMemberModel> _members = [];
   bool _isLoading = true;
+  String? _loadError;
   String _filter = 'all'; // all, staff, pending, owner
 
   @override
@@ -39,13 +41,20 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
   }
 
   Future<void> _loadMembers() async {
-    setState(() => _isLoading = true);
-    final list = await _service.listMembers(widget.eventId);
-    if (mounted) {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    try {
+      final list = await _service.listMembers(widget.eventId);
+      if (!mounted) return;
       setState(() {
         _members = list;
-        _isLoading = false;
       });
+    } on Exception catch (error) {
+      if (mounted) setState(() => _loadError = error.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -107,7 +116,8 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
                   const SizedBox(height: 16),
                   Text(
                     'Hak Akses & Izin (Granular Permissions PRD):',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   ...OrganizerPermission.values.map((perm) {
@@ -115,8 +125,17 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
                     return CheckboxListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
-                      title: Text(perm.code, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                      subtitle: Text(perm.label, style: const TextStyle(fontSize: 11)),
+                      title: Text(
+                        perm.code,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                      subtitle: Text(
+                        perm.label,
+                        style: const TextStyle(fontSize: 11),
+                      ),
                       value: isChecked,
                       onChanged: (val) {
                         setDialogState(() {
@@ -145,21 +164,32 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
                   final email = emailController.text.trim();
                   final name = nameController.text.trim();
                   Navigator.pop(ctx);
-                  await _service.inviteStaff(
-                    eventId: widget.eventId,
-                    eventTitle: widget.eventTitle,
-                    email: email,
-                    name: name,
-                    permissions: selectedPermissions,
-                  );
-                  if (mounted) {
+                  try {
+                    await _service.inviteStaff(
+                      eventId: widget.eventId,
+                      eventTitle: widget.eventTitle,
+                      email: email,
+                      name: name,
+                      permissions: selectedPermissions,
+                    );
+                    if (!mounted) return;
                     messenger.showSnackBar(
                       SnackBar(
-                        content: Text('Undangan staf berhasil dikirim ke $email (Masa aktif 7 hari).'),
+                        content: Text(
+                          'Undangan demo dibuat untuk $email (berlaku 7 hari).',
+                        ),
                         backgroundColor: Colors.green.shade800,
                       ),
                     );
-                    _loadMembers();
+                    await _loadMembers();
+                  } on Exception catch (error) {
+                    if (mounted) {
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text('Undangan gagal dibuat: $error'),
+                        ),
+                      );
+                    }
                   }
                 }
               },
@@ -172,7 +202,9 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
   }
 
   void _showEditPermissionsDialog(EventMemberModel member) {
-    final Set<OrganizerPermission> tempPermissions = Set.from(member.permissions);
+    final Set<OrganizerPermission> tempPermissions = Set.from(
+      member.permissions,
+    );
 
     showDialog(
       context: context,
@@ -194,8 +226,17 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
                   return CheckboxListTile(
                     dense: true,
                     contentPadding: EdgeInsets.zero,
-                    title: Text(perm.code, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                    subtitle: Text(perm.label, style: const TextStyle(fontSize: 11)),
+                    title: Text(
+                      perm.code,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                    subtitle: Text(
+                      perm.label,
+                      style: const TextStyle(fontSize: 11),
+                    ),
                     value: isChecked,
                     onChanged: (val) {
                       setDialogState(() {
@@ -212,21 +253,37 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Batal'),
+            ),
             FilledButton(
               onPressed: () async {
                 final messenger = ScaffoldMessenger.of(context);
                 Navigator.pop(ctx);
-                await _service.updatePermissions(
-                  eventId: widget.eventId,
-                  memberId: member.id,
-                  permissions: tempPermissions,
-                );
-                if (mounted) {
-                  messenger.showSnackBar(
-                    SnackBar(content: Text('Izin staf ${member.name} berhasil diperbarui.')),
+                try {
+                  final updated = await _service.updatePermissions(
+                    eventId: widget.eventId,
+                    memberId: member.id,
+                    permissions: tempPermissions,
                   );
-                  _loadMembers();
+                  if (!mounted) return;
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        updated
+                            ? 'Izin staf ${member.name} diperbarui (demo).'
+                            : 'Izin staf tidak dapat diperbarui.',
+                      ),
+                    ),
+                  );
+                  if (updated) await _loadMembers();
+                } on Exception catch (error) {
+                  if (mounted) {
+                    messenger.showSnackBar(
+                      SnackBar(content: Text('Izin gagal diperbarui: $error')),
+                    );
+                  }
                 }
               },
               child: const Text('Simpan Izin'),
@@ -258,7 +315,8 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
         children: [
           // Banner context
           Container(
-            color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+            color: Theme.of(context).colorScheme.primaryContainer
+                .withValues(alpha: 0.3),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
@@ -268,8 +326,17 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Event Terpilih:', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                      Text(widget.eventTitle, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      const Text(
+                        'Event Terpilih:',
+                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                      Text(
+                        widget.eventTitle,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -284,7 +351,10 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
 
           // Filter bar
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -296,13 +366,17 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
                   ),
                   const SizedBox(width: 8),
                   ChoiceChip(
-                    label: Text('Staff Aktif (${_members.where((m) => m.isStaff && m.isAccepted).length})'),
+                    label: Text(
+                      'Staff Aktif (${_members.where((m) => m.isStaff && m.isAccepted).length})',
+                    ),
                     selected: _filter == 'staff',
                     onSelected: (_) => setState(() => _filter = 'staff'),
                   ),
                   const SizedBox(width: 8),
                   ChoiceChip(
-                    label: Text('Menunggu / Pending (${_members.where((m) => m.isPending).length})'),
+                    label: Text(
+                      'Menunggu / Pending (${_members.where((m) => m.isPending).length})',
+                    ),
                     selected: _filter == 'pending',
                     onSelected: (_) => setState(() => _filter = 'pending'),
                   ),
@@ -323,121 +397,225 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
+                : _loadError != null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.error_outline, size: 48),
+                          const SizedBox(height: 12),
+                          Text(_loadError!, textAlign: TextAlign.center),
+                          const SizedBox(height: 12),
+                          FilledButton.icon(
+                            onPressed: _loadMembers,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Coba lagi'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
                 : filtered.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.group_off, size: 64, color: Colors.grey.shade400),
-                            const SizedBox(height: 12),
-                            const Text('Belum ada staf anggota pada kategori ini.'),
-                          ],
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.group_off,
+                          size: 64,
+                          color: Colors.grey.shade400,
                         ),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(16.0),
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          final m = filtered[index];
-                          return Card(
-                            elevation: 1,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            child: Padding(
-                              padding: const EdgeInsets.all(14.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                        const SizedBox(height: 12),
+                        const Text('Belum ada staf anggota pada kategori ini.'),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.all(16.0),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final m = filtered[index];
+                      return Card(
+                        elevation: 1,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
                                 children: [
-                                  Row(
-                                    children: [
-                                      CircleAvatar(
-                                        backgroundColor: m.isOwner ? Colors.purple.shade50 : Colors.indigo.shade50,
-                                        child: Icon(
-                                          m.isOwner ? Icons.workspace_premium : Icons.badge,
-                                          color: m.isOwner ? Colors.purple : Colors.indigo,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              m.name,
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                            ),
-                                            Text(m.email, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                          ],
-                                        ),
-                                      ),
-                                      _buildStatusBadge(m),
-                                    ],
+                                  CircleAvatar(
+                                    backgroundColor: m.isOwner
+                                        ? Colors.purple.shade50
+                                        : Colors.indigo.shade50,
+                                    child: Icon(
+                                      m.isOwner
+                                          ? Icons.workspace_premium
+                                          : Icons.badge,
+                                      color: m.isOwner
+                                          ? Colors.purple
+                                          : Colors.indigo,
+                                    ),
                                   ),
-                                  const SizedBox(height: 10),
-                                  Wrap(
-                                    spacing: 6,
-                                    runSpacing: 4,
-                                    children: m.isOwner
-                                        ? [
-                                            Chip(
-                                              label: const Text('Full Access (Owner)', style: TextStyle(fontSize: 11)),
-                                              backgroundColor: Colors.purple.shade50,
-                                              padding: EdgeInsets.zero,
-                                            ),
-                                          ]
-                                        : m.permissions.map((p) {
-                                            return Chip(
-                                              label: Text(p.code, style: const TextStyle(fontSize: 10)),
-                                              backgroundColor: Colors.blue.shade50,
-                                              padding: EdgeInsets.zero,
-                                            );
-                                          }).toList(),
-                                  ),
-                                  if (!m.isOwner) ...[
-                                    const Divider(height: 20),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        TextButton.icon(
-                                          icon: const Icon(Icons.security, size: 16),
-                                          label: const Text('Edit Izin'),
-                                          onPressed: () => _showEditPermissionsDialog(m),
+                                        Text(
+                                          m.name,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                          ),
                                         ),
-                                        const SizedBox(width: 8),
-                                        TextButton.icon(
-                                          icon: const Icon(Icons.person_remove, size: 16, color: Colors.red),
-                                          label: const Text('Cabut Akses', style: TextStyle(color: Colors.red)),
-                                          onPressed: () async {
-                                            final confirm = await showDialog<bool>(
-                                              context: context,
-                                              builder: (c) => AlertDialog(
-                                                title: const Text('Cabut Akses Staf?'),
-                                                content: Text('Apakah Anda yakin ingin mencabut hak staf dari ${m.name}?'),
-                                                actions: [
-                                                  TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Batal')),
-                                                  FilledButton(
-                                                    style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                                                    onPressed: () => Navigator.pop(c, true),
-                                                    child: const Text('Cabut'),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                            if (confirm == true) {
-                                              await _service.revokeAccess(eventId: widget.eventId, memberId: m.id);
-                                              _loadMembers();
-                                            }
-                                          },
+                                        Text(
+                                          m.email,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey,
+                                          ),
                                         ),
                                       ],
                                     ),
-                                  ],
+                                  ),
+                                  _buildStatusBadge(m),
                                 ],
                               ),
-                            ),
-                          );
-                        },
-                      ),
+                              const SizedBox(height: 10),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: m.isOwner
+                                    ? [
+                                        Chip(
+                                          label: const Text(
+                                            'Full Access (Owner)',
+                                            style: TextStyle(fontSize: 11),
+                                          ),
+                                          backgroundColor:
+                                              Colors.purple.shade50,
+                                          padding: EdgeInsets.zero,
+                                        ),
+                                      ]
+                                    : m.permissions.map((p) {
+                                        return Chip(
+                                          label: Text(
+                                            p.code,
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                          backgroundColor: Colors.blue.shade50,
+                                          padding: EdgeInsets.zero,
+                                        );
+                                      }).toList(),
+                              ),
+                              if (!m.isOwner) ...[
+                                const Divider(height: 20),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    TextButton.icon(
+                                      icon: const Icon(
+                                        Icons.security,
+                                        size: 16,
+                                      ),
+                                      label: const Text('Edit Izin'),
+                                      onPressed: () =>
+                                          _showEditPermissionsDialog(m),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    TextButton.icon(
+                                      icon: const Icon(
+                                        Icons.person_remove,
+                                        size: 16,
+                                        color: Colors.red,
+                                      ),
+                                      label: const Text(
+                                        'Cabut Akses',
+                                        style: TextStyle(color: Colors.red),
+                                      ),
+                                      onPressed: () async {
+                                        final messenger = ScaffoldMessenger.of(
+                                          context,
+                                        );
+                                        final confirm = await showDialog<bool>(
+                                          context: context,
+                                          builder: (c) => AlertDialog(
+                                            title: const Text(
+                                              'Cabut Akses Staf?',
+                                            ),
+                                            content: Text(
+                                              'Apakah Anda yakin ingin mencabut hak staf dari ${m.name}?',
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(c, false),
+                                                child: const Text('Batal'),
+                                              ),
+                                              FilledButton(
+                                                style: FilledButton.styleFrom(
+                                                  backgroundColor: Colors.red,
+                                                ),
+                                                onPressed: () =>
+                                                    Navigator.pop(c, true),
+                                                child: const Text('Cabut'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        if (confirm == true) {
+                                          try {
+                                            final revoked = await _service
+                                                .revokeAccess(
+                                                  eventId: widget.eventId,
+                                                  memberId: m.id,
+                                                );
+                                            if (!mounted) return;
+                                            messenger.showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  revoked
+                                                      ? 'Akses ${m.name} dicabut (demo).'
+                                                      : 'Akses staf tidak dapat dicabut.',
+                                                ),
+                                              ),
+                                            );
+                                            if (revoked) {
+                                              await _loadMembers();
+                                            }
+                                          } on Exception catch (error) {
+                                            if (mounted) {
+                                              messenger.showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    'Akses gagal dicabut: $error',
+                                                  ),
+                                                ),
+                                              );
+                                            }
+                                          }
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -448,21 +626,51 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
     if (m.isOwner) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(color: Colors.purple.shade50, borderRadius: BorderRadius.circular(6)),
-        child: const Text('Owner', style: TextStyle(color: Colors.purple, fontSize: 11, fontWeight: FontWeight.bold)),
+        decoration: BoxDecoration(
+          color: Colors.purple.shade50,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: const Text(
+          'Owner',
+          style: TextStyle(
+            color: Colors.purple,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       );
     }
     if (m.isPending) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(6)),
-        child: const Text('Pending (7 Hari)', style: TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.bold)),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: const Text(
+          'Pending (7 Hari)',
+          style: TextStyle(
+            color: Colors.orange,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       );
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(6)),
-      child: const Text('Aktif (Staff)', style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold)),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: const Text(
+        'Aktif (Staff)',
+        style: TextStyle(
+          color: Colors.green,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 }

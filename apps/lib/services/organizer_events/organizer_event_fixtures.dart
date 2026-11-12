@@ -12,10 +12,10 @@ class OrganizerEventFixtures {
   OrganizerEventFixtures._();
 
   /// Owner aktif pada demo Organizer.
-  static const String demoOwnerId = 'org-demo-0001';
+  static const String demoOwnerId = 'org-001';
 
   /// Owner lain; dipakai untuk membuktikan scope Owner dan akses ditolak.
-  static const String otherOwnerId = 'org-demo-0002';
+  static const String otherOwnerId = 'org-002';
 
   /// Nama Owner demo (nilai awal form).
   static const String demoOwnerName = 'Nadia Organizer';
@@ -29,16 +29,16 @@ class OrganizerEventFixtures {
       EventModel(
         id: 'evt-1001',
         organizerId: demoOwnerId,
-        title: 'Jakarta Music Fest 2026',
+        title: 'Tech Innovation Summit 2026',
         description:
             'Festival musik dua hari dengan 12 penampil lokal dan nasional. '
             'Data ini adalah fixture demo, bukan event yang benar-benar tayang.',
         posterUrl: 'https://demo.eticket.local/posters/music-fest.png',
-        category: 'Musik',
+        category: 'Teknologi',
         startDateTime: DateTime(2026, 12, 20, 19, 0),
         endDateTime: DateTime(2026, 12, 20, 23, 0),
         timeZone: 'Asia/Jakarta',
-        location: 'Istora Senayan, Jakarta',
+        location: 'Grand Ballroom Hotel Indonesia',
         eventType: OrganizerEventFormat.offline,
         contactInfo: demoOwnerEmail,
         organizerName: demoOwnerName,
@@ -59,8 +59,7 @@ class OrganizerEventFixtures {
         id: 'evt-1002',
         organizerId: demoOwnerId,
         title: 'Webinar Produk Digital 2026',
-        description:
-            'Webinar gratis tentang riset pengguna dan prioritas roadmap produk.',
+        description: 'Webinar gratis tentang riset pengguna dan prioritas roadmap produk.',
         posterUrl: 'https://demo.eticket.local/posters/webinar.png',
         category: 'Seminar',
         startDateTime: DateTime(2026, 12, 12, 13, 0),
@@ -84,8 +83,7 @@ class OrganizerEventFixtures {
         id: 'evt-1003',
         organizerId: demoOwnerId,
         title: 'Workshop Fotografi Produk',
-        description:
-            'Kelas praktik fotografi produk untuk pelaku UMKM. 30 kursi terbatas.',
+        description: 'Kelas praktik fotografi produk untuk pelaku UMKM. 30 kursi terbatas.',
         category: 'Workshop',
         startDateTime: DateTime(2027, 1, 17, 9, 0),
         endDateTime: DateTime(2027, 1, 17, 15, 0),
@@ -155,9 +153,9 @@ class OrganizerEventFixtures {
       TicketTypeModel(
         id: 'tt-2001',
         eventId: 'evt-1001',
-        name: 'Reguler',
+        name: 'Regular Pass',
         description: 'Akses satu hari festival.',
-        price: 250000,
+        price: 350000,
         quota: 500,
         sold: 320,
         held: 15,
@@ -168,7 +166,7 @@ class OrganizerEventFixtures {
       TicketTypeModel(
         id: 'tt-2002',
         eventId: 'evt-1001',
-        name: 'VIP',
+        name: 'VIP Pass',
         description: 'Area depan panggung dan jalur masuk khusus.',
         price: 750000,
         quota: 100,
@@ -219,7 +217,7 @@ class OrganizerEventFixtures {
       'evt-1001': OrganizerEventMetrics(
         pendingOrders: 6,
         participants: 407,
-        checkedIn: 0,
+        checkedIn: 2,
       ),
       'evt-1002': OrganizerEventMetrics(
         pendingOrders: 3,

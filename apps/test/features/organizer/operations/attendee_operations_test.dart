@@ -17,12 +17,12 @@ void main() {
       ownerContext = OrganizerMembershipContext.owner(
         userId: 'usr-org-001',
         userName: 'Penyelenggara Tech (Owner)',
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
       );
       gateStaffContext = OrganizerMembershipContext.staff(
         userId: 'usr-stf-002',
         userName: 'Siti Rahma (Staf Pintu)',
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         permissions: {
           OrganizerPermission.viewEvent,
           OrganizerPermission.scanTicket,
@@ -33,7 +33,7 @@ void main() {
       restrictedStaffContext = OrganizerMembershipContext.staff(
         userId: 'usr-stf-003',
         userName: 'Doni (Staf Terbatas)',
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         permissions: {
           OrganizerPermission.viewEvent,
           OrganizerPermission.viewParticipants,
@@ -42,7 +42,7 @@ void main() {
     });
 
     test('1. Attendee filtering, searching, and data minimization compliance (FR-67-69)', () {
-      final attendees = repo.getAttendeesForEvent('evt-001');
+      final attendees = repo.getAttendeesForEvent('evt-1001');
       expect(attendees.isNotEmpty, isTrue);
 
       // Verify data minimization
@@ -53,14 +53,14 @@ void main() {
 
       // Search by name
       final searchResult = repo.getAttendeesForEvent(
-        'evt-001',
+        'evt-1001',
         search: 'Ahmad',
       );
       expect(searchResult.any((a) => a.name.contains('Ahmad')), isTrue);
 
       // Filter by check-in status
       final checkedInOnly = repo.getAttendeesForEvent(
-        'evt-001',
+        'evt-1001',
         filterStatus: 'checked_in',
       );
       for (final a in checkedInOnly) {
@@ -71,7 +71,7 @@ void main() {
       final otherEventAttendees = repo.getAttendeesForEvent('evt-999');
       expect(otherEventAttendees.isEmpty, isTrue);
       final pendingPayment = repo.getAttendeesForEvent(
-        'evt-001',
+        'evt-1001',
         filterPaymentStatus: 'pending',
       );
       expect(pendingPayment.every((a) => a.paymentStatus == 'pending'), isTrue);
@@ -80,7 +80,7 @@ void main() {
     test('2. Assisted Registration validation, VA creation, and pending status (FR-30-35)', () {
       // Rejects empty orderer
       final emptyResult = repo.createAssistedRegistration(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         ordererName: '',
         ordererEmail: '',
         ordererPhone: '',
@@ -94,7 +94,7 @@ void main() {
 
       // Rejects duplicate attendee email in same order
       final duplicateResult = repo.createAssistedRegistration(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         ordererName: 'Hendra Gunawan',
         ordererEmail: 'hendra@example.com',
         ordererPhone: '081233445566',
@@ -120,7 +120,7 @@ void main() {
 
       // Successfully creates assisted order with Virtual Account & pending payment status
       final successResult = repo.createAssistedRegistration(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         ordererName: 'Bambang Sudiro',
         ordererEmail: 'bambang.sudiro@example.com',
         ordererPhone: '081555667788',
@@ -153,7 +153,7 @@ void main() {
 
     test('assisted registration denies wrong event and missing permission', () {
       final denied = repo.createAssistedRegistration(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         context: OrganizerMembershipContext.staff(
           eventId: 'evt-999',
           permissions: {OrganizerPermission.assistRegistration},
@@ -180,7 +180,7 @@ void main() {
     test('3. Scanner validation & edge cases (valid, already used, wrong event, cancelled, invalid)', () {
       // Permission Denied Check
       final deniedResult = repo.validateAndCheckIn(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         ticketCode: 'TK-TECH-003',
         context: restrictedStaffContext, // Lacks SCAN_TICKET
       );
@@ -189,7 +189,7 @@ void main() {
 
       // Invalid QR code
       final invalidResult = repo.validateAndCheckIn(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         ticketCode: 'INV-999',
         context: gateStaffContext,
       );
@@ -198,7 +198,7 @@ void main() {
 
       // Ticket for wrong event
       final wrongEventResult = repo.validateAndCheckIn(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         ticketCode: 'TK-WRONG-999',
         context: gateStaffContext,
       );
@@ -207,7 +207,7 @@ void main() {
 
       // Cancelled ticket
       final cancelledResult = repo.validateAndCheckIn(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         ticketCode: 'TK-TECH-006',
         context: gateStaffContext,
       );
@@ -216,7 +216,7 @@ void main() {
 
       // Already checked-in ticket (TK-TECH-001 is already checked in in mock fixture)
       final usedResult = repo.validateAndCheckIn(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         ticketCode: 'TK-TECH-001',
         context: gateStaffContext,
       );
@@ -225,7 +225,7 @@ void main() {
 
       // Valid ticket check-in (TK-TECH-003 is valid and unchecked)
       final validResult = repo.validateAndCheckIn(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         ticketCode: 'TK-TECH-003',
         context: gateStaffContext,
       );
@@ -239,7 +239,7 @@ void main() {
 
       // Re-scan same ticket must now fail
       final reScanResult = repo.validateAndCheckIn(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         ticketCode: 'TK-TECH-003',
         context: gateStaffContext,
       );
@@ -253,7 +253,7 @@ void main() {
 
       // Offline check-in on TK-TECH-004
       final offlineResult = repo.validateAndCheckIn(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         ticketCode: 'TK-TECH-004',
         context: gateStaffContext,
       );
@@ -264,7 +264,7 @@ void main() {
       expect(repo.offlineQueue.length, greaterThanOrEqualTo(1));
 
       // Sync offline queue
-      final syncSummary = repo.syncOfflineQueue('evt-001');
+      final syncSummary = repo.syncOfflineQueue('evt-1001');
       expect(syncSummary['synced'], greaterThanOrEqualTo(1));
 
       repo.toggleOfflineMode(false);
@@ -272,9 +272,9 @@ void main() {
     });
 
     test('5. Financial metrics isolation (Gross vs Commission vs Gateway vs Proceeds)', () {
-      final report = repo.getEventReport('evt-001');
+      final report = repo.getEventReport('evt-1001');
 
-      expect(report.eventId, equals('evt-001'));
+      expect(report.eventId, equals('evt-1001'));
       expect(report.totalOrders, greaterThan(0));
       expect(report.totalTicketsSold, greaterThan(0));
       expect(report.grossSales, greaterThan(0));
@@ -295,12 +295,12 @@ void main() {
     test('6. CSV export permission enforcement and data minimization', () {
       // Restricted staff should be denied export
       expect(
-        () => repo.exportAttendeesCsv('evt-001', restrictedStaffContext),
+        () => repo.exportAttendeesCsv('evt-1001', restrictedStaffContext),
         throwsA(isA<Exception>()),
       );
 
       // Owner should successfully generate CSV
-      final csv = repo.exportAttendeesCsv('evt-001', ownerContext);
+      final csv = repo.exportAttendeesCsv('evt-1001', ownerContext);
       expect(csv, contains('ID,Nama,Email,No_HP,Kategori_Tiket,Kode_Tiket'));
       expect(csv, contains('***@')); // Masked email
       expect(csv, contains('****')); // Masked phone
@@ -308,11 +308,11 @@ void main() {
 
     test('7. Event Activity Logger API records operational actions', () {
       final initialCount = EventActivityLogger.instance
-          .getActivitiesForEvent('evt-001')
+          .getActivitiesForEvent('evt-1001')
           .length;
 
       EventActivityLogger.instance.log(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         actorId: 'usr-org-001',
         actorName: 'Penyelenggara Tech',
         action: 'UPDATE_EVENT_SCHEDULE',
@@ -320,12 +320,12 @@ void main() {
       );
 
       final updatedCount = EventActivityLogger.instance
-          .getActivitiesForEvent('evt-001')
+          .getActivitiesForEvent('evt-1001')
           .length;
       expect(updatedCount, equals(initialCount + 1));
 
       final latest = EventActivityLogger.instance
-          .getActivitiesForEvent('evt-001')
+          .getActivitiesForEvent('evt-1001')
           .first;
       expect(latest.action, equals('UPDATE_EVENT_SCHEDULE'));
       expect(latest.summary, contains('keynote'));
@@ -340,18 +340,18 @@ void main() {
         },
       );
       final outOfScope = repo.validateAndCheckIn(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         ticketCode: 'TK-TECH-003',
         context: wrongEventContext,
       );
       expect(outOfScope.status, 'DENIED');
 
       final scanOnly = OrganizerMembershipContext.staff(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         permissions: {OrganizerPermission.scanTicket},
       );
       final validWithoutCheckIn = repo.validateAndCheckIn(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         ticketCode: 'TK-TECH-003',
         context: scanOnly,
       );
@@ -360,10 +360,10 @@ void main() {
     });
 
     test('report filters by ticket type and date range', () {
-      final vip = repo.getEventReport('evt-001', ticketType: 'VIP Pass');
+      final vip = repo.getEventReport('evt-1001', ticketType: 'VIP Pass');
       expect(vip.tierBreakdown.keys, everyElement('VIP Pass'));
       final emptyPeriod = repo.getEventReport(
-        'evt-001',
+        'evt-1001',
         from: DateTime(2099),
         through: DateTime(2099, 12, 31),
       );
@@ -374,14 +374,14 @@ void main() {
     test('offline sync leaves other event queue entries untouched', () {
       repo.toggleOfflineMode(true);
       repo.validateAndCheckIn(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         ticketCode: 'TK-TECH-004',
         context: gateStaffContext,
       );
       final before = repo.offlineQueue.length;
       repo.syncOfflineQueue('evt-999');
       expect(repo.offlineQueue.length, before);
-      repo.syncOfflineQueue('evt-001');
+      repo.syncOfflineQueue('evt-1001');
       repo.toggleOfflineMode(false);
     });
   });
