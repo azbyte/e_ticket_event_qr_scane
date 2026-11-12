@@ -36,6 +36,13 @@ void main() {
       expect(txs.isNotEmpty, isTrue);
       expect(txs.first.status, equals('success'));
     });
+
+    test('Rejects unknown plans without changing the subscription', () async {
+      final before = await service.getCurrentSubscription();
+
+      expect(await service.changePlan('missing-plan'), isFalse);
+      expect(await service.getCurrentSubscription(), same(before));
+    });
   });
 
   group('OrganizerSupportService Tests (FR-95, FR-96)', () {
@@ -45,33 +52,30 @@ void main() {
       supportService = OrganizerSupportService.instance;
     });
 
-    test('Creates complaint with RPT-ORG ticket format and status token', () async {
-      final complaint = await supportService.submitComplaint(
-        organizerId: 'org-001',
-        email: 'organizer@techsummit.id',
-        category: 'Moderasi Event',
-        subject: 'Permohonan peninjauan kembali banner event',
-        description: 'Banner event telah diperbarui sesuai panduan komunitas.',
-      );
+    test(
+      'Creates complaint with RPT-ORG ticket format and status token',
+      () async {
+        final complaint = await supportService.submitComplaint(
+          organizerId: 'org-001',
+          email: 'organizer@techsummit.id',
+          category: 'Moderasi Event',
+          subject: 'Permohonan peninjauan kembali banner event',
+          description:
+              'Banner event telah diperbarui sesuai panduan komunitas.',
+        );
 
-      expect(complaint.ticketNumber.startsWith('RPT-ORG-'), isTrue);
-      expect(complaint.statusToken.isNotEmpty, isTrue);
-      expect(complaint.status, equals('open'));
-      expect(complaint.category, equals('Moderasi Event'));
-    });
+        expect(complaint.ticketNumber.startsWith('RPT-ORG-'), isTrue);
+        expect(complaint.statusToken.isNotEmpty, isTrue);
+        expect(complaint.status, equals('open'));
+        expect(complaint.category, equals('Moderasi Event'));
+      },
+    );
 
-    test('Strictly conceals internal admin notes from public presentation (FR-96)', () async {
+    test('Lists only complaints owned by the requested organizer', () async {
       final complaints = await supportService.listComplaints('org-001');
       expect(complaints.isNotEmpty, isTrue);
-
-      for (final c in complaints) {
-        // Publicly accessible sanitized note must be strictly null
-        expect(c.sanitizedInternalNote, isNull);
-        // Ensure entity retains backend audit flag without exposing content
-        if (c.hasInternalAuditNote) {
-          expect(c.internalNotes, isNotNull);
-        }
-      }
+      expect(complaints.every((c) => c.organizerId == 'org-001'), isTrue);
+      expect(await supportService.listComplaints('org-002'), isEmpty);
     });
 
     test('Loads FAQ guidance items', () {

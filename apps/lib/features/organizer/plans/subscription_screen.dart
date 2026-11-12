@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 
 import '../../../routes/app_routes.dart';
 import '../../../services/organizer_plans/organizer_plans_service.dart';
+import '../events/widgets/organizer_feedback_view.dart';
 import '../shell/organizer_shell.dart';
 
 class SubscriptionScreen extends StatefulWidget {
@@ -28,6 +29,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
   List<OrganizerPlanModel> _plans = [];
   List<PlanTransactionModel> _transactions = [];
   bool _isLoading = true;
+  String? _loadError;
+  bool _isChangingPlan = false;
 
   @override
   void initState() {
@@ -47,17 +50,24 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    final sub = await _service.getCurrentSubscription();
-    final plans = await _service.getAvailablePlans();
-    final trxs = await _service.getTransactionHistory();
-    if (mounted) {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    try {
+      final sub = await _service.getCurrentSubscription();
+      final plans = await _service.getAvailablePlans();
+      final trxs = await _service.getTransactionHistory();
+      if (!mounted) return;
       setState(() {
         _subscription = sub;
         _plans = plans;
         _transactions = trxs;
-        _isLoading = false;
       });
+    } on Exception catch (error) {
+      if (mounted) setState(() => _loadError = error.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -106,21 +116,41 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
             child: const Text('Batal'),
           ),
           FilledButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await _service.changePlan(plan.id);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Paket berhasil dialihkan ke ${plan.name} (Simulasi).',
-                    ),
-                    backgroundColor: Colors.green.shade800,
-                  ),
-                );
-                _loadData();
-              }
-            },
+            onPressed: _isChangingPlan
+                ? null
+                : () async {
+                    setState(() => _isChangingPlan = true);
+                    Navigator.pop(ctx);
+                    try {
+                      final changed = await _service.changePlan(plan.id);
+                      if (!mounted) return;
+                      if (!changed) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Paket demo tidak ditemukan.'),
+                          ),
+                        );
+                        return;
+                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Paket demo dialihkan ke ${plan.name}. Tidak ada penagihan.',
+                          ),
+                          backgroundColor: Colors.green.shade800,
+                        ),
+                      );
+                      await _loadData();
+                    } on Exception catch (error) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Paket gagal diubah: $error')),
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => _isChangingPlan = false);
+                    }
+                  },
             child: const Text('Konfirmasi Pilihan'),
           ),
         ],
@@ -135,6 +165,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
       title: 'Paket & Langganan',
       child: _isLoading
           ? const Center(child: CircularProgressIndicator())
+          : _loadError != null
+          ? OrganizerErrorView(message: _loadError!, onRetry: _loadData)
           : Column(
               children: [
                 TabBar(
@@ -159,6 +191,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
   }
 
   Widget _buildPlansTab() {
+    if (_plans.isEmpty) {
+      return const OrganizerEmptyView(
+        title: 'Paket belum tersedia',
+        description: 'Belum ada paket demo yang dapat ditampilkan.',
+      );
+    }
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
