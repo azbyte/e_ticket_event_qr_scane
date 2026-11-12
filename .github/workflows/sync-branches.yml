@@ -1,33 +1,40 @@
-name: Sync Development Branches After Merge to Main
+name: Sync Direct Child Branches After Merge
 
-# Sinkronisasi otomatis seluruh branch pengembangan dan integrasi
-# HANYA setelah Pull Request ke main berhasil di-merge.
+# Sinkronisasi direct-child-only: ketika Pull Request berhasil di-merge ke
+# suatu branch (source), HANYA direct child yang terdaftar pada source itu
+# di .github/sync-config.yaml yang disinkronkan.
 #
-# Pemicu spesifik: pull_request dengan aktivitas closed, kemudian
-# difilter hanya jika merged == true dan base.ref == 'main'.
+# Sumber kebenaran tunggal: .github/sync-config.yaml
 #
-# Workflow ini sengaja TIDAK menggunakan on.push sehingga tidak akan
-# berjalan pada push/commit/PR/merge pada branch selain main.
+# Pemicu: pull_request ditutup (semua branch, bukan hanya main), difilter
+# hanya merged == true. Source diambil secara dinamis dari base.ref.
+#
+# Sengaja TIDAK menggunakan on.push sehingga push hasil sinkronisasi tidak
+# memicu ulang workflow ini. quality.yml hanya terpicu pada push/PR ke main,
+# sehingga push ke branch development tidak membentuk loop sinkronisasi.
 
 on:
   pull_request:
     types:
       - closed
-    branches:
-      - main
 
 permissions:
-  # Izin minimum yang diperlukan: push ke branch pengembangan/integrasi.
-  # Tidak ada izin force push, tidak ada izin ke main langsung.
+  # GITHUB_TOKEN perlu izin repository untuk fetch/push; target dibatasi oleh
+  # konfigurasi, dan validator menolak main sebagai child.
   contents: write
 
+# Sederakan per source (base.ref). Karena satu child hanya boleh memiliki
+# satu parent (ditetapkan konfigurasi), ini melindungi setiap target branch
+# dari modifikasi bersamaan tanpa menghambat sinkronisasi source lain.
+concurrency:
+  group: sync-${{ github.event.pull_request.base.ref }}
+  cancel-in-progress: false
+
 jobs:
-  sync-branches:
-    name: Sinkronkan branch pengembangan dengan main
-    # Pastikan hanya berjalan saat PR ke main benar-benar di-merge
-    if: >
-      github.event.pull_request.merged == true &&
-      github.event.pull_request.base.ref == 'main'
+  sync:
+    name: Sinkronkan direct child dari source
+    # Pastikan hanya PR yang benar-benar di-merge yang diproses.
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -36,91 +43,175 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Konfigurasi git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Sinkronkan seluruh branch pengembangan dengan main
+      # Validasi konfigurasi dilakukan SEBELUM operasi Git apapun.
+      # Jika tidak valid, seluruh proses dihentikan sebelum target
+      # manapun dimodifikasi.
+      - name: Validasi konfigurasi sinkronisasi
+        id: validate
+        run: |
+          node .github/scripts/validate-sync-config.js validate .github/sync-config.yaml
+
+      # Baca konfigurasi SATU kali dalam satu proses; hasilnya konsisten
+      # untuk semua target. Direktif child ditulis ke berkas rencana.
+      - name: Tentukan direct child dari source
+        id: children
+        env:
+          SOURCE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          output="$(node .github/scripts/validate-sync-config.js children "$SOURCE" .github/sync-config.yaml)" || {
+            echo "::error::Gagal membaca direct child dari konfigurasi"
+            exit 1
+          }
+          case "$output" in
+            'SKIPPED: SOURCE_NOT_CONFIGURED')
+              echo "skipped=true" >> "$GITHUB_OUTPUT"
+              echo "reason=$output" >> "$GITHUB_OUTPUT"
+              : > .sync-plan-children.txt
+              echo "::notice::$output"
+              ;;
+            'SKIPPED: NO_DIRECT_CHILDREN')
+              echo "skipped=false" >> "$GITHUB_OUTPUT"
+              echo "reason=$output" >> "$GITHUB_OUTPUT"
+              : > .sync-plan-children.txt
+              echo "::notice::$output"
+              ;;
+            *)
+              echo "skipped=false" >> "$GITHUB_OUTPUT"
+              echo "reason=direct_children" >> "$GITHUB_OUTPUT"
+              printf '%s\n' "$output" > .sync-plan-children.txt
+              ;;
+          esac
+      - name: Sinkronkan setiap direct child secara independen
+        if: steps.children.outputs.skipped == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REMOTE: origin
+          SOURCE: ${{ github.event.pull_request.base.ref }}
         run: |
           set -euo pipefail
 
-          remote="origin"
+          source="$SOURCE"
+          remote="$REMOTE"
+          plan=".sync-plan-children.txt"
 
-          # Ambil semua branch terbaru dari remote dan hapus referensi
-          # cabang yang sudah dihapus di server.
+          echo "Source: $source"
+          echo "Direct child target:"
+          while IFS= read -r child; do [ -n "$child" ] && echo "  - $child"; done < "$plan"
+
+          # Ambil semua referensi terbaru dari remote sebelum operasi Git.
           git fetch "$remote" --prune
 
-          # Pastikan lokal main sinkron dengan origin/main.
-          # Workflow ini tidak pernah push ke main, sehingga tidak
-          # melanggar perlindungan branch main.
-          git checkout main
-          git merge --ff-only "$remote/main"
+          # Verifikasi source tersedia di remote sebelum target manapun
+          # dimodifikasi.
+          if ! git ls-remote --exit-code --heads "$remote" "$source" >/dev/null 2>&1; then
+            echo "::error::Source '$source' tidak tersedia di remote '$remote'"
+            exit 1
+          fi
 
-          # Kumpulkan daftar branch pengembangan secara dinamis dari remote,
-          # kecuali main, HEAD, dan nama remote itu sendiri (origin). Nama branch
-          # diambil secara struktural dengan %(refname:strip=3) yang menghapus
-          # awalan refs/remotes/origin/ secara utuh, bukan dengan parsing teks
-          # awalan "origin/". Dengan demikian remote "origin" tidak pernah masuk
-          # ke daftar sebagai nama branch, dan nama branch yang mengandung "/"
-          # (contoh: update/organizer, feature/login) tetap utuh serta terdeteksi
-          # secara dinamis, termasuk branch baru yang belum pernah ada lokal.
-          branches_to_sync=()
-          while IFS= read -r ref; do
-            [ -n "$ref" ] || continue
-            branches_to_sync+=("$ref")
-          done < <(
-            git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin/ \
-              | grep -v '^HEAD$' \
-              | grep -v '^main$' \
-              | grep -v '^origin$'
-          )
+          mapfile -t children < <(grep -v '^[[:space:]]*$' "$plan")
 
           success=()
           failed=()
+          skipped=()
 
-          for branch in "${branches_to_sync[@]}"; do
-            echo "::group::Sinkronisasi branch $branch"
+          for child in "${children[@]}"; do
+            echo "::group::Sinkronisasi $child"
 
-            # Buat/switch ke branch lokal. Jika belum ada lokal, buat dari remote.
-            if git rev-parse --verify "refs/heads/$branch" >/dev/null 2>&1; then
-              git checkout "$branch"
-            else
-              git checkout -b "$branch" "$remote/$branch"
+            # Verifikasi target tersedia di remote sebelum operasi.
+            if ! git ls-remote --exit-code --heads "$remote" "$child" >/dev/null 2>&1; then
+              echo "TARGET_NOT_FOUND_ON_REMOTE: $child"
+              failed+=("$child (tidak tersedia di remote)")
+              echo "::endgroup::"
+              continue
             fi
 
-            # Integrasikan perubahan terbaru main ke branch pengembangan
-            # menggunakan strategi merge (bukan reset / rebase paksa).
-            # Riwayat commit dan pekerjaan developer dipertahankan.
-            if git merge --no-edit "$remote/main"; then
-              git push "$remote" "$branch"
-              success+=("$branch")
-              echo "Berhasil disinkronkan: $branch"
+            # Checkout / buat branch lokal child dari remote.
+            if git rev-parse --verify "refs/heads/$child" >/dev/null 2>&1; then
+              git checkout "$child"
             else
-              # Konflik terdeteksi: batalkan merge, jangan ubah isi branch,
-              # jangan memilih versi secara sembarangan, laporkan untuk
-              # diselesaikan manual. Kegagalan satu branch tidak menghentikan
-              # branch lain.
+              git checkout -b "$child" "$remote/$child"
+            fi
+
+            # Up-to-date: source sudah merupakan ancestral dari child -> lewati.
+            if git merge-base --is-ancestor "$remote/$source" HEAD; then
+              echo "UP_TO_DATE: $child sudah menyertakan perubahan dari $source"
+              skipped+=("$child (sudah up-to-date)")
+              echo "::endgroup::"
+              continue
+            fi
+
+            # Integrasikan source ke child dengan merge biasa (bukan rebase /
+            # reset paksa / force push). Riwayat dan pekerjaan developer
+            # dipertahankan.
+            if git merge --no-edit "$remote/$source"; then
+              if git push "$remote" "$child"; then
+                success+=("$child")
+                echo "Berhasil disinkronkan: $child"
+              else
+                # Push ditolak karena remote berubah: fetch ulang dan periksa
+                # kondisi terbaru sebelum mencoba kembali. Tidak ada force push.
+                echo "Push ditolak untuk $child, fetch ulang..."
+                git fetch "$remote" --prune
+                # Periksa kondisi REMOTE target (bukan HEAD lokal, yang mungkin
+                # sudah memiliki commit merge yang belum berhasil di-push).
+                if git merge-base --is-ancestor "$remote/$source" "$remote/$child"; then
+                  echo "UP_TO_DATE_AFTER_FETCH: $child sudah menyertakan perubahan dari $source"
+                  skipped+=("$child (sudah up-to-date setelah fetch)")
+                else
+                  git merge --no-edit "$remote/$source" 2>/dev/null && {
+                    if git push "$remote" "$child"; then
+                      success+=("$child (berhasil setelah retry)")
+                      echo "Berhasil disinkronkan (retry): $child"
+                    else
+                      failed+=("$child (push ditolak setelah retry)")
+                      echo "::warning::Gagal push $child setelah retry"
+                    fi
+                  } || {
+                    git merge --abort 2>/dev/null || true
+                    git checkout "$child" -- . 2>/dev/null || true
+                    failed+=("$child (konflik setelah fetch ulang)")
+                    echo "::warning::Gagal disinkronkan: $child (konflik, perlu resolusi manual)"
+                  }
+                fi
+              fi
+            else
+              # Konflik: batalkan merge, jangan ubah isi branch, jangan memilih
+              # versi secara otomatis, laporkan untuk diselesaikan manual.
+              # Kegagalan satu child tidak menghentikan child lain.
               git merge --abort 2>/dev/null || true
-              git checkout "$branch" -- . 2>/dev/null || true
-              failed+=("$branch (konflik, perlu resolusi manual)")
-              echo "::warning::Gagal disinkronkan: $branch (konflik, perlu resolusi manual)"
+              git checkout "$child" -- . 2>/dev/null || true
+              failed+=("$child (konflik, perlu resolusi manual)")
+              echo "::warning::Gagal disinkronkan: $child (konflik, perlu resolusi manual)"
             fi
             echo "::endgroup::"
           done
 
-          # Kembali ke main agar workspace tidak tertinggal di branch lain
-          git checkout main
+          # Kembali ke source branch agar workspace tidak tertinggal di child.
+          git checkout "$source" 2>/dev/null || git checkout -B "$source" "$remote/$source" 2>/dev/null || true
 
           # Ringkasan hasil sinkronisasi
           {
-            echo "## Hasil Sinkronisasi Branch setelah Merge ke Main"
+            echo "## Hasil Sinkronisasi Branch (Direct Child Only)"
             echo ""
             echo "Pull Request yang memicu: #${{ github.event.pull_request.number }}"
-            echo "Branch tujuan: main"
+            echo "Source: $source"
             echo ""
+            if [ ${#skipped[@]} -gt 0 ]; then
+              echo "### Dilewati (sudah up-to-date)"
+              for b in "${skipped[@]}"; do echo "- $b"; done
+              echo ""
+            fi
             if [ ${#success[@]} -gt 0 ]; then
               echo "### Berhasil disinkronkan"
               for b in "${success[@]}"; do echo "- $b"; done
@@ -131,8 +222,13 @@ jobs:
               for b in "${failed[@]}"; do echo "- $b"; done
               echo ""
             fi
-            if [ ${#success[@]} -eq 0 ] && [ ${#failed[@]} -eq 0 ]; then
-              echo "Tidak ada branch pengembangan yang tersedia untuk disinkronkan."
+            if [ ${#skipped[@]} -eq 0 ] && [ ${#success[@]} -eq 0 ] && [ ${#failed[@]} -eq 0 ]; then
+              echo "Tidak ada direct child yang diproses."
               echo ""
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo "::error::Sinkronisasi gagal untuk ${#failed[@]} target; lihat ringkasan job."
+            exit 1
+          fi

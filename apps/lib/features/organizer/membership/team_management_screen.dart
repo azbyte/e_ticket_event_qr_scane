@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import '../../../core/validators/input_validator.dart';
 import '../../../routes/app_routes.dart';
 import '../../../services/organizer_membership/organizer_membership_service.dart';
+import '../../../services/organizer_operations/organizer_permission.dart';
 import '../shell/organizer_shell.dart';
 
 class TeamManagementScreen extends StatefulWidget {
