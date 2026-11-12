@@ -1,4 +1,6 @@
-/// Activity log for a support report (PRD section 4.10).
+/// Activity log for a support report (PRD sections 4.10, 6.8, FR-100).
+library;
+
 class ReportActivityModel {
   final String id;
   final String reportId;
@@ -43,4 +45,28 @@ class ReportActivityModel {
       'created_at': createdAt.toIso8601String(),
     };
   }
+
+  ReportActivityModel copyWith({
+    String? id,
+    String? reportId,
+    String? staffId,
+    String? staffName,
+    String? action,
+    String? note,
+    DateTime? createdAt,
+  }) {
+    return ReportActivityModel(
+      id: id ?? this.id,
+      reportId: reportId ?? this.reportId,
+      staffId: staffId ?? this.staffId,
+      staffName: staffName ?? this.staffName,
+      action: action ?? this.action,
+      note: note ?? this.note,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  String toString() =>
+      'ReportActivityModel(id: $id, action: $action, staff: $staffName, time: $createdAt)';
 }

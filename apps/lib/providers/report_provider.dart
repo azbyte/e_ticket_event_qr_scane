@@ -1,4 +1,4 @@
-/// Support report state provider (PRD section 4.10).
+/// Support report state provider (PRD sections 4.10, 6.8, FR-94 s.d. FR-101).
 ///
 /// Manages support tickets for attendees, admins, and support agents.
 library;
@@ -24,6 +24,11 @@ class ReportProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
+  void clearSelectedReport() {
+    _selectedReport = null;
+    notifyListeners();
+  }
+
   /// Loads reports with optional filters.
   Future<bool> loadReports({Map<String, dynamic>? query}) async {
     _setLoading(true);
@@ -31,6 +36,12 @@ class ReportProvider extends ChangeNotifier {
     try {
       final list = await _reportService.listReports(query: query);
       _reports = list.map((e) => SupportReportModel.fromJson(e)).toList();
+      if (_selectedReport != null) {
+        final match = _reports.where((r) => r.id == _selectedReport!.id);
+        if (match.isNotEmpty) {
+          _selectedReport = match.first;
+        }
+      }
       notifyListeners();
       return true;
     } catch (e) {
@@ -63,6 +74,8 @@ class ReportProvider extends ChangeNotifier {
     required String contactEmail,
     required String category,
     required String description,
+    String? subject,
+    String? priority,
     String? orderReference,
     String? userId,
   }) async {
@@ -72,7 +85,9 @@ class ReportProvider extends ChangeNotifier {
       final payload = {
         'contact_email': contactEmail,
         'category': category,
+        'subject': subject ?? 'Laporan Baru',
         'description': description,
+        'priority': priority ?? 'medium',
         'order_reference': orderReference ?? '',
         'user_id': userId,
       };
@@ -94,15 +109,107 @@ class ReportProvider extends ChangeNotifier {
     required String reportId,
     required String status,
     String? note,
+    String handledBy = 'Admin Platform',
   }) async {
     _setLoading(true);
     _error = null;
     try {
-      await _reportService.updateReportStatus(
+      final data = await _reportService.updateReportStatus(
         reportId: reportId,
         status: status,
         note: note,
+        handledBy: handledBy,
       );
+      if (data['success'] == false) {
+        _error = data['message']?.toString() ?? 'Gagal memperbarui status';
+        return false;
+      }
+      await loadReports();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Updates report priority (FR-98).
+  Future<bool> updatePriority({
+    required String reportId,
+    required String priority,
+    String handledBy = 'Admin Platform',
+  }) async {
+    _setLoading(true);
+    _error = null;
+    try {
+      final data = await _reportService.updateReportPriority(
+        reportId: reportId,
+        priority: priority,
+        handledBy: handledBy,
+      );
+      if (data['success'] == false) {
+        _error = data['message']?.toString() ?? 'Gagal memperbarui prioritas';
+        return false;
+      }
+      await loadReports();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Adds a public reply to reporter (FR-99).
+  Future<bool> addReply({
+    required String reportId,
+    required String message,
+    String senderName = 'Admin Platform',
+    String senderRole = 'Admin Platform',
+  }) async {
+    _setLoading(true);
+    _error = null;
+    try {
+      final data = await _reportService.addReply(
+        reportId: reportId,
+        message: message,
+        senderName: senderName,
+        senderRole: senderRole,
+      );
+      if (data['success'] == false) {
+        _error = data['message']?.toString() ?? 'Gagal mengirim balasan';
+        return false;
+      }
+      await loadReports();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Adds an internal note strictly hidden from reporter (FR-99, FR-101).
+  Future<bool> addInternalNote({
+    required String reportId,
+    required String note,
+    String authorName = 'Admin Platform',
+  }) async {
+    _setLoading(true);
+    _error = null;
+    try {
+      final data = await _reportService.addInternalNote(
+        reportId: reportId,
+        note: note,
+        authorName: authorName,
+      );
+      if (data['success'] == false) {
+        _error = data['message']?.toString() ?? 'Gagal menambahkan catatan internal';
+        return false;
+      }
       await loadReports();
       return true;
     } catch (e) {
