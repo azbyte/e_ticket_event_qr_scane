@@ -34,7 +34,7 @@ Jika ingin menjalankan pemeriksaan tanpa AI, gunakan perintah berikut di termina
 cd backend
 npm ci
 npm test
-node --test ../.github/scripts/validate-sync-config.test.js
+npm run test:sync-config
 npm run check
 npm run format:check
 npm run validate:skills
@@ -50,6 +50,39 @@ flutter test
 
 Semua perintah di atas adalah perintah yang sama dengan yang digunakan di `.github/workflows/quality.yml`.
 
+## Pemeriksaan otomatis sebelum push
+
+Aktifkan hook satu kali per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Siapkan dependency sebelum push pertama (`npm ci` dari `backend/` dan
+`flutter pub get` dari `apps/`). Hook menjalankan seluruh test dan pemeriksaan
+backend/Flutter pada setiap push. Hook memakai Node.js dan Flutter yang tersedia
+secara lokal; CI menggunakan Node.js 22 dan Flutter 3.47.9 stable. Hook dapat
+dilewati dengan `--no-verify`, sehingga pemeriksaan CI dan branch protection
+tetap menjadi gate yang otoritatif.
+
+## Memblokir merge di GitHub
+
+Workflow memberi status gabungan bernama `PR Quality Gate`. Maintainer harus
+mengaktifkannya sebagai required status check dalam branch protection/ruleset
+untuk setiap branch tujuan PR (minimal `main`), serta meminta branch PR
+diperbarui dengan base sebelum merge. Workflow sendiri tidak dapat mengaktifkan
+aturan repository tersebut.
+
+## Menangani konflik sinkronisasi branch
+
+Jika job sinkronisasi gagal karena konflik, buka ringkasan job untuk melihat
+branch dan daftar file yang berkonflik. Jalankan perintah `fetch`, `switch`,
+dan `merge` yang tercantum di ringkasan pada clone lokal. Selesaikan perubahan
+teks dengan meninjau kedua sisi; untuk binary atau modify/delete, pilih secara
+sengaja apakah file dipertahankan atau dihapus. Stage hasilnya, lanjutkan merge,
+jalankan PR Quality Gate, lalu push branch tersebut. Jangan menganggap konflik
+otomatis telah diperbaiki hanya karena workflow mencatatnya.
+
 ## Daftar Pemeriksaan yang Dilakukan
 
 ### Backend
@@ -57,7 +90,7 @@ Semua perintah di atas adalah perintah yang sama dengan yang digunakan di `.gith
 |---|---|
 | Dependency install | `npm ci` |
 | Backend tests | `npm test` |
-| Sync config validator tests | `node --test ../.github/scripts/validate-sync-config.test.js` |
+| Sync config validator tests | `npm run test:sync-config` |
 | Syntax check | `npm run check` |
 | Format check | `npm run format:check` |
 | Validate skills | `npm run validate:skills` |

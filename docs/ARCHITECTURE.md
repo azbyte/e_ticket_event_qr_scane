@@ -26,9 +26,17 @@ Perubahan UI perlu mempertahankan mock dan integrasi API yang terpisah.
 3. Gunakan fixtures sintetis; tidak perlu Supabase untuk unit/widget test.
 4. Frontend, dari `apps/`: `flutter pub get`, `flutter analyze`, `flutter test`.
 5. Backend, dari `backend/`: `npm ci`, `npm test`,
-   `node --test ../.github/scripts/validate-sync-config.test.js`,
+   `npm run test:sync-config`,
    `npm run check`, `npm run format:check`, `npm run validate:skills`.
 6. Tinjau diff, periksa secret dan dokumentasi, catat hasil/batasan.
+
+Git hook `.githooks/pre-push` dapat diaktifkan per clone dengan
+`git config core.hooksPath .githooks`. Hook menjalankan seluruh pemeriksaan kode
+sebelum push dan memerlukan dependency lokal yang telah disiapkan. GitHub Actions
+menjalankan quality workflow pada semua push dan pull request; maintainer harus
+menjadikan status `PR Quality Gate` required melalui branch protection/ruleset
+agar kegagalan memblokir merge. Konflik sinkronisasi branch dilaporkan dengan
+daftar file dan instruksi resolusi pada ringkasan job.
 
 `npm run lint` adalah alias kompatibilitas untuk `npm run check` dan tidak
 dijalankan terpisah oleh CI. `npm run format:check` memeriksa trailing

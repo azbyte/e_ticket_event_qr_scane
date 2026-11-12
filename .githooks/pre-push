@@ -1,0 +1,25 @@
+#!/bin/sh
+set -eu
+
+root="$(git rev-parse --show-toplevel)"
+cd "$root"
+
+echo "Running the repository quality checks before push..."
+npm --prefix backend test
+npm --prefix backend run test:sync-config
+npm --prefix backend run check
+npm --prefix backend run format:check
+npm --prefix backend run validate:skills
+
+(
+  cd apps
+  if command -v cmd.exe >/dev/null 2>&1 && command -v flutter.bat >/dev/null 2>&1; then
+    cmd.exe /c flutter.bat analyze --no-fatal-infos
+    cmd.exe /c flutter.bat test
+  else
+    flutter analyze --no-fatal-infos
+    flutter test
+  fi
+)
+
+echo "All pre-push checks passed."
