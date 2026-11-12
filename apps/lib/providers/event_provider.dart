@@ -28,11 +28,10 @@ class EventProvider extends ChangeNotifier {
   EventProvider({
     OrganizerEventRepository? repository,
     EventService? eventService,
-    TicketTypeService? ticketTypeService,
+    this._ticketTypeService,
     String? ownerId,
   }) : _repository = repository ?? MockOrganizerEventRepository.shared(),
        _eventService = eventService,
-       _ticketTypeService = ticketTypeService,
        _isPublicProvider = eventService != null,
        _ownerId = ownerId ?? OrganizerEventFixtures.demoOwnerId;
 
