@@ -13,22 +13,27 @@ BAGIAN 1 – INFORMASI DAN KONDISI PROYEK
 1.1 Kondisi proyek
 - Pengembangan saat ini berfokus pada frontend Flutter di folder `apps`.
 - Repository juga memiliki `backend/` dan sebagian service Flutter dapat
-  melakukan request HTTP; keberadaannya bukan persetujuan untuk mengubahnya.
-  Ruang lingkup pembagian ini hanya UI/prototype Flutter di `apps` dengan data
-  dummy lokal, tanpa endpoint, database, migration, atau integrasi backend.
-- Jangan menganggap seluruh alur yang sudah ada sebagai mock/offline. Developer
-  harus memastikan alur yang dikerjakan pada pembagian ini memakai fixture/mock
-  yang terpisah dari widget dan tidak mengirim request jaringan.
+  melakukan request HTTP; jangan gunakan jalur tersebut untuk tugas ini.
+  Ruang lingkup saat ini hanya tampilan/prototipe UI Flutter di `apps` dengan
+  data dummy lokal. Backend dan integrasinya dikerjakan pada tahap berikutnya.
+- Semua interaksi yang ditampilkan (form, filter, status, CRUD, moderasi,
+  pembayaran, scanner/check-in) hanya simulasi lokal untuk demonstrasi; tidak
+  melakukan request jaringan, menyimpan data sungguhan, atau menjalankan proses
+  bisnis nyata. Data boleh berupa fixture statis atau state sementara.
 - Model, provider, service, konstanta, dan route di `apps/lib` termasuk scope
   hanya jika tercantum sebagai file milik developer pada Bagian 4; file shared
   yang tidak tercantum sebagai milik developer harus diperlakukan read-only.
-- Struktur frontend yang dikerjakan harus memungkinkan integrasi backend pada
-  tahap berikutnya (pisahkan service/repository dari widget, gunakan model
-  DTO, pola loading/error/empty/success).
+- Provider/service/mock adapter hanya dibuat atau diubah jika diperlukan oleh
+  tampilan dan hanya boleh mengelola data dummy lokal; tidak membuat integrasi
+  backend atau persistence. Pertahankan state loading/error/empty/success untuk
+  demonstrasi UI.
 
 1.2 Batasan pengerjaan
 - Implementasi tugas ini diizinkan hanya pada frontend `apps` dan file yang
   developer miliki sesuai Bagian 4, termasuk test domain masing-masing.
+- Fokus implementasi adalah tampilan dan interaksi demonstratif berbasis data
+  dummy. Tidak mengimplementasikan backend, endpoint/API, HTTP, database,
+  persistence, pembayaran/auth/check-in nyata, atau logika bisnis produksi.
 - Jangan mengubah `backend/`, migration/database, endpoint/API, konfigurasi
   global, dependency, generated files, atau role schema sebagai bagian dari
   prototype ini.
@@ -43,7 +48,8 @@ BAGIAN 1 – INFORMASI DAN KONDISI PROYEK
 
 1.3 Tujuan akhir dokumen
 - Menyusun pembagian tugas yang jelas untuk 3 developer sehingga seluruh fitur
-  Role Organizer dan Role Admin sesuai `prd.md` selesai pada frontend `apps`.
+  tampilan Role Organizer dan Role Admin sesuai `prd.md` tersedia sebagai
+  prototipe UI di frontend `apps`, memakai data dummy saja.
 - Setiap pekerjaan memiliki satu developer penanggung jawab (OWNER), tanpa
   tanggung jawab tumpang tindih antara Developer 2 dan Developer 3.
 - Kontrak integrasi antardeveloper jelas terdefinisi.
@@ -394,11 +400,13 @@ b) Selesaikan navigasi dan routing Organizer:
    - Pastikan OrganizerShell (sidebar/bottom nav) mencakup semua menu Organizer.
 c) Selesaikan state management:
    - Klarifikasi pemakaian OrganizerProvider vs EventProvider; pilih satu
-     sumber kebenaran per domain atau dokumentasikan pemisahan dengan jelas.
-   - Pastikan loading, empty, error, success state di semua screen Organizer.
+     sumber state dummy per domain atau dokumentasikan pemisahan dengan jelas;
+     tidak membangun integrasi backend.
+   - Pastikan loading, empty, error, success state demonstratif di semua screen
+     Organizer.
 d) Selesaikan data dummy:
-   - Pastikan data dummy konsisten di semua mock service/repository Organizer
-     (ID event, ticket type, attendee, staff, order, transaksi paket).
+   - Pastikan fixture/state lokal pada tampilan Organizer konsisten (ID event,
+     ticket type, attendee, staff, order, transaksi paket).
 e) Pertahankan OrganizerPermission tunggal di
    services/organizer_operations/organizer_permission.dart; tidak ada enum
    kedua yang perlu disatukan.
@@ -466,27 +474,30 @@ Ruang lingkup: Modul Admin yang berhubungan dengan monetisasi, pengaturan
 platform, dan audit. Tidak tumpang tindih dengan Developer 2.
 
 Pekerjaan spesifik (membuat file BARU, tidak mengubah file Developer 2):
+Seluruhnya adalah screen/prototipe dengan data dummy. Service/provider hanya
+dibuat atau diubah sebagai mock lokal jika dibutuhkan UI; jangan membuat
+integrasi/backend atau persistence.
 a) Manajemen Paket Layanan Admin (FR-74, FR-75, FR-76):
    - Buat package_management_screen.dart: daftar paket, buat/edit paket,
      aktifkan/nonaktifkan, arsipkan paket, atur fitur dan batas penggunaan.
-   - Buat service dan provider untuk paket (data dummy).
+   - Gunakan fixture lokal; service/provider mock hanya jika dibutuhkan UI.
 b) Manajemen Langganan Organizer dari sisi Admin (FR-79):
    - Buat subscription_management_screen.dart: lihat semua langganan,
      filter paket/status, lihat riwayat, lihat pembayaran paket.
-   - Buat service dan provider untuk langganan (data dummy).
+   - Gunakan fixture lokal; service/provider mock hanya jika dibutuhkan UI.
 c) Transaksi dan Pendapatan (FR-89 s.d. FR-93):
    - Buat transaction_revenue_screen.dart: daftar transaksi tiket dan
      pembayaran paket, pisahkan gross ticket sales dari platform revenue,
      tampilkan komisi sebagai snapshot, pisahkan pendapatan paket dan komisi.
-   - Buat service dan provider untuk transaksi (data dummy).
+   - Gunakan fixture lokal; service/provider mock hanya jika dibutuhkan UI.
 d) Pengaturan Platform (FR-102, FR-103):
    - Buat admin_settings_screen.dart: kelola pengaturan platform,
      catat perubahan komisi/biaya.
-   - Buat service dan provider untuk pengaturan (data dummy).
+   - Gunakan fixture lokal; service/provider mock hanya jika dibutuhkan UI.
 e) Audit Log (FR-104, FR-105, FR-106):
    - Buat audit_log_screen.dart: lihat audit log, cari dan filter,
      tampilkan tindakan administratif penting.
-   - Buat service dan provider untuk audit log (data dummy).
+   - Gunakan fixture lokal; service/provider mock hanya jika dibutuhkan UI.
 f) Halaman Profil Admin (/admin/profile):
    - Buat admin_profile_screen.dart. Konstanta /admin/profile sudah ada, tetapi
      generator aktif saat ini belum mengarahkannya ke screen Admin yang tepat.
@@ -676,6 +687,10 @@ BAGIAN 4 – DAFTAR KEPEMILIKAN FILE
 --------------------------------------------------------------------------------
 BAGIAN 5 – KONTRAK INTEGRASI ANTARDEVELOPER
 --------------------------------------------------------------------------------
+
+Semua model, service/provider signature, dan istilah "API" di bagian ini
+merujuk pada interface internal Flutter/mock untuk tampilan, bukan endpoint
+backend. Gunakan hanya data dummy lokal dan jangan mengirim request jaringan.
 
 [INTEGRATION CONTRACT: ROLE_AUTH_AND_USER_MODEL]
 1. Modul yang saling berhubungan: Auth (Developer 1) <-> Semua role
@@ -945,8 +960,9 @@ BAGIAN 5 – KONTRAK INTEGRASI ANTARDEVELOPER
      awalan yang konsisten per domain.
    - Nomor laporan dan token status harus aman dan unik.
 5. Fungsi dan parameter yang harus konsisten:
-   - Semua mock service harus menggunakan AppConfig.mockMode dan Future.delayed
-     untuk simulasi jaringan.
+   - Jika tampilan memerlukan mock adapter, adapter hanya memakai fixture/data
+     lokal dan tidak boleh fallback ke endpoint. Delay opsional hanya untuk
+     memperlihatkan state loading; tidak mensimulasikan request jaringan nyata.
    - Data dummy harus memuat loading, empty, error, success state.
 6. Aturan penggunaan oleh developer lain:
    - Developer 2 dan 3 tidak boleh mengubah data dummy milik Developer 1.
