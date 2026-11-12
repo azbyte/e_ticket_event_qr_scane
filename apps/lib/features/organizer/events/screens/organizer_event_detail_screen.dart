@@ -70,7 +70,8 @@ class _OrganizerEventDetailScreenState
   void initState() {
     super.initState();
     _ownsProvider = widget.provider == null;
-    _provider = widget.provider ??
+    _provider =
+        widget.provider ??
         EventProvider(
           repository: widget.repository,
           ownerId: widget.ownerId ?? OrganizerEventFixtures.demoOwnerId,
@@ -121,7 +122,10 @@ class _OrganizerEventDetailScreenState
     }
   }
 
-  Future<void> _submitForReview(EventModel event, {required bool resubmit}) async {
+  Future<void> _submitForReview(
+    EventModel event, {
+    required bool resubmit,
+  }) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -130,8 +134,8 @@ class _OrganizerEventDetailScreenState
           resubmit
               ? 'Event akan dikirim ulang ke moderator beserta perbaikan Anda.'
               : 'Event akan dikirim ke moderator. Status berubah menjadi '
-                  '"Menunggu moderasi" dan tidak dapat diubah sampai ada '
-                  'keputusan (simulasi).',
+                    '"Menunggu moderasi" dan tidak dapat diubah sampai ada '
+                    'keputusan (simulasi).',
         ),
         actions: <Widget>[
           TextButton(
@@ -147,8 +151,10 @@ class _OrganizerEventDetailScreenState
     );
     if (confirmed != true) return;
 
-    final updated =
-        await _provider.submitForReview(event.id, resubmit: resubmit);
+    final updated = await _provider.submitForReview(
+      event.id,
+      resubmit: resubmit,
+    );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -190,8 +196,7 @@ class _OrganizerEventDetailScreenState
     );
     if (decision == null) return;
 
-    final updated =
-        await _provider.simulateModeration(event.id, decision);
+    final updated = await _provider.simulateModeration(event.id, decision);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -236,7 +241,9 @@ class _OrganizerEventDetailScreenState
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(_provider.actionError ?? 'Gagal menghapus draft.')),
+      SnackBar(
+        content: Text(_provider.actionError ?? 'Gagal menghapus draft.'),
+      ),
     );
   }
 
@@ -270,7 +277,7 @@ class _OrganizerEventDetailScreenState
         content: Text(
           ok
               ? 'Kategori "${type.name}" '
-                  '${type.isActive ? 'dinonaktifkan' : 'diaktifkan'}.'
+                    '${type.isActive ? 'dinonaktifkan' : 'diaktifkan'}.'
               : (_provider.actionError ?? 'Gagal mengubah status kategori.'),
         ),
       ),
@@ -337,69 +344,69 @@ class _OrganizerEventDetailScreenState
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-        listenable: _provider,
-        builder: (context, _) {
-          final event = _provider.selectedEvent;
-          final extraTabs = widget.extraTabs;
-          final tabs = <OrganizerEventExtraTab>[
-            OrganizerEventExtraTab(
-              label: 'Ringkasan',
-              builder: (_) => _buildRingkasan(event!),
-            ),
-            OrganizerEventExtraTab(
-              label: 'Informasi',
-              builder: (_) => _buildInformasi(event!),
-            ),
-            OrganizerEventExtraTab(
-              label: 'Tiket',
-              builder: (_) => _buildTiket(event!),
-            ),
-            ...extraTabs,
-          ];
+    listenable: _provider,
+    builder: (context, _) {
+      final event = _provider.selectedEvent;
+      final extraTabs = widget.extraTabs;
+      final tabs = <OrganizerEventExtraTab>[
+        OrganizerEventExtraTab(
+          label: 'Ringkasan',
+          builder: (_) => _buildRingkasan(event!),
+        ),
+        OrganizerEventExtraTab(
+          label: 'Informasi',
+          builder: (_) => _buildInformasi(event!),
+        ),
+        OrganizerEventExtraTab(
+          label: 'Tiket',
+          builder: (_) => _buildTiket(event!),
+        ),
+        ...extraTabs,
+      ];
 
-          return DefaultTabController(
-            length: tabs.length,
-            child: Scaffold(
-              appBar: AppBar(
-                title: Text(
-                  event?.title ?? 'Detail Event',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                actions: <Widget>[
-                  if (event != null) ...<Widget>[
-                    IconButton(
-                      tooltip: 'Pratinjau publik',
-                      onPressed: () => _openPreview(event),
-                      icon: const Icon(Icons.visibility_outlined),
-                    ),
-                    IconButton(
-                      tooltip: 'Salin tautan registrasi',
-                      onPressed: () => _copyLink(event),
-                      icon: const Icon(Icons.link),
-                    ),
-                    if (event.canBeEdited)
-                      IconButton(
-                        tooltip: 'Edit event',
-                        onPressed: () => _openForm(event),
-                        icon: const Icon(Icons.edit_outlined),
-                      ),
-                  ],
-                ],
-                bottom: event == null
-                    ? null
-                    : TabBar(
-                        isScrollable: true,
-                        tabs: <Widget>[
-                          for (final tab in tabs) Tab(text: tab.label),
-                        ],
-                      ),
-              ),
-              body: _buildBody(event, tabs),
+      return DefaultTabController(
+        length: tabs.length,
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(
+              event?.title ?? 'Detail Event',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-          );
-        },
+            actions: <Widget>[
+              if (event != null) ...<Widget>[
+                IconButton(
+                  tooltip: 'Pratinjau publik',
+                  onPressed: () => _openPreview(event),
+                  icon: const Icon(Icons.visibility_outlined),
+                ),
+                IconButton(
+                  tooltip: 'Salin tautan registrasi',
+                  onPressed: () => _copyLink(event),
+                  icon: const Icon(Icons.link),
+                ),
+                if (event.canBeEdited)
+                  IconButton(
+                    tooltip: 'Edit event',
+                    onPressed: () => _openForm(event),
+                    icon: const Icon(Icons.edit_outlined),
+                  ),
+              ],
+            ],
+            bottom: event == null
+                ? null
+                : TabBar(
+                    isScrollable: true,
+                    tabs: <Widget>[
+                      for (final tab in tabs) Tab(text: tab.label),
+                    ],
+                  ),
+          ),
+          body: _buildBody(event, tabs),
+        ),
       );
+    },
+  );
 
   Widget _buildBody(EventModel? event, List<OrganizerEventExtraTab> tabs) {
     if (_provider.hasAccessDenied) {
@@ -417,9 +424,7 @@ class _OrganizerEventDetailScreenState
       return const OrganizerLoadingView(message: 'Memuat detail event...');
     }
     return TabBarView(
-      children: <Widget>[
-        for (final tab in tabs) tab.builder(context),
-      ],
+      children: <Widget>[for (final tab in tabs) tab.builder(context)],
     );
   }
 
@@ -436,13 +441,11 @@ class _OrganizerEventDetailScreenState
                 Expanded(
                   child: Text(
                     title,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleSmall
+                    style: Theme.of(context).textTheme.titleSmall
                         ?.copyWith(fontWeight: FontWeight.w700),
                   ),
                 ),
-                if (trailing != null) trailing,
+                ?trailing,
               ],
             ),
             const SizedBox(height: 10),
@@ -454,36 +457,36 @@ class _OrganizerEventDetailScreenState
   }
 
   Widget _infoRow(IconData icon, String label, String? value) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Icon(icon, size: 18, color: Colors.black45),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    label,
-                    style:
-                        const TextStyle(fontSize: 11.5, color: Colors.black45),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    (value == null || value.trim().isEmpty) ? '-' : value,
-                    style: const TextStyle(fontSize: 13.5),
-                  ),
-                ],
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Icon(icon, size: 18, color: Colors.black45),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                label,
+                style: const TextStyle(fontSize: 11.5, color: Colors.black45),
               ),
-            ),
-          ],
+              const SizedBox(height: 2),
+              Text(
+                (value == null || value.trim().isEmpty) ? '-' : value,
+                style: const TextStyle(fontSize: 13.5),
+              ),
+            ],
+          ),
         ),
-      );
+      ],
+    ),
+  );
 
   Widget _buildRingkasan(EventModel event) {
     final summary = _provider.summary;
-    final period = '${core.DateUtils.formatDateTime(event.startDateTime)} - '
+    final period =
+        '${core.DateUtils.formatDateTime(event.startDateTime)} - '
         '${core.DateUtils.formatDateTime(event.endDateTime)} '
         '(${OrganizerTimeZones.label(event.timeZone)})';
 
@@ -491,7 +494,8 @@ class _OrganizerEventDetailScreenState
       padding: const EdgeInsets.all(16),
       children: <Widget>[
         const OrganizerInfoBanner(
-          message: 'Seluruh angka pada halaman ini berasal dari fixture lokal '
+          message:
+              'Seluruh angka pada halaman ini berasal dari fixture lokal '
               '(simulasi Tahap 0). Tidak ada order, pembayaran, atau check-in '
               'sungguhan.',
         ),
@@ -551,8 +555,9 @@ class _OrganizerEventDetailScreenState
             ),
             OrganizerStatTile(
               label: 'Sisa kuota',
-              value:
-                  OrganizerFormatters.thousands(summary?.ticketsRemaining ?? 0),
+              value: OrganizerFormatters.thousands(
+                summary?.ticketsRemaining ?? 0,
+              ),
               icon: Icons.inventory_2_outlined,
               color: Colors.blueGrey,
             ),
@@ -587,8 +592,11 @@ class _OrganizerEventDetailScreenState
               if (event.needsPhysicalLocation)
                 _infoRow(Icons.place_outlined, 'Alamat', event.location),
               if (event.needsOnlineUrl)
-                _infoRow(Icons.videocam_outlined, 'Tautan online',
-                    event.onlineUrl),
+                _infoRow(
+                  Icons.videocam_outlined,
+                  'Tautan online',
+                  event.onlineUrl,
+                ),
               _infoRow(Icons.contacts_outlined, 'Kontak', event.contactInfo),
             ],
           ),
@@ -624,9 +632,9 @@ class _OrganizerEventDetailScreenState
                         Text(
                           event.registrationUrlIsDemo
                               ? 'Tautan demo: event belum dipublikasikan ke '
-                                  'server mana pun.'
+                                    'server mana pun.'
                               : 'Tautan publik simulasi untuk event yang sudah '
-                                  'disetujui.',
+                                    'disetujui.',
                           style: const TextStyle(
                             fontSize: 11.5,
                             color: Colors.black45,
@@ -688,7 +696,6 @@ class _OrganizerEventDetailScreenState
               ],
             ),
           ),
-
       ],
     );
   }
@@ -711,14 +718,15 @@ class _OrganizerEventDetailScreenState
         children: <Widget>[
           Row(
             children: <Widget>[
-              const Icon(Icons.feedback_outlined,
-                  size: 18, color: Colors.orange),
+              const Icon(
+                Icons.feedback_outlined,
+                size: 18,
+                color: Colors.orange,
+              ),
               const SizedBox(width: 8),
               Text(
                 'Catatan revisi moderator',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleSmall
+                style: Theme.of(context).textTheme.titleSmall
                     ?.copyWith(fontWeight: FontWeight.w700),
               ),
             ],
@@ -745,7 +753,8 @@ class _OrganizerEventDetailScreenState
           const Padding(
             padding: EdgeInsets.only(bottom: 12),
             child: OrganizerInfoBanner(
-              message: 'Perubahan penting pada event yang sudah tayang dapat '
+              message:
+                  'Perubahan penting pada event yang sudah tayang dapat '
                   'memerlukan moderasi ulang. Kebijakan detail belum final, '
                   'sehingga status tidak diubah otomatis oleh prototipe ini.',
               color: AppTheme.warningColor,
@@ -760,10 +769,16 @@ class _OrganizerEventDetailScreenState
               _infoRow(Icons.title, 'Nama event', event.title),
               _infoRow(Icons.label_outline, 'Kategori', event.category),
               _infoRow(
-                  Icons.description_outlined, 'Deskripsi', event.description),
+                Icons.description_outlined,
+                'Deskripsi',
+                event.description,
+              ),
               _infoRow(Icons.image_outlined, 'Poster', event.posterUrl),
               _infoRow(
-                  Icons.storefront_outlined, 'Penyelenggara', event.organizerName),
+                Icons.storefront_outlined,
+                'Penyelenggara',
+                event.organizerName,
+              ),
               _infoRow(Icons.contacts_outlined, 'Kontak', event.contactInfo),
             ],
           ),
@@ -798,7 +813,11 @@ class _OrganizerEventDetailScreenState
             children: <Widget>[
               _infoRow(Icons.category_outlined, 'Format', event.formatLabel),
               _infoRow(Icons.place_outlined, 'Alamat', event.location),
-              _infoRow(Icons.videocam_outlined, 'Tautan online', event.onlineUrl),
+              _infoRow(
+                Icons.videocam_outlined,
+                'Tautan online',
+                event.onlineUrl,
+              ),
             ],
           ),
         ),
@@ -827,7 +846,11 @@ class _OrganizerEventDetailScreenState
                 ],
               ),
               const SizedBox(height: 10),
-              _infoRow(Icons.info_outline, 'Informasi publik', event.publicInfo),
+              _infoRow(
+                Icons.info_outline,
+                'Informasi publik',
+                event.publicInfo,
+              ),
               const Text(
                 'Batas waktu pembayaran mengikuti kebijakan platform yang belum '
                 'ditetapkan pada prototipe ini.',
@@ -846,33 +869,33 @@ class _OrganizerEventDetailScreenState
           )
         else
           OrganizerInfoBanner(
-            message: 'Event berstatus ${event.statusLabel} tidak dapat diubah. '
+            message:
+                'Event berstatus ${event.statusLabel} tidak dapat diubah. '
                 'Tunggu keputusan moderator atau hubungi admin.',
             color: AppTheme.warningColor,
             icon: Icons.lock_clock,
           ),
-
       ],
     );
   }
 
   Widget _buildTicketChip(String label) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(fontSize: 11.5, color: Colors.black54),
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: Colors.black.withValues(alpha: 0.04),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Text(
+      label,
+      style: const TextStyle(fontSize: 11.5, color: Colors.black54),
+    ),
+  );
 
   Widget _buildTicketTile(EventModel event, TicketTypeModel type) {
     final period = type.salesStart == null && type.salesEnd == null
         ? 'Tanpa batas periode'
         : '${core.DateUtils.formatDate(type.salesStart)} - '
-            '${core.DateUtils.formatDate(type.salesEnd)}';
+              '${core.DateUtils.formatDate(type.salesEnd)}';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -916,9 +939,7 @@ class _OrganizerEventDetailScreenState
             const SizedBox(height: 8),
             Text(
               OrganizerFormatters.rupiah(type.price),
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
+              style: Theme.of(context).textTheme.titleMedium
                   ?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
@@ -974,15 +995,15 @@ class _OrganizerEventDetailScreenState
             Expanded(
               child: Text(
                 'Kategori tiket (${types.length})',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleSmall
+                style: Theme.of(context).textTheme.titleSmall
                     ?.copyWith(fontWeight: FontWeight.w700),
               ),
             ),
             FilledButton.tonalIcon(
               key: const Key('ticket-add-button'),
-              onPressed: event.canBeEdited ? () => _openTicketForm(event) : null,
+              onPressed: event.canBeEdited
+                  ? () => _openTicketForm(event)
+                  : null,
               icon: const Icon(Icons.add, size: 18),
               label: const Text('Tambah'),
             ),
@@ -990,7 +1011,8 @@ class _OrganizerEventDetailScreenState
         ),
         const SizedBox(height: 12),
         const OrganizerInfoBanner(
-          message: 'Harga pada order lama disimpan sebagai snapshot, sehingga '
+          message:
+              'Harga pada order lama disimpan sebagai snapshot, sehingga '
               'perubahan harga hanya berlaku untuk order baru. Kuota tidak '
               'boleh lebih kecil dari jumlah terjual + tertahan.',
         ),
@@ -1020,8 +1042,9 @@ class _OrganizerEventDetailScreenState
                   ),
                   const SizedBox(height: 12),
                   FilledButton(
-                    onPressed:
-                        event.canBeEdited ? () => _openTicketForm(event) : null,
+                    onPressed: event.canBeEdited
+                        ? () => _openTicketForm(event)
+                        : null,
                     child: const Text('Tambah kategori tiket'),
                   ),
                 ],
