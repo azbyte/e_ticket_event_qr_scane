@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/check_in_provider.dart';
 import '../../../services/organizer_membership/organizer_membership_service.dart';
+import '../../../services/organizer_operations/organizer_permission.dart';
 import '../../check_in/screens/check_in_history_screen.dart';
 import '../../check_in/screens/check_in_screen.dart';
 import '../../reports/screens/report_list_screen.dart';

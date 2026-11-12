@@ -47,11 +47,11 @@ jobs:
       - name: Run backend tests
         run: npm test
 
+      - name: Test sync config validator
+        run: node --test ../.github/scripts/validate-sync-config.test.js
+
       - name: Check backend syntax
         run: npm run check
-
-      - name: Run ESLint
-        run: npm run lint
 
       - name: Check formatting
         run: npm run format:check

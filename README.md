@@ -6,16 +6,19 @@
 - Arsitektur dan workflow lokal: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 - Kontribusi dan pemeriksaan sebelum PR: [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - Hasil audit tools dan penerapan: [`LAPORAN_ANALISIS_DAN_PENERAPAN_TOOLS.txt`](LAPORAN_ANALISIS_DAN_PENERAPAN_TOOLS.txt).
-- GitHub Actions memeriksa backend tests/syntax dan Flutter analyze/widget tests
-  pada push dan pull request.
+- GitHub Actions memeriksa backend tests/syntax, test validator sinkronisasi
+  branch, dan Flutter analyze/widget tests pada push dan pull request.
+
+Versi tool yang dipakai CI: Node.js 22 dan Flutter 3.47.9 stable. Gunakan versi
+tersebut untuk hasil lokal yang konsisten.
 
 Backend checks:
 
 ```bash
 cd backend
 npm test
+node --test ../.github/scripts/validate-sync-config.test.js
 npm run check
-npm run lint
 npm run format:check
 ```
 
@@ -36,9 +39,9 @@ flutter test
 
 `flutter analyze` lokal saat ini mengeluarkan temuan info yang sudah ada di
 kode; CI menggunakan `--no-fatal-infos`, tetapi tetap gagal untuk error/warning.
-Backend `lint`/`format:check` memakai pemeriksaan lokal tanpa dependency tambahan;
-lint saat ini memeriksa syntax, sedangkan format check memeriksa trailing
-whitespace dan validitas JSON—belum setara dengan ESLint/Prettier.
+`npm run lint` tetap tersedia sebagai alias kompatibilitas untuk `npm run check`
+dan tidak dijalankan terpisah oleh CI. `npm run format:check` memeriksa trailing
+whitespace dan validitas JSON—belum setara dengan formatter penuh.
 
 ## Akun demo (mode dummy)
 

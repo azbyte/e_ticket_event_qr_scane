@@ -5,30 +5,7 @@
 library;
 
 import '../../core/config/app_config.dart';
-
-/// Granular permissions for event staff per PRD Section 2.3 & FR-60.
-enum OrganizerPermission {
-  viewEvent('VIEW_EVENT', 'Melihat detail event'),
-  viewParticipants('VIEW_PARTICIPANTS', 'Melihat daftar peserta'),
-  assistRegistration('ASSIST_REGISTRATION', 'Melakukan registrasi dibantu'),
-  viewOrders('VIEW_ORDERS', 'Melihat pesanan tiket'),
-  scanTicket('SCAN_TICKET', 'Memindai QR tiket'),
-  checkInTicket('CHECK_IN_TICKET', 'Melakukan konfirmasi check-in'),
-  viewScanHistory('VIEW_SCAN_HISTORY', 'Melihat riwayat scan'),
-  viewReports('VIEW_REPORTS', 'Melihat laporan event'),
-  exportParticipants('EXPORT_PARTICIPANTS', 'Mengekspor data peserta');
-
-  const OrganizerPermission(this.code, this.label);
-  final String code;
-  final String label;
-
-  static OrganizerPermission? fromCode(String code) {
-    for (final p in values) {
-      if (p.code == code) return p;
-    }
-    return null;
-  }
-}
+import '../organizer_operations/organizer_permission.dart';
 
 /// Event member entity representing Owner or Staff membership on an event.
 class EventMemberModel {

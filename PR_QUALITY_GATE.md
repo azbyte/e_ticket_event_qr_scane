@@ -34,8 +34,8 @@ Jika ingin menjalankan pemeriksaan tanpa AI, gunakan perintah berikut di termina
 cd backend
 npm ci
 npm test
+node --test ../.github/scripts/validate-sync-config.test.js
 npm run check
-npm run lint
 npm run format:check
 npm run validate:skills
 ```
@@ -57,8 +57,8 @@ Semua perintah di atas adalah perintah yang sama dengan yang digunakan di `.gith
 |---|---|
 | Dependency install | `npm ci` |
 | Backend tests | `npm test` |
+| Sync config validator tests | `node --test ../.github/scripts/validate-sync-config.test.js` |
 | Syntax check | `npm run check` |
-| Lint | `npm run lint` |
 | Format check | `npm run format:check` |
 | Validate skills | `npm run validate:skills` |
 

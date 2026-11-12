@@ -1,0 +1,23 @@
+# Sumber kebenaran tunggal (Single Source of Truth) untuk hierarki
+# source-child sinkronisasi branch GitHub.
+#
+# Sumber yang menerima Pull Request berhasil di-merge akan disinkronkan
+# HANYA ke direct child yang terdaftar di bawahnya (direct-child-only).
+# Tidak ada sinkronisasi rekursif, cucu, parent, ancestor, atau sibling.
+#
+# Aturan konfigurasi:
+# - Satu child hanya boleh memiliki satu parent.
+# - Satu source boleh memiliki banyak child.
+# - Child boleh menjadi source untuk child berikutnya.
+# - Dilarang self-reference, duplicate child, multiple parent, dan siklus.
+# - Branch 'main' adalah source/root dan tidak boleh menjadi target child.
+# - Relasi harus tidak ambigu.
+#
+# Penambahan, penghapusan, dan perubahan relasi branch dilakukan hanya
+# melalui berkas ini, tanpa mengubah workflow, skrip, atau skill.
+
+sources:
+  main:
+    - Developer-1
+    - Developer-2
+    - Developer-3

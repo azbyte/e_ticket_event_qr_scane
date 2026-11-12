@@ -32,8 +32,9 @@ sesuai; file skill berada di `.agents/skills/<nama>/SKILL.md`.
 - Perubahan struktur instruksi, skills, tooling atau editor: skill `workspace`.
 - UI Flutter dan design system: `flutter-ui`; endpoint/security/data backend:
   `backend-api`.
-- Bug yang perlu direproduksi: `debug`; review diff: `review`; paket validasi/
-  penerimaan: `verification`; pemeriksaan kualitas sebelum PR: `pr-quality-gate`.
+- Bug yang perlu direproduksi: `debug`; review diff: `review`; pemeriksaan
+  kualitas sebelum PR (termasuk mode targeted berdasarkan dampak perubahan):
+  `pr-quality-gate`.
 
 Requirement sumber adalah `prd.md` serta migration/source aktual; PRD UI prototype
 memiliki batas cakupan tersendiri. Jika permintaan menyentuh backend, cek konteks
@@ -59,9 +60,12 @@ dan mandat terkini—jangan menganggap roadmap PRD sebagai approval otomatis.
 
 1. Periksa status/diff Git, baca modul terdampak, PRD, dokumentasi dan skill terkait.
 2. Rumuskan perubahan sekecil mungkin; perubahan tooling bukan alasan menambah fitur.
-3. Jalankan pemeriksaan relevan: `cd apps && flutter analyze && flutter test`;
-   `cd backend && npm test`, `npm run check`, `npm run lint`,
-   `npm run format:check`; validasi skill lewat `npm run validate:skills`.
+3. Jalankan pemeriksaan relevan dari `apps/`: `flutter analyze`, `flutter test`;
+   dari `backend/`: `npm test`, `npm run check`, `npm run format:check`, dan
+   `npm run validate:skills`. Uji validator sinkronisasi dengan
+   `node --test ../.github/scripts/validate-sync-config.test.js` dari `backend/`.
+   `npm run lint` adalah alias `npm run check`, jadi tidak perlu menjalankan
+   keduanya.
 4. Tinjau diff dan catat PASS/FAIL/BLOCKED/NOT RUN. Bedakan analisis statis,
    unit/widget test, integrasi Supabase/API dan validasi UI/perangkat.
 5. Perbarui dokumentasi bila fakta atau cara kerja berubah. Jangan mengklaim

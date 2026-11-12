@@ -6,10 +6,10 @@
 3. Jangan sertakan `.env`, secret, data pribadi, build output atau perubahan
    dependency yang tidak diperlukan. Jangan mengubah API/database/fitur bisnis
    dalam PR tooling.
-4. Jalankan `npm run validate:skills` setelah mengubah instruksi/skill; jalankan
-   pemeriksaan frontend/backend yang relevan menurut `README.md` dan
-   laporkan perintah serta hasilnya. Untuk bug, sertakan langkah reproduksi dan
-   regression test jika memungkinkan.
+4. Jalankan `npm --prefix backend run validate:skills` dari root setelah
+   mengubah instruksi/skill; jalankan pemeriksaan frontend/backend yang relevan
+   menurut `README.md` dan laporkan perintah serta hasilnya. Untuk bug, sertakan
+   langkah reproduksi dan regression test jika memungkinkan.
 5. Sebelum membuat PR, jalankan PR Quality Gate melalui AI di VS Code
    (skill `pr-quality-gate`) atau jalankan pemeriksaan secara manual menurut
    `PR_QUALITY_GATE.md`. Pastikan semua pemeriksaan wajib berhasil.
