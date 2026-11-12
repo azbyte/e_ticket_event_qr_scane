@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:e_ticket_event_qr_scane/services/organizer_membership/organizer_membership_service.dart';
+import 'package:e_ticket_event_qr_scane/services/organizer_operations/organizer_permission.dart';
 
 void main() {
   group('OrganizerMembershipService & Granular Permissions (FR-60–65)', () {

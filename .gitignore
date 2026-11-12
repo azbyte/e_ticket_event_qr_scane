@@ -1,0 +1,56 @@
+# =============================================================================
+# Root .gitignore — Repository E-Ticket Event & QR Scanner
+# Melengkapi (tidak mengganti) .gitignore di apps/ dan backend/
+# =============================================================================
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Editor / IDE ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- Logs ---
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Environment (secret terlindungi) ---
+.env
+.env.*
+!.env.example
+
+# --- Dependency directories (sudah diabaikan oleh .gitignore subproyek) ---
+node_modules/
+.pnpm/
+.dart_tool/
+.pub-cache/
+
+# --- Build output (sudah diabaikan oleh .gitignore subproyek) ---
+build/
+dist/
+.coverage/
+.next/
+out/
+
+# --- Flutter/Dart specific (melengkapi apps/.gitignore) ---
+.flutter-plugins-dependencies
+.widget_preview/
+
+# --- OS-specific build artifacts ---
+android/app/debug/
+android/app/profile/
+android/app/release/
+
+# =============================================================================
+# Catatan:
+# - File sumber (*.dart, *.js, *.md, *.json, *.yaml, *.yml, *.txt) TIDAK diabaikan.
+# - Konfigurasi penting (pubspec.yaml, package.json, analysis_options.yaml,
+#   .editorconfig, AGENTS.md, SKILL.md, PRD.md, README.md, dll.) TIDAK diabaikan.
+# - .env di backend/ sudah tercakup di backend/.gitignore dan pola .env di atas.
+# =============================================================================
