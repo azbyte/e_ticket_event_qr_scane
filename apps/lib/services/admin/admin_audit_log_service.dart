@@ -17,7 +17,7 @@ class AdminAuditLogService {
       actorRole: 'ADMIN',
       action: 'EVENT_APPROVED',
       entityType: 'EVENT',
-      entityId: 'evt-001',
+      entityId: 'evt-1001',
       details: 'Menyetujui event "Tech Innovation Summit 2026" untuk tayang publik.',
       metadata: {'eventTitle': 'Tech Innovation Summit 2026'},
     ),

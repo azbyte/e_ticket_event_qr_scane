@@ -58,7 +58,7 @@ void main() {
 
     test('inviteStaff creates pending member with 7-day expiration', () async {
       final newStaff = await service.inviteStaff(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         eventTitle: 'Tech Innovation Summit 2026',
         email: 'tester.crew@event.id',
         name: 'Tester Crew',
@@ -79,7 +79,7 @@ void main() {
 
     test('updatePermissions updates staff permission set successfully', () async {
       final success = await service.updatePermissions(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         memberId: 'mem-002',
         permissions: {
           OrganizerPermission.viewEvent,
@@ -90,7 +90,7 @@ void main() {
       );
 
       expect(success, isTrue);
-      final members = await service.listMembers('evt-001');
+      final members = await service.listMembers('evt-1001');
       final budi = members.firstWhere((m) => m.id == 'mem-002');
       expect(budi.permissions.contains(OrganizerPermission.viewReports), isTrue);
     });
@@ -107,7 +107,7 @@ void main() {
 
     test('revokeAccess removes staff membership', () async {
       final invited = await service.inviteStaff(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         eventTitle: 'Tech Innovation Summit 2026',
         email: 'to.revoke@event.id',
         name: 'Revoke Candidate',
@@ -115,12 +115,12 @@ void main() {
       );
 
       final revokeOk = await service.revokeAccess(
-        eventId: 'evt-001',
+        eventId: 'evt-1001',
         memberId: invited.id,
       );
       expect(revokeOk, isTrue);
 
-      final members = await service.listMembers('evt-001');
+      final members = await service.listMembers('evt-1001');
       expect(members.any((m) => m.id == invited.id), isFalse);
     });
   });

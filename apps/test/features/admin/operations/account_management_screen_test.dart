@@ -4,16 +4,17 @@ import 'package:provider/provider.dart';
 
 import 'package:e_ticket_event_qr_scane/features/admin/screens/account_management_screen.dart';
 import 'package:e_ticket_event_qr_scane/providers/auth_provider.dart';
+import 'package:e_ticket_event_qr_scane/services/admin/admin_audit_log_service.dart';
 import 'package:e_ticket_event_qr_scane/services/auth/auth_service.dart';
 
 class FakeAdminAuthService extends AuthService {
   @override
   Future<Map<String, dynamic>> me() async => {
-        'id': 'usr-admin',
-        'name': 'Super Admin',
-        'email': 'admin@event.com',
-        'role': 'admin',
-      };
+    'id': 'usr-admin',
+    'name': 'Super Admin',
+    'email': 'admin@event.com',
+    'role': 'admin',
+  };
 }
 
 void main() {
@@ -29,8 +30,9 @@ void main() {
   }
 
   group('AccountManagementScreen Widget Tests (FR-87, FR-88)', () {
-    testWidgets('Menampilkan tab Semua Akun, Organizer, dan Participant',
-        (tester) async {
+    testWidgets('Menampilkan tab Semua Akun, Organizer, dan Participant', (
+      tester,
+    ) async {
       final auth = AuthProvider(FakeAdminAuthService());
       await auth.restoreSession();
 
@@ -51,8 +53,9 @@ void main() {
       expect(find.text('Budi Santoso'), findsOneWidget);
     });
 
-    testWidgets('Pencarian akun menyaring data berdasarkan kata kunci',
-        (tester) async {
+    testWidgets('Pencarian akun menyaring data berdasarkan kata kunci', (
+      tester,
+    ) async {
       final auth = AuthProvider(FakeAdminAuthService());
       await auth.restoreSession();
 
@@ -68,8 +71,9 @@ void main() {
       expect(find.text('Budi Santoso'), findsNothing);
     });
 
-    testWidgets('Penangguhan akun wajib mengisi alasan (FR-88)',
-        (tester) async {
+    testWidgets('Penangguhan akun wajib mengisi alasan (FR-88)', (
+      tester,
+    ) async {
       final auth = AuthProvider(FakeAdminAuthService());
       await auth.restoreSession();
 
@@ -82,7 +86,7 @@ void main() {
 
       // Tap tombol tangguhkan pertama
       await tester.tap(suspendButtons.first);
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 300));
 
       // Dialog penangguhan muncul
       expect(find.textContaining('Alasan Penangguhan Akun *'), findsOneWidget);
@@ -90,22 +94,38 @@ void main() {
       // Coba klik konfirmasi tanpa alasan
       final confirmBtn = find.widgetWithText(FilledButton, 'Tangguhkan Akun');
       await tester.tap(confirmBtn);
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 300));
 
       // Validasi error tampil
       expect(find.text('Alasan penangguhan wajib diisi.'), findsOneWidget);
 
       // Isi alasan yang valid
       final reasonField = find.byType(TextFormField);
-      await tester.enterText(reasonField, 'Pelanggaran syarat ketentuan penjualan tiket.');
-      await tester.pumpAndSettle();
+      await tester.enterText(
+        reasonField,
+        'Pelanggaran syarat ketentuan penjualan tiket.',
+      );
+      await tester.pump(const Duration(milliseconds: 300));
 
       // Konfirmasi penangguhan
       await tester.tap(confirmBtn);
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 300));
 
       // SnackBar konfirmasi tampil
       expect(find.textContaining('berhasil ditangguhkan'), findsOneWidget);
+
+      final auditLogs = await tester.runAsync(
+        () => AdminAuditLogService.instance.getAuditLogs(
+          actionFilter: 'ACCOUNT_SUSPENDED',
+          entityFilter: 'USER',
+          searchQuery: 'usr-org-001',
+        ),
+      );
+      expect(auditLogs, hasLength(1));
+      expect(
+        auditLogs!.single.reason,
+        'Pelanggaran syarat ketentuan penjualan tiket.',
+      );
     });
   });
 }

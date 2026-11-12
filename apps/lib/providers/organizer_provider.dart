@@ -1,7 +1,8 @@
-/// Organizer state provider (PRD sections 4.2, 4.8, 4.9).
+/// Legacy API-backed Organizer provider retained for the later integration phase.
 ///
-/// State management for organizer dashboard, event management,
-/// attendee monitoring, and staff delegation.
+/// The current local Organizer prototype uses `EventProvider` and its mock
+/// repository for event and ticket-type state; this provider is not its source
+/// of truth.
 library;
 
 import 'package:flutter/foundation.dart';

@@ -80,7 +80,7 @@ class OrganizerMembershipService {
   static final List<EventMemberModel> _mockMembers = [
     EventMemberModel(
       id: 'mem-001',
-      eventId: 'evt-001',
+      eventId: 'evt-1001',
       eventTitle: 'Tech Innovation Summit 2026',
       userId: 'usr-org-01',
       email: 'organizer@techsummit.id',
@@ -94,7 +94,7 @@ class OrganizerMembershipService {
     ),
     EventMemberModel(
       id: 'mem-002',
-      eventId: 'evt-001',
+      eventId: 'evt-1001',
       eventTitle: 'Tech Innovation Summit 2026',
       userId: 'usr-staff-01',
       email: 'budi.santoso@eventcrew.id',
@@ -114,7 +114,7 @@ class OrganizerMembershipService {
     ),
     EventMemberModel(
       id: 'mem-003',
-      eventId: 'evt-001',
+      eventId: 'evt-1001',
       eventTitle: 'Tech Innovation Summit 2026',
       userId: 'usr-staff-02',
       email: 'siti.rahma@eventcrew.id',
@@ -133,7 +133,7 @@ class OrganizerMembershipService {
     ),
     EventMemberModel(
       id: 'mem-004',
-      eventId: 'evt-001',
+      eventId: 'evt-1001',
       eventTitle: 'Tech Innovation Summit 2026',
       userId: '',
       email: 'dimas.panitia@eventcrew.id',

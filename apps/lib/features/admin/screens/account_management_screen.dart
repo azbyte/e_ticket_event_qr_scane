@@ -8,13 +8,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../providers/auth_provider.dart';
+import '../../../services/admin/admin_audit_log_service.dart';
 
 /// Model internal akun platform untuk prototipe UI Admin.
 class PlatformAccountItem {
   final String id;
   final String name;
   final String email;
-  final String role; // 'admin' | 'organizer' | 'participant'
+  final String role; // 'admin' | 'organizer' | 'attendee'
   final String? organizationName;
   final String? activePlan;
   final int eventCount;
@@ -128,7 +129,7 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
       id: 'usr-part-001',
       name: 'Budi Santoso',
       email: 'budi@example.com',
-      role: 'participant',
+      role: 'attendee',
       orderCount: 3,
       joinedAt: DateTime(2025, 4, 15),
       isDisabled: false,
@@ -137,7 +138,7 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
       id: 'usr-part-002',
       name: 'Dewi Lestari',
       email: 'dewi.lestari@example.com',
-      role: 'participant',
+      role: 'attendee',
       orderCount: 1,
       joinedAt: DateTime(2025, 6, 20),
       isDisabled: false,
@@ -146,7 +147,7 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
       id: 'usr-part-003',
       name: 'Siti Nurhaliza',
       email: 'siti.nur@example.com',
-      role: 'participant',
+      role: 'attendee',
       orderCount: 2,
       joinedAt: DateTime(2025, 7, 5),
       isDisabled: false,
@@ -260,22 +261,40 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
     );
   }
 
-  void _performSuspend(PlatformAccountItem account, String reason) {
+  Future<void> _performSuspend(
+    PlatformAccountItem account,
+    String reason,
+  ) async {
     final idx = _mockAccounts.indexWhere((a) => a.id == account.id);
-    if (idx != -1) {
-      setState(() {
-        _mockAccounts[idx] = _mockAccounts[idx].copyWith(
-          isDisabled: true,
-          suspensionReason: reason,
-        );
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Akun "${account.name}" berhasil ditangguhkan. Alasan dicatat ke AuditLog.'),
-          backgroundColor: Colors.red.shade800,
-        ),
+    if (idx == -1) return;
+
+    final actor = context.read<AuthProvider>().user;
+    await AdminAuditLogService.instance.logAction(
+      actorId: actor?.id ?? actor?.email ?? 'usr-admin-01',
+      actorName: actor?.name ?? 'Super Admin',
+      action: 'ACCOUNT_SUSPENDED',
+      entityType: 'USER',
+      entityId: account.id,
+      reason: reason,
+      details: 'Menangguhkan akun ${account.email}.',
+      metadata: {'email': account.email, 'role': account.role},
+    );
+    if (!mounted) return;
+
+    setState(() {
+      _mockAccounts[idx] = _mockAccounts[idx].copyWith(
+        isDisabled: true,
+        suspensionReason: reason,
       );
-    }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Akun "${account.name}" berhasil ditangguhkan. Alasan dicatat ke AuditLog.',
+        ),
+        backgroundColor: Colors.red.shade800,
+      ),
+    );
   }
 
   void _showReactivateDialog(PlatformAccountItem account) {
@@ -316,23 +335,34 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.green),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
               final idx = _mockAccounts.indexWhere((a) => a.id == account.id);
-              if (idx != -1) {
-                setState(() {
-                  _mockAccounts[idx] = _mockAccounts[idx].copyWith(
-                    isDisabled: false,
-                    clearSuspensionReason: true,
-                  );
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Akun "${account.name}" telah diaktifkan kembali.'),
-                    backgroundColor: Colors.green.shade800,
-                  ),
+              if (idx == -1) return;
+
+              final actor = context.read<AuthProvider>().user;
+              await AdminAuditLogService.instance.logAction(
+                actorId: actor?.id ?? actor?.email ?? 'usr-admin-01',
+                actorName: actor?.name ?? 'Super Admin',
+                action: 'ACCOUNT_REACTIVATED',
+                entityType: 'USER',
+                entityId: account.id,
+                details: 'Mengaktifkan kembali akun ${account.email}.',
+                metadata: {'email': account.email, 'role': account.role},
+              );
+              if (!mounted) return;
+              setState(() {
+                _mockAccounts[idx] = _mockAccounts[idx].copyWith(
+                  isDisabled: false,
+                  clearSuspensionReason: true,
                 );
-              }
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Akun "${account.name}" telah diaktifkan kembali.'),
+                  backgroundColor: Colors.green.shade800,
+                ),
+              );
             },
             child: const Text('Aktifkan Kembali'),
           ),
@@ -416,7 +446,7 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
                 _buildAccountsList('organizer', currentUserId),
 
                 // Tab 3: Participant
-                _buildAccountsList('participant', currentUserId),
+                _buildAccountsList('attendee', currentUserId),
               ],
             ),
           ),
@@ -521,7 +551,7 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
                       ),
                     ],
                   ),
-                ] else if (item.role == 'participant') ...[
+                ] else if (item.role == 'attendee') ...[
                   Row(
                     children: [
                       Icon(Icons.confirmation_number_outlined, size: 14, color: Colors.grey.shade600),
@@ -615,7 +645,7 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(4)),
       child: Text(
-        role.toUpperCase(),
+        role == 'attendee' ? 'PARTICIPANT' : role.toUpperCase(),
         style: TextStyle(color: fg, fontSize: 9, fontWeight: FontWeight.bold),
       ),
     );

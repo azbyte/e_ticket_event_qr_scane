@@ -11,7 +11,7 @@ void main() {
       MaterialApp(
         home: AttendeeListScreen(
           initialMembershipContext: OrganizerMembershipContext.staff(
-            eventId: 'evt-001',
+            eventId: 'evt-1001',
             userName: 'Staf Pintu Masuk',
             permissions: {
               OrganizerPermission.scanTicket,

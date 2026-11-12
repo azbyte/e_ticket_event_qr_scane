@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:e_ticket_event_qr_scane/services/organizer_plans/organizer_plans_service.dart';
 import 'package:e_ticket_event_qr_scane/services/organizer_support/organizer_support_service.dart';
+import 'package:e_ticket_event_qr_scane/services/report/report_service.dart';
 
 void main() {
   group('OrganizerPlansService Tests (FR-76–79)', () {
@@ -50,26 +51,27 @@ void main() {
 
     setUp(() {
       supportService = OrganizerSupportService.instance;
+      ReportService.resetMockData();
     });
 
-    test(
-      'Creates complaint with RPT-ORG ticket format and status token',
-      () async {
-        final complaint = await supportService.submitComplaint(
-          organizerId: 'org-001',
-          email: 'organizer@techsummit.id',
-          category: 'Moderasi Event',
-          subject: 'Permohonan peninjauan kembali banner event',
-          description:
-              'Banner event telah diperbarui sesuai panduan komunitas.',
-        );
+    test('Creates complaint in the shared Admin report store', () async {
+      final complaint = await supportService.submitComplaint(
+        organizerId: 'org-001',
+        email: 'organizer@techsummit.id',
+        category: 'Moderasi Event',
+        subject: 'Permohonan peninjauan kembali banner event',
+        description: 'Banner event telah diperbarui sesuai panduan komunitas.',
+      );
+      final adminReport = await ReportService().getReport(complaint.id);
 
-        expect(complaint.ticketNumber.startsWith('RPT-ORG-'), isTrue);
-        expect(complaint.statusToken.isNotEmpty, isTrue);
-        expect(complaint.status, equals('open'));
-        expect(complaint.category, equals('Moderasi Event'));
-      },
-    );
+      expect(complaint.ticketNumber.startsWith('RPT-2026-'), isTrue);
+      expect(complaint.statusToken.isNotEmpty, isTrue);
+      expect(complaint.status, equals('open'));
+      expect(complaint.category, equals('Moderasi Event'));
+      expect(adminReport['id'], complaint.id);
+      expect(adminReport['ticket_number'], complaint.ticketNumber);
+      expect(adminReport['status_token'], complaint.statusToken);
+    });
 
     test('Lists only complaints owned by the requested organizer', () async {
       final complaints = await supportService.listComplaints('org-001');
@@ -77,6 +79,37 @@ void main() {
       expect(complaints.every((c) => c.organizerId == 'org-001'), isTrue);
       expect(await supportService.listComplaints('org-002'), isEmpty);
     });
+
+    test(
+      'Admin replies and status changes appear in the Organizer view',
+      () async {
+        final before = (await supportService.listComplaints('org-001')).single;
+        final reportService = ReportService();
+
+        await reportService.addReply(
+          reportId: before.id,
+          message: 'Dokumen sudah diverifikasi.',
+        );
+        await reportService.updateReportStatus(
+          reportId: before.id,
+          status: 'resolved',
+        );
+        await reportService.addInternalNote(
+          reportId: before.id,
+          note: 'Catatan internal admin.',
+        );
+
+        final after = (await supportService.listComplaints('org-001')).single;
+        expect(after.id, before.id);
+        expect(after.status, 'resolved');
+        expect(
+          after.replies.any(
+            (reply) => reply.message == 'Dokumen sudah diverifikasi.',
+          ),
+          isTrue,
+        );
+      },
+    );
 
     test('Loads FAQ guidance items', () {
       final faqs = supportService.getFaqs();

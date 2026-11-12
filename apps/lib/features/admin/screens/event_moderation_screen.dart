@@ -7,112 +7,22 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../../models/event/event_model.dart';
-import '../../../providers/organizer_provider.dart';
+import '../../../services/admin/admin_audit_log_service.dart';
 import '../../../services/organizer_events/organizer_event_contract.dart';
+import '../../../services/organizer_events/organizer_event_repository.dart';
+import '../../../services/organizer_events/mock_organizer_event_repository.dart';
 
 class EventModerationScreen extends StatefulWidget {
   const EventModerationScreen({
     super.key,
-    this.organizerProvider,
+    this.repository,
   });
 
-  final OrganizerProvider? organizerProvider;
-
-  static List<EventModel> _generateDefaultEvents() => [
-    EventModel(
-      id: 'evt-001',
-      organizerId: 'org-001',
-      organizerName: 'PT Event Kreasi Nusantara',
-      title: 'Tech Innovation Summit 2026',
-      description:
-          'Konferensi teknologi terbesar tahun 2026 yang menghadirkan pembicara pakar AI, Cloud, dan Cybersecurity.',
-      category: 'Teknologi',
-      startDateTime: DateTime.now().add(const Duration(days: 14)),
-      endDateTime: DateTime.now().add(const Duration(days: 15)),
-      location: 'Grand Ballroom Hotel Indonesia Kempinski, Jakarta',
-      eventType: 'hybrid',
-      contactInfo: 'organizer@techsummit.id',
-      status: OrganizerEventStatus.published,
-      isPublic: true,
-      publicUrl: 'https://demo.eticket.local/e/evt-001',
-      createdAt: DateTime.now().subtract(const Duration(days: 10)),
-    ),
-    EventModel(
-      id: 'evt-002',
-      organizerId: 'org-001',
-      organizerName: 'PT Event Kreasi Nusantara',
-      title: 'Workshop Flutter & Backend Modern',
-      description:
-          'Pelatihan intensif 2 hari membangun arsitektur aplikasi mobile enterprise skala besar.',
-      category: 'Seminar',
-      startDateTime: DateTime.now().add(const Duration(days: 21)),
-      endDateTime: DateTime.now().add(const Duration(days: 22)),
-      location: 'Auditorium Fasilkom UI, Depok',
-      eventType: 'offline',
-      contactInfo: 'workshop@devcommunity.id',
-      status: OrganizerEventStatus.pendingReview,
-      isPublic: false,
-      createdAt: DateTime.now().subtract(const Duration(days: 2)),
-    ),
-    EventModel(
-      id: 'evt-003',
-      organizerId: 'org-001',
-      organizerName: 'PT Event Kreasi Nusantara',
-      title: 'Festival Musik Indie Nusantara',
-      description:
-          'Pentas seni dan pertunjukan musik musisi independen dari berbagai penjuru tanah air.',
-      category: 'Musik',
-      startDateTime: DateTime.now().add(const Duration(days: 35)),
-      endDateTime: DateTime.now().add(const Duration(days: 36)),
-      location: 'Parkir Timur Senayan, Jakarta Pusat',
-      eventType: 'offline',
-      contactInfo: 'kontak@festmusik.id',
-      status: OrganizerEventStatus.pendingReview,
-      isPublic: false,
-      createdAt: DateTime.now().subtract(const Duration(days: 3)),
-    ),
-    EventModel(
-      id: 'evt-004',
-      organizerId: 'org-002',
-      organizerName: 'Komunitas Startup Indonesia',
-      title: 'Startup Pitch & Funding Night',
-      description:
-          'Ajang temu founder startup dengan angel investor dan venture capital ternama.',
-      category: 'Komunitas',
-      startDateTime: DateTime.now().add(const Duration(days: 40)),
-      endDateTime: DateTime.now().add(const Duration(days: 40, hours: 5)),
-      location: 'Co-working Space Kuningan, Jakarta',
-      eventType: 'offline',
-      contactInfo: 'pitch@startupindo.id',
-      status: OrganizerEventStatus.revisionRequested,
-      reviewNote: 'Mohon cantumkan perincian kriteria startup dan kontak konfirmasi legalitas.',
-      isPublic: false,
-      createdAt: DateTime.now().subtract(const Duration(days: 5)),
-    ),
-    EventModel(
-      id: 'evt-005',
-      organizerId: 'org-003',
-      organizerName: 'CV Tiket Gelap Fiktif',
-      title: 'Konser Musisi Internasional Rahasia',
-      description: 'Konser artis luar negeri tanpa izin edar resmi dari otoritas terkait.',
-      category: 'Musik',
-      startDateTime: DateTime.now().add(const Duration(days: 60)),
-      endDateTime: DateTime.now().add(const Duration(days: 60, hours: 4)),
-      location: 'Lokasi Rahasia',
-      eventType: 'offline',
-      contactInfo: 'rahasia@event.id',
-      status: OrganizerEventStatus.suspended,
-      reviewNote: 'Ditangguhkan admin: Penyelenggara tidak memiliki surat izin keramaian resmi.',
-      isPublic: false,
-      createdAt: DateTime.now().subtract(const Duration(days: 8)),
-    ),
-  ];
-
-  static List<EventModel> _internalMockEvents = _generateDefaultEvents();
+  final OrganizerEventRepository? repository;
 
   /// Reset mock events ke kondisi default awal (berguna untuk testing).
   static void resetMockEvents() {
-    _internalMockEvents = _generateDefaultEvents();
+    MockOrganizerEventRepository.resetShared();
   }
 
   @override
@@ -120,15 +30,19 @@ class EventModerationScreen extends StatefulWidget {
 }
 
 class _EventModerationScreenState extends State<EventModerationScreen> {
-  late final OrganizerProvider? _externalProvider;
+  late final OrganizerEventRepository _repository;
+  List<EventModel> _events = const <EventModel>[];
+  bool _isLoading = true;
+  String? _loadError;
   String _filter = OrganizerEventStatus.pendingReview;
   final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _externalProvider = widget.organizerProvider;
-    _externalProvider?.loadEvents();
+    _repository =
+        widget.repository ?? MockOrganizerEventRepository.shared();
+    _loadEvents();
   }
 
   @override
@@ -137,29 +51,57 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
     super.dispose();
   }
 
-  List<EventModel> _getCurrentEvents() {
-    // If external provider has loaded events, use them; otherwise use mock fallback
-    final provider = _externalProvider;
-    if (provider != null && provider.events.isNotEmpty) {
-      return provider.events;
+  Future<void> _loadEvents() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    try {
+      final events = await _repository.listPlatformEvents();
+      if (mounted) setState(() => _events = events);
+    } on Exception catch (error) {
+      if (mounted) setState(() => _loadError = error.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
-    return EventModerationScreen._internalMockEvents;
   }
 
-  Future<void> _updateEventState(EventModel updated) async {
-    final idx = EventModerationScreen._internalMockEvents.indexWhere((e) => e.id == updated.id);
-    if (idx != -1) {
-      EventModerationScreen._internalMockEvents[idx] = updated;
-    } else {
-      EventModerationScreen._internalMockEvents.insert(0, updated);
+  Future<void> _updateEventState(
+    EventModel event, {
+    required String status,
+    required String action,
+    required String successMessage,
+    String? note,
+  }) async {
+    try {
+      await _repository.simulatePlatformModeration(
+        eventId: event.id,
+        status: status,
+        note: note,
+      );
+      await AdminAuditLogService.instance.logAction(
+        actorId: 'admin@event.com',
+        actorName: 'Super Admin',
+        action: action,
+        entityType: 'EVENT',
+        entityId: event.id,
+        reason: note,
+        details: 'Keputusan simulasi untuk event "${event.title}".',
+        metadata: {'title': event.title, 'status': status},
+      );
+      await _loadEvents();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(successMessage)),
+        );
+      }
+    } on Exception catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Perubahan event gagal disimpan: $error')),
+        );
+      }
     }
-
-    final provider = _externalProvider;
-    if (provider != null) {
-      await provider.updateEvent(updated);
-    }
-
-    if (mounted) setState(() {});
   }
 
   void _showApproveDialog(EventModel event) {
@@ -183,22 +125,13 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
             style: FilledButton.styleFrom(backgroundColor: Colors.green),
             onPressed: () async {
               Navigator.pop(ctx);
-              final updated = event.copyWith(
+              await _updateEventState(
+                event,
                 status: OrganizerEventStatus.approved,
-                isPublic: true,
-                publicUrl: event.publicUrl ?? 'https://demo.eticket.local/e/${event.id}',
-                clearReviewNote: true,
-                updatedAt: DateTime.now(),
+                action: 'EVENT_APPROVED',
+                successMessage:
+                    'Event "${event.title}" telah disetujui & tayang.',
               );
-              await _updateEventState(updated);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Event "${event.title}" telah disetujui & tayang.'),
-                    backgroundColor: Colors.green.shade800,
-                  ),
-                );
-              }
             },
             child: const Text('Setujui & Publikasikan'),
           ),
@@ -257,21 +190,14 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
             onPressed: () async {
               if (!formKey.currentState!.validate()) return;
               Navigator.pop(ctx);
-              final updated = event.copyWith(
+              await _updateEventState(
+                event,
                 status: OrganizerEventStatus.revisionRequested,
-                reviewNote: noteController.text.trim(),
-                isPublic: false,
-                updatedAt: DateTime.now(),
+                action: 'EVENT_REVISION_REQUESTED',
+                successMessage:
+                    'Permintaan revisi dikirim ke penyelenggara "${event.title}".',
+                note: noteController.text.trim(),
               );
-              await _updateEventState(updated);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Permintaan revisi dikirim ke penyelenggara "${event.title}".'),
-                    backgroundColor: Colors.orange.shade900,
-                  ),
-                );
-              }
             },
             child: const Text('Kirim Catatan Revisi'),
           ),
@@ -329,22 +255,13 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
             onPressed: () async {
               if (!formKey.currentState!.validate()) return;
               Navigator.pop(ctx);
-              final updated = event.copyWith(
+              await _updateEventState(
+                event,
                 status: OrganizerEventStatus.rejected,
-                reviewNote: reasonController.text.trim(),
-                isPublic: false,
-                clearPublicUrl: true,
-                updatedAt: DateTime.now(),
+                action: 'EVENT_REJECTED',
+                successMessage: 'Event "${event.title}" telah ditolak.',
+                note: reasonController.text.trim(),
               );
-              await _updateEventState(updated);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Event "${event.title}" telah ditolak.'),
-                    backgroundColor: Colors.red.shade800,
-                  ),
-                );
-              }
             },
             child: const Text('Tolak Permohonan'),
           ),
@@ -403,21 +320,14 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
             onPressed: () async {
               if (!formKey.currentState!.validate()) return;
               Navigator.pop(ctx);
-              final updated = event.copyWith(
+              await _updateEventState(
+                event,
                 status: OrganizerEventStatus.suspended,
-                reviewNote: reasonController.text.trim(),
-                isPublic: false,
-                updatedAt: DateTime.now(),
+                action: 'EVENT_SUSPENDED',
+                successMessage:
+                    'Event "${event.title}" telah ditangguhkan.',
+                note: reasonController.text.trim(),
               );
-              await _updateEventState(updated);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Event "${event.title}" telah ditangguhkan.'),
-                    backgroundColor: Colors.red.shade800,
-                  ),
-                );
-              }
             },
             child: const Text('Tangguhkan Event'),
           ),
@@ -447,21 +357,13 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
             style: FilledButton.styleFrom(backgroundColor: Colors.green),
             onPressed: () async {
               Navigator.pop(ctx);
-              final updated = event.copyWith(
+              await _updateEventState(
+                event,
                 status: OrganizerEventStatus.approved,
-                isPublic: true,
-                clearReviewNote: true,
-                updatedAt: DateTime.now(),
+                action: 'EVENT_REACTIVATED',
+                successMessage:
+                    'Penangguhan event "${event.title}" berhasil dibuka.',
               );
-              await _updateEventState(updated);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Penangguhan event "${event.title}" berhasil dibuka.'),
-                    backgroundColor: Colors.green.shade800,
-                  ),
-                );
-              }
             },
             child: const Text('Buka Penangguhan'),
           ),
@@ -559,7 +461,7 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final allEvents = _getCurrentEvents();
+    final allEvents = _events;
 
     final query = _searchController.text.trim().toLowerCase();
     final events = allEvents.where((e) {
@@ -593,10 +495,7 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
           IconButton(
             tooltip: 'Segarkan',
             icon: const Icon(Icons.refresh),
-            onPressed: () {
-              _externalProvider?.loadEvents();
-              setState(() {});
-            },
+            onPressed: _loadEvents,
           ),
         ],
       ),
@@ -675,7 +574,23 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
 
           // Events List
           Expanded(
-            child: events.isEmpty
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _loadError != null
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text('Gagal memuat event.'),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: _loadEvents,
+                              child: const Text('Coba lagi'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : events.isEmpty
                 ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,

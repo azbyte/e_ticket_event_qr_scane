@@ -13,7 +13,7 @@ class AdminRevenueService {
     AdminTicketTransactionModel(
       id: 'trx-tkt-001',
       orderId: 'ord-1001',
-      eventId: 'evt-001',
+      eventId: 'evt-1001',
       eventTitle: 'Tech Innovation Summit 2026',
       organizerId: 'org-001',
       organizerName: 'PT Event Nusantara',
@@ -29,7 +29,7 @@ class AdminRevenueService {
     AdminTicketTransactionModel(
       id: 'trx-tkt-002',
       orderId: 'ord-1002',
-      eventId: 'evt-001',
+      eventId: 'evt-1001',
       eventTitle: 'Tech Innovation Summit 2026',
       organizerId: 'org-001',
       organizerName: 'PT Event Nusantara',
@@ -77,7 +77,7 @@ class AdminRevenueService {
     AdminTicketTransactionModel(
       id: 'trx-tkt-005',
       orderId: 'ord-1005',
-      eventId: 'evt-001',
+      eventId: 'evt-1001',
       eventTitle: 'Tech Innovation Summit 2026',
       organizerId: 'org-001',
       organizerName: 'PT Event Nusantara',
@@ -138,15 +138,36 @@ class AdminRevenueService {
   /// Calculates aggregated revenue summary for platform monitoring (FR-89 s.d. FR-93).
   Future<AdminRevenueSummary> getRevenueSummary({String period = 'all'}) async {
     await Future<void>.delayed(const Duration(milliseconds: 150));
+    return getRevenueSummarySnapshot(period: period);
+  }
 
-    // Filter paid ticket transactions
-    final paidTickets = _ticketTransactions.where((t) => t.status == 'PAID').toList();
-    final grossTicketSales = paidTickets.fold<double>(0.0, (acc, t) => acc + t.grossAmount);
-    final ticketCommission = paidTickets.fold<double>(0.0, (acc, t) => acc + t.commissionAmount);
+  /// Synchronous local snapshot used by dashboard widgets that render mock data.
+  AdminRevenueSummary getRevenueSummarySnapshot({String period = 'all'}) {
+    final cutoff = _periodStart(period, DateTime.now());
+    bool isIncluded(DateTime date) => cutoff == null || !date.isBefore(cutoff);
+    final periodTickets = _ticketTransactions
+        .where((transaction) => isIncluded(transaction.createdAt))
+        .toList(growable: false);
+    final paidTickets = periodTickets
+        .where((transaction) => transaction.status == 'PAID')
+        .toList(growable: false);
+    final grossTicketSales = paidTickets.fold<double>(
+      0.0,
+      (acc, t) => acc + t.grossAmount,
+    );
+    final ticketCommission = paidTickets.fold<double>(
+      0.0,
+      (acc, t) => acc + t.commissionAmount,
+    );
 
-    // Filter paid package transactions
-    final paidPackages = _packageTransactions.where((p) => p.status == 'PAID').toList();
-    final packageRevenue = paidPackages.fold<double>(0.0, (acc, p) => acc + p.amount);
+    final paidPackages = _packageTransactions
+        .where((transaction) => transaction.status == 'PAID')
+        .where((transaction) => isIncluded(transaction.createdAt))
+        .toList(growable: false);
+    final packageRevenue = paidPackages.fold<double>(
+      0.0,
+      (acc, p) => acc + p.amount,
+    );
 
     final totalPlatformRevenue = ticketCommission + packageRevenue;
 
@@ -161,6 +182,25 @@ class AdminRevenueService {
     );
   }
 
+  DateTime? _periodStart(String period, DateTime now) {
+    switch (period) {
+      case 'today':
+        return DateTime(now.year, now.month, now.day);
+      case '7d':
+      case 'this_week':
+        return now.subtract(const Duration(days: 7));
+      case '30d':
+        return now.subtract(const Duration(days: 30));
+      case 'this_month':
+        return DateTime(now.year, now.month);
+      case 'this_year':
+        return DateTime(now.year);
+      case 'all':
+      default:
+        return null;
+    }
+  }
+
   /// Lists ticket transactions.
   Future<List<AdminTicketTransactionModel>> getTicketTransactions({
     String? statusFilter,
@@ -169,7 +209,9 @@ class AdminRevenueService {
     await Future<void>.delayed(const Duration(milliseconds: 150));
     List<AdminTicketTransactionModel> list = List.from(_ticketTransactions);
 
-    if (statusFilter != null && statusFilter.isNotEmpty && statusFilter != 'ALL') {
+    if (statusFilter != null &&
+        statusFilter.isNotEmpty &&
+        statusFilter != 'ALL') {
       list = list.where((t) => t.status == statusFilter).toList();
     }
 
@@ -195,7 +237,9 @@ class AdminRevenueService {
     await Future<void>.delayed(const Duration(milliseconds: 150));
     List<AdminPackageTransactionModel> list = List.from(_packageTransactions);
 
-    if (statusFilter != null && statusFilter.isNotEmpty && statusFilter != 'ALL') {
+    if (statusFilter != null &&
+        statusFilter.isNotEmpty &&
+        statusFilter != 'ALL') {
       list = list.where((p) => p.status == statusFilter).toList();
     }
 
@@ -212,4 +256,3 @@ class AdminRevenueService {
     return list;
   }
 }
-

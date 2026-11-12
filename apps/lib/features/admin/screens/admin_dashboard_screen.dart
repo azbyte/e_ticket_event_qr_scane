@@ -7,88 +7,47 @@ library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../features/notifications/screens/notification_list_screen.dart';
+import '../../../models/admin/admin_transaction_revenue_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../routes/app_routes.dart';
-import '../../../services/event/event_service.dart';
-import '../screens/account_management_screen.dart';
-import '../screens/event_moderation_screen.dart';
-import '../screens/report_management_screen.dart';
+import '../../../services/admin/admin_revenue_service.dart';
+import '../../../services/organizer_events/mock_organizer_event_repository.dart';
 
 /// DTO Ringkasan Keuangan Platform sesuai Kontrak Integrasi Developer 3.
 class PlatformRevenueSummary {
-  final double grossTicketSales;
-  final double ticketCommissionRevenue;
-  final double packageRevenue;
-  final double totalPlatformRevenue;
+  final AdminRevenueSummary revenue;
   final int totalOrders;
   final int totalTicketsIssued;
   final int totalOrganizers;
   final int totalParticipants;
 
   const PlatformRevenueSummary({
-    required this.grossTicketSales,
-    required this.ticketCommissionRevenue,
-    required this.packageRevenue,
-    required this.totalPlatformRevenue,
+    required this.revenue,
     required this.totalOrders,
     required this.totalTicketsIssued,
     required this.totalOrganizers,
     required this.totalParticipants,
   });
 
-  /// Factory untuk kalkulasi simulasi berdasarkan periode (FR-84, FR-90, FR-93).
-  factory PlatformRevenueSummary.forPeriod(String period) {
-    switch (period) {
-      case 'today':
-        return const PlatformRevenueSummary(
-          grossTicketSales: 15000000,
-          ticketCommissionRevenue: 750000,
-          packageRevenue: 500000,
-          totalPlatformRevenue: 1250000,
-          totalOrders: 42,
-          totalTicketsIssued: 78,
-          totalOrganizers: 5,
-          totalParticipants: 65,
-        );
-      case '7d':
-        return const PlatformRevenueSummary(
-          grossTicketSales: 84000000,
-          ticketCommissionRevenue: 4200000,
-          packageRevenue: 2500000,
-          totalPlatformRevenue: 6700000,
-          totalOrders: 210,
-          totalTicketsIssued: 395,
-          totalOrganizers: 8,
-          totalParticipants: 320,
-        );
-      case '30d':
-      case 'this_month':
-        return const PlatformRevenueSummary(
-          grossTicketSales: 320000000,
-          ticketCommissionRevenue: 16000000,
-          packageRevenue: 9000000,
-          totalPlatformRevenue: 25000000,
-          totalOrders: 820,
-          totalTicketsIssued: 1650,
-          totalOrganizers: 14,
-          totalParticipants: 1240,
-        );
-      case 'all':
-      default:
-        return const PlatformRevenueSummary(
-          grossTicketSales: 750000000,
-          ticketCommissionRevenue: 37500000,
-          packageRevenue: 18500000,
-          totalPlatformRevenue: 56000000,
-          totalOrders: 1850,
-          totalTicketsIssued: 3820,
-          totalOrganizers: 24,
-          totalParticipants: 2950,
-        );
-    }
+  factory PlatformRevenueSummary.forPeriod(
+    String period,
+    AdminRevenueSummary revenue,
+  ) {
+    final counts = switch (period) {
+      'today' => (5, 78, 5, 65),
+      '7d' => (8, 395, 8, 320),
+      '30d' || 'this_month' => (14, 1650, 14, 1240),
+      _ => (24, 3820, 24, 2950),
+    };
+    return PlatformRevenueSummary(
+      revenue: revenue,
+      totalOrders: revenue.totalTicketOrders,
+      totalTicketsIssued: counts.$2,
+      totalOrganizers: counts.$3,
+      totalParticipants: counts.$4,
+    );
   }
 }
 
@@ -105,7 +64,6 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
-  final EventService _eventService = EventService();
   String _selectedPeriod = '30d'; // today, 7d, 30d, this_month, all
   late Future<List<Map<String, dynamic>>> _eventsFuture;
   late PlatformRevenueSummary _summary;
@@ -120,20 +78,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (widget.eventsLoader != null) {
       return widget.eventsLoader!();
     }
-    if (AppConfig.mockMode) {
-      return _eventService.listEvents();
-    }
-    try {
-      return await _eventService.platformEvents();
-    } catch (_) {
-      return _eventService.listEvents();
-    }
+    final events = await MockOrganizerEventRepository.shared()
+        .listPlatformEvents();
+    return events.map((event) => event.toJson()).toList(growable: false);
   }
 
   void _reload() {
     setState(() {
       _eventsFuture = _loadEvents();
-      _summary = PlatformRevenueSummary.forPeriod(_selectedPeriod);
+      _summary = PlatformRevenueSummary.forPeriod(
+        _selectedPeriod,
+        AdminRevenueService.instance.getRevenueSummarySnapshot(
+          period: _selectedPeriod,
+        ),
+      );
     });
   }
 
@@ -254,7 +212,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     if (val != null) {
                       setState(() {
                         _selectedPeriod = val;
-                        _summary = PlatformRevenueSummary.forPeriod(val);
+                        _summary = PlatformRevenueSummary.forPeriod(
+                          val,
+                          AdminRevenueService.instance
+                              .getRevenueSummarySnapshot(period: val),
+                        );
                       });
                     }
                   },
@@ -270,6 +232,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               builder: (context, snapshot) {
                 final isLoading = snapshot.connectionState == ConnectionState.waiting;
                 final events = snapshot.data ?? [];
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('Gagal memuat data event platform.'),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: _reload,
+                          child: const Text('Coba lagi'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
 
                 // Categorize events (FR-80)
                 final now = DateTime.now();
@@ -352,11 +329,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 backgroundColor: Colors.orange.shade100,
                                 foregroundColor: Colors.orange.shade900,
                               ),
-                              onPressed: () => Navigator.push(
+                              onPressed: () => Navigator.pushNamed(
                                 context,
-                                MaterialPageRoute<void>(
-                                  builder: (_) => const EventModerationScreen(),
-                                ),
+                                AppRoutes.adminEventModeration,
                               ),
                               child: const Text('Tinjau'),
                             ),
@@ -496,7 +471,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      _formatCurrency(_summary.totalPlatformRevenue),
+                                      _formatCurrency(
+                                        _summary.revenue.totalPlatformRevenue,
+                                      ),
                                       style: const TextStyle(
                                         fontSize: 22,
                                         fontWeight: FontWeight.bold,
@@ -519,20 +496,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             // Breakdown Rows (FR-93)
                             _buildRevenueRow(
                               'Penjualan Tiket Kotor (Gross Sales)',
-                              _formatCurrency(_summary.grossTicketSales),
+                              _formatCurrency(_summary.revenue.grossTicketSales),
                               isSubtitle: true,
                               note: 'Nilai transaksi keseluruhan peserta',
                             ),
                             const SizedBox(height: 8),
                             _buildRevenueRow(
                               'Komisi Tiket Platform (5% Snapshot)',
-                              _formatCurrency(_summary.ticketCommissionRevenue),
+                              _formatCurrency(
+                                _summary.revenue.ticketCommissionRevenue,
+                              ),
                               color: Colors.indigo,
                             ),
                             const SizedBox(height: 8),
                             _buildRevenueRow(
                               'Pendapatan Paket Layanan Organizer',
-                              _formatCurrency(_summary.packageRevenue),
+                              _formatCurrency(_summary.revenue.packageRevenue),
                               color: Colors.teal,
                             ),
                           ],
@@ -564,11 +543,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         title: const Text('Pengelolaan akun'),
                         subtitle: const Text('Kelola akun Organizer, Participant, status penangguhan.'),
                         trailing: const Icon(Icons.chevron_right),
-                        onTap: () => Navigator.push(
+                        onTap: () => Navigator.pushNamed(
                           context,
-                          MaterialPageRoute<void>(
-                            builder: (_) => const AccountManagementScreen(),
-                          ),
+                          AppRoutes.adminAccounts,
                         ),
                       ),
                     ),
@@ -579,11 +556,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         title: const Text('Moderasi & Semua Event Platform'),
                         subtitle: const Text('Setujui, tolak, minta revisi, atau tangguhkan event.'),
                         trailing: const Icon(Icons.chevron_right),
-                        onTap: () => Navigator.push(
+                        onTap: () => Navigator.pushNamed(
                           context,
-                          MaterialPageRoute<void>(
-                            builder: (_) => const EventModerationScreen(),
-                          ),
+                          AppRoutes.adminEventModeration,
                         ),
                       ),
                     ),
@@ -594,11 +569,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         title: const Text('Admin Support Center'),
                         subtitle: const Text('Tangani tiket keluhan, catatan internal, dan balasan.'),
                         trailing: const Icon(Icons.chevron_right),
-                        onTap: () => Navigator.push(
+                        onTap: () => Navigator.pushNamed(
                           context,
-                          MaterialPageRoute<void>(
-                            builder: (_) => const ReportManagementScreen(),
-                          ),
+                          AppRoutes.adminReports,
                         ),
                       ),
                     ),

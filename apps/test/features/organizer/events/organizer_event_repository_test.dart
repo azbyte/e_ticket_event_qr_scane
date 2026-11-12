@@ -127,6 +127,41 @@ void main() {
     });
   });
 
+  group('MockOrganizerEventRepository — integrasi moderasi Admin', () {
+    test('Admin membaca store bersama dan keputusan terlihat oleh Owner', () async {
+      final repo = MockOrganizerEventRepository(latency: Duration.zero);
+      final platformEvents = await repo.listPlatformEvents();
+
+      expect(platformEvents.map((event) => event.id), contains('evt-9001'));
+      expect(platformEvents.map((event) => event.id), contains('evt-1002'));
+
+      final updated = await repo.simulatePlatformModeration(
+        eventId: 'evt-1002',
+        status: OrganizerEventStatus.revisionRequested,
+        note: 'Lengkapi informasi venue.',
+      );
+      final ownerEvents = await repo.listEvents(ownerId: ownerId);
+      final ownerEvent = ownerEvents.firstWhere(
+        (event) => event.id == updated.id,
+      );
+
+      expect(ownerEvent.status, OrganizerEventStatus.revisionRequested);
+      expect(ownerEvent.reviewNote, 'Lengkapi informasi venue.');
+    });
+
+    test('Admin wajib memberi alasan untuk menangguhkan event tayang', () async {
+      final repo = MockOrganizerEventRepository(latency: Duration.zero);
+
+      await expectLater(
+        repo.simulatePlatformModeration(
+          eventId: 'evt-1001',
+          status: OrganizerEventStatus.suspended,
+        ),
+        throwsA(isA<OrganizerEventException>()),
+      );
+    });
+  });
+
   group('MockOrganizerEventRepository — lifecycle event', () {
     test('event baru selalu berstatus draft dan bukan publik', () async {
       final repo = MockOrganizerEventRepository(latency: Duration.zero);

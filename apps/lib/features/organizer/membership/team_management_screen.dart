@@ -15,7 +15,7 @@ import '../shell/organizer_shell.dart';
 class TeamManagementScreen extends StatefulWidget {
   const TeamManagementScreen({
     super.key,
-    this.eventId = 'evt-001',
+    this.eventId = 'evt-1001',
     this.eventTitle = 'Tech Innovation Summit 2026',
   });
 

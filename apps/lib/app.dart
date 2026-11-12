@@ -5,8 +5,10 @@ import 'core/config/app_config.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/register_screen.dart';
-import 'features/admin/screens/admin_dashboard_screen.dart';
+import 'features/admin/tabs/admin_tab_controller.dart';
+import 'features/events/screens/event_list_screen.dart';
 import 'features/organizer/screens/organizer_dashboard_screen.dart';
+import 'features/staff/screens/staff_dashboard_screen.dart';
 import 'providers/auth_provider.dart';
 import 'routes/app_routes.dart';
 import 'app_router.dart';
@@ -57,9 +59,13 @@ class RoleGuard extends StatelessWidget {
         builder: (context, auth, _) {
           if (auth.isLoading) return const _LoadingScreen();
           if (!auth.isAuthenticated) return const LoginScreen();
-          final isAdmin = auth.user!.role.name == 'admin';
-          if (isAdmin != admin) return _homeForRole(auth.user!.role.name);
-          return admin ? const AdminDashboardScreen() : const OrganizerDashboardScreen();
+          final role = auth.user!.role.name;
+          if (role != (admin ? 'admin' : 'organizer')) {
+            return _homeForRole(role);
+          }
+          return admin
+              ? const AdminTabController()
+              : const OrganizerDashboardScreen();
         },
       );
 }
@@ -68,7 +74,11 @@ Widget _homeForRole(String role) => role == 'admin'
     ? const RoleGuard(admin: true)
     : role == 'organizer'
         ? const RoleGuard(admin: false)
-        : const LoginScreen();
+        : role == 'staff'
+            ? const StaffDashboardScreen()
+            : role == 'attendee'
+                ? const EventListScreen()
+                : const LoginScreen();
 
 class _LoadingScreen extends StatelessWidget {
   const _LoadingScreen();

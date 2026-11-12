@@ -20,7 +20,7 @@ class ScannerService {
     'TK-TECH-001': {
       'id': 'tkt-001',
       'token': 'TK-TECH-001',
-      'event_id': 'evt-001',
+      'event_id': 'evt-1001',
       'event_title': 'Tech Innovation Summit 2026',
       'attendee_name': 'Ahmad Fauzi',
       'attendee_email': 'ahmad.fauzi@example.com',
@@ -32,7 +32,7 @@ class ScannerService {
     'TK-TECH-002': {
       'id': 'tkt-002',
       'token': 'TK-TECH-002',
-      'event_id': 'evt-001',
+      'event_id': 'evt-1001',
       'event_title': 'Tech Innovation Summit 2026',
       'attendee_name': 'Dewi Lestari',
       'attendee_email': 'dewi.lestari@example.com',
@@ -44,7 +44,7 @@ class ScannerService {
     'TK-TECH-003': {
       'id': 'tkt-003',
       'token': 'TK-TECH-003',
-      'event_id': 'evt-001',
+      'event_id': 'evt-1001',
       'event_title': 'Tech Innovation Summit 2026',
       'attendee_name': 'Rian Pratama',
       'attendee_email': 'rian.pratama@example.com',
@@ -56,7 +56,7 @@ class ScannerService {
     'TK-TECH-004': {
       'id': 'tkt-004',
       'token': 'TK-TECH-004',
-      'event_id': 'evt-001',
+      'event_id': 'evt-1001',
       'event_title': 'Tech Innovation Summit 2026',
       'attendee_name': 'Siti Nurhaliza',
       'attendee_email': 'siti.nurhaliza@example.com',
@@ -68,7 +68,7 @@ class ScannerService {
     'TK-TECH-005': {
       'id': 'tkt-005',
       'token': 'TK-TECH-005',
-      'event_id': 'evt-001',
+      'event_id': 'evt-1001',
       'event_title': 'Tech Innovation Summit 2026',
       'attendee_name': 'Eko Prasetyo',
       'attendee_email': 'eko.prasetyo@example.com',
@@ -123,7 +123,7 @@ class ScannerService {
             'ticket': {
               'id': 'tkt-dynamic-${DateTime.now().millisecondsSinceEpoch}',
               'token': cleanToken,
-              'event_id': 'evt-001',
+              'event_id': 'evt-1001',
               'event_title': 'Tech Innovation Summit 2026',
               'attendee_name': 'Peserta Simulasi',
               'attendee_email': 'peserta@example.com',

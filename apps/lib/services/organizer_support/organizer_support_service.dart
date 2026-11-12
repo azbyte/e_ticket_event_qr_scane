@@ -4,6 +4,9 @@
 /// public response history, while strictly concealing admin internal notes per PRD specifications.
 library;
 
+import '../../models/report/support_report_model.dart';
+import '../report/report_service.dart';
+
 class ComplaintReplyModel {
   final String sender; // 'Admin Platform' or 'Penyelenggara'
   final String message;
@@ -67,54 +70,7 @@ class OrganizerSupportService {
   static const String demoOrganizerId = 'org-001';
   static const String demoOrganizerEmail = 'nadia@demo.eticket.local';
 
-  static final List<OrganizerComplaintModel> _mockComplaints = [
-    OrganizerComplaintModel(
-      id: 'cmp-001',
-      ticketNumber: 'RPT-ORG-2026-001',
-      statusToken: 'tok-org-alpha-991',
-      organizerId: 'org-001',
-      organizerEmail: demoOrganizerEmail,
-      category: 'Moderasi Event',
-      subject: 'Permohonan percepatan review event Tech Innovation Summit',
-      description: 'Event kami telah diajukan 2 hari lalu namun status masih pending review. Mohon bantuan konfirmasi dokumen perizinan tempat acara.',
-      status: 'in_progress',
-      createdAt: DateTime.now().subtract(const Duration(hours: 24)),
-      updatedAt: DateTime.now().subtract(const Duration(hours: 6)),
-      replies: [
-        ComplaintReplyModel(
-          sender: 'Penyelenggara',
-          message: 'Halo admin, tiket acara kami sudah mulai dipromosikan, mohon bantuannya untuk peninjauan.',
-          sentAt: DateTime.now().subtract(const Duration(hours: 24)),
-        ),
-        ComplaintReplyModel(
-          sender: 'Admin Platform',
-          message: 'Halo Tim Tech Innovation Summit. Dokumen perizinan Anda sudah kami terima dan sedang diverifikasi oleh tim kurasi acara.',
-          sentAt: DateTime.now().subtract(const Duration(hours: 6)),
-        ),
-      ],
-    ),
-    OrganizerComplaintModel(
-      id: 'cmp-002',
-      ticketNumber: 'RPT-ORG-2026-002',
-      statusToken: 'tok-org-beta-992',
-      organizerId: 'org-001',
-      organizerEmail: demoOrganizerEmail,
-      category: 'Undangan Staf',
-      subject: 'Email undangan staf panitia masuk ke folder spam',
-      description:
-          'Staf kami melaporkan tidak menerima email tautan aktivasi scanner.',
-      status: 'resolved',
-      createdAt: DateTime.now().subtract(const Duration(days: 3)),
-      updatedAt: DateTime.now().subtract(const Duration(days: 2)),
-      replies: [
-        ComplaintReplyModel(
-          sender: 'Admin Platform',
-          message: 'Masalah pengiriman telah dicek pada gateway email. Staf juga dapat login langsung menggunakan email terdaftar pada menu Staf Event.',
-          sentAt: DateTime.now().subtract(const Duration(days: 2)),
-        ),
-      ],
-    ),
-  ];
+  final ReportService _reportService = ReportService();
 
   static const List<OrganizerFaqItem> _faqList = [
     OrganizerFaqItem(
@@ -144,10 +100,14 @@ class OrganizerSupportService {
   Future<List<OrganizerComplaintModel>> listComplaints(
     String organizerId,
   ) async {
-    await Future<void>.delayed(const Duration(milliseconds: 250));
+    final reports = await _reportService.listReports();
     return List<OrganizerComplaintModel>.unmodifiable(
-      _mockComplaints
-          .where((complaint) => complaint.organizerId == organizerId)
+      reports
+          .map(
+            (report) => SupportReportModel.fromJson(report),
+          )
+          .where((report) => report.userId == organizerId)
+          .map(_toOrganizerComplaint)
           .toList(growable: false),
     );
   }
@@ -160,32 +120,67 @@ class OrganizerSupportService {
     required String subject,
     required String description,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 350));
-    final sequence = _mockComplaints.length + 1;
-    final suffix = sequence.toString().padLeft(3, '0');
-    final newComplaint = OrganizerComplaintModel(
-      id: 'rpt-org-$suffix',
-      ticketNumber: 'RPT-ORG-2026-$suffix',
-      statusToken:
-          'demo-status-org-$suffix-${DateTime.now().microsecondsSinceEpoch}',
-      organizerId: organizerId,
-      organizerEmail: email,
-      category: category,
-      subject: subject,
-      description: description,
-      status: 'open',
-      createdAt: DateTime.now(),
-      replies: [
-        ComplaintReplyModel(
-          sender: 'Penyelenggara',
-          message: description,
-          sentAt: DateTime.now(),
-        ),
-      ],
-    );
-    _mockComplaints.insert(0, newComplaint);
-    return newComplaint;
+    final report = await _reportService.createReport({
+      'user_id': organizerId,
+      'contact_email': email,
+      'category': _toReportCategory(category),
+      'subject': subject,
+      'description': description,
+    });
+    return _toOrganizerComplaint(SupportReportModel.fromJson(report));
   }
+
+  OrganizerComplaintModel _toOrganizerComplaint(SupportReportModel report) {
+    final token = report.statusToken;
+    if (token == null || token.isEmpty) {
+      throw StateError('Laporan ${report.id} tidak memiliki token status.');
+    }
+
+    return OrganizerComplaintModel(
+      id: report.id,
+      ticketNumber: report.ticketNumber,
+      statusToken: token,
+      organizerId: report.userId ?? '',
+      organizerEmail: report.contactEmail ?? '',
+      category: _toOrganizerCategory(report.category),
+      subject: report.subject,
+      description: report.description,
+      status: report.status,
+      createdAt: report.createdAt,
+      updatedAt: report.updatedAt,
+      replies: report.replies
+          .map(
+            (reply) => ComplaintReplyModel(
+              sender: reply.senderName,
+              message: reply.message,
+              sentAt: reply.createdAt,
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+
+  String _toReportCategory(String category) => switch (category) {
+        'Moderasi Event' => 'EVENT',
+        'Pembayaran' => 'PAYMENT',
+        'Tiket Elektronik' => 'E_TICKET',
+        'Scanner' => 'SCANNER',
+        'Akun' => 'ACCOUNT',
+        'Langganan' => 'SUBSCRIPTION',
+        'Transaksi' => 'TRANSACTION',
+        _ => 'OTHER',
+      };
+
+  String _toOrganizerCategory(String category) => switch (category) {
+        'EVENT' => 'Moderasi Event',
+        'PAYMENT' => 'Pembayaran',
+        'E_TICKET' => 'Tiket Elektronik',
+        'SCANNER' => 'Scanner',
+        'ACCOUNT' => 'Akun',
+        'SUBSCRIPTION' => 'Langganan',
+        'TRANSACTION' => 'Transaksi',
+        _ => category,
+      };
 
   /// Gets FAQ list.
   List<OrganizerFaqItem> getFaqs() => _faqList;

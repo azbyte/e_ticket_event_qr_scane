@@ -42,6 +42,7 @@ void main() {
       expect(find.text('Moderasi'), findsOneWidget);
       expect(find.text('Akun'), findsOneWidget);
       expect(find.text('Support'), findsOneWidget);
+      expect(find.text('Bisnis'), findsOneWidget);
 
       // Default index 0: Dashboard Screen
       expect(find.text('Super Admin Dashboard'), findsOneWidget);
@@ -75,6 +76,11 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Admin Support Center'), findsOneWidget);
+
+      await tester.tap(find.text('Bisnis'));
+      await tester.pumpAndSettle();
+      expect(find.text('Modul Bisnis Platform'), findsOneWidget);
+      expect(find.text('Langganan Organizer'), findsOneWidget);
     });
   });
 }

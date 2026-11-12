@@ -19,7 +19,7 @@ class AttendeeListScreen extends StatefulWidget {
   const AttendeeListScreen({
     super.key,
     this.event,
-    this.eventId = 'evt-001',
+    this.eventId = 'evt-1001',
     this.initialMembershipContext,
   });
 

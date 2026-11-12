@@ -6,10 +6,6 @@ import 'package:provider/provider.dart';
 
 import '../../../providers/auth_provider.dart';
 import '../../../routes/app_routes.dart';
-import 'admin_settings_screen.dart';
-import 'audit_log_screen.dart';
-import 'package:e_ticket_event_qr_scane/features/admin/screens/package_management_screen.dart';
-import 'transaction_revenue_screen.dart';
 
 class AdminProfileScreen extends StatelessWidget {
   const AdminProfileScreen({super.key});
@@ -112,48 +108,48 @@ class AdminProfileScreen extends StatelessWidget {
                       leading: const Icon(Icons.inventory_2_outlined, color: Colors.blue),
                       title: const Text('Manajemen Paket Layanan'),
                       trailing: const Icon(Icons.chevron_right),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const PackageManagementScreen()),
-                        );
-                      },
+                      onTap: () =>
+                          Navigator.pushNamed(context, AppRoutes.adminPackages),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.card_membership_outlined, color: Colors.purple),
+                      title: const Text('Langganan Organizer'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        AppRoutes.adminSubscriptions,
+                      ),
                     ),
                     const Divider(height: 1),
                     ListTile(
                       leading: const Icon(Icons.monetization_on_outlined, color: Colors.green),
                       title: const Text('Transaksi & Pendapatan Platform'),
                       trailing: const Icon(Icons.chevron_right),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const TransactionRevenueScreen()),
-                        );
-                      },
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        AppRoutes.adminTransactions,
+                      ),
                     ),
                     const Divider(height: 1),
                     ListTile(
                       leading: const Icon(Icons.settings_outlined, color: Colors.orange),
                       title: const Text('Pengaturan Komisi & Platform'),
                       trailing: const Icon(Icons.chevron_right),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const AdminSettingsScreen()),
-                        );
-                      },
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        AppRoutes.adminSettings,
+                      ),
                     ),
                     const Divider(height: 1),
                     ListTile(
                       leading: const Icon(Icons.history_outlined, color: Colors.indigo),
                       title: const Text('Audit Log Tindakan Admin'),
                       trailing: const Icon(Icons.chevron_right),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const AuditLogScreen()),
-                        );
-                      },
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        AppRoutes.adminAuditLog,
+                      ),
                     ),
                   ],
                 ),
