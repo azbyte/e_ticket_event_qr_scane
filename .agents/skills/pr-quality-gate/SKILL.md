@@ -13,6 +13,12 @@ Skill ini menggabungkan dua mode pemeriksaan yang sebelumnya dipisah:
 
 Skill ini TIDAK mengubah flow Git, TIDAK membuat PR otomatis, dan TIDAK push otomatis.
 
+Repository menyediakan hook pre-push di `.githooks/pre-push`. Setelah
+mengaktifkan `git config core.hooksPath .githooks` dan menyiapkan dependency,
+hook menjalankan seluruh pemeriksaan backend dan Flutter yang sama dengan CI
+sebelum push. Hook lokal dapat dilewati; status `PR Quality Gate` yang diwajibkan
+melalui branch protection/ruleset GitHub adalah gate merge yang otoritatif.
+
 ## 1. Tujuan
 
 - Deteksi dan perbaiki masalah sebelum PR dibuat.
@@ -80,7 +86,7 @@ Di direktori `backend/`:
 |---|---|---|---|
 | 1 | Dependency install | `npm ci` | quality.yml |
 | 2 | Backend tests | `npm test` | quality.yml |
-| 3 | Sync config validator tests | `node --test ../.github/scripts/validate-sync-config.test.js` | quality.yml |
+| 3 | Sync config validator tests | `npm run test:sync-config` | quality.yml |
 | 4 | Syntax check | `npm run check` | quality.yml |
 | 5 | Format check | `npm run format:check` | quality.yml |
 | 6 | Validate skills | `npm run validate:skills` | quality.yml |
@@ -90,7 +96,7 @@ Contoh eksekusi:
 cd backend
 npm ci
 npm test
-node --test ../.github/scripts/validate-sync-config.test.js
+npm run test:sync-config
 npm run check
 npm run format:check
 npm run validate:skills
@@ -169,7 +175,16 @@ Beberapa pemeriksaan hanya dapat dijalankan di GitHub Actions karena memerlukan 
 
 Jika pemeriksaan ini tidak tersedia lokal, tandai sebagai **SKIPPED** dengan alasan "Hanya tersedia di GitHub Actions environment". Jangan beri status PASS palsu.
 
-## 7. Cara Memanggil Skill Ini
+## 7. Konflik Sinkronisasi Branch
+
+Jika workflow sinkronisasi gagal saat merge source ke direct child, ringkasan
+job mencantumkan branch dan file konflik serta perintah untuk mengambil source,
+berpindah ke child, dan mengulang merge secara lokal. Jangan memilih versi
+otomatis. Tinjau kedua sisi; untuk file biner atau modify/delete tentukan
+eksplisit apakah file dipertahankan atau dihapus. Setelah resolusi, jalankan
+quality checks sebelum push.
+
+## 8. Cara Memanggil Skill Ini
 
 Di VS Code, gunakan perintah AI / chat dan sebutkan:
 - "Jalankan PR Quality Gate pada branch ini"
@@ -179,7 +194,7 @@ Di VS Code, gunakan perintah AI / chat dan sebutkan:
 
 AI akan menjalankan langkah yang relevan di skill ini dan memberikan laporan akhir.
 
-## 8. Cara Memperbarui Skill Ini
+## 9. Cara Memperbarui Skill Ini
 
 Jika standar pemeriksaan PR di GitHub Actions (`.github/workflows/quality.yml`) berubah:
 1. Perbarui daftar perintah di bagian 4 (Pemeriksaan Kualitas) agar sesuai.

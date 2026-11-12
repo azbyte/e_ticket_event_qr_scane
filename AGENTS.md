@@ -63,7 +63,7 @@ dan mandat terkini—jangan menganggap roadmap PRD sebagai approval otomatis.
 3. Jalankan pemeriksaan relevan dari `apps/`: `flutter analyze`, `flutter test`;
    dari `backend/`: `npm test`, `npm run check`, `npm run format:check`, dan
    `npm run validate:skills`. Uji validator sinkronisasi dengan
-   `node --test ../.github/scripts/validate-sync-config.test.js` dari `backend/`.
+   `npm run test:sync-config` dari `backend/`.
    `npm run lint` adalah alias `npm run check`, jadi tidak perlu menjalankan
    keduanya.
 4. Tinjau diff dan catat PASS/FAIL/BLOCKED/NOT RUN. Bedakan analisis statis,

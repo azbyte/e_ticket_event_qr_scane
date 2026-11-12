@@ -6,8 +6,14 @@
 - Arsitektur dan workflow lokal: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 - Kontribusi dan pemeriksaan sebelum PR: [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - Hasil audit tools dan penerapan: [`LAPORAN_ANALISIS_DAN_PENERAPAN_TOOLS.txt`](LAPORAN_ANALISIS_DAN_PENERAPAN_TOOLS.txt).
-- GitHub Actions memeriksa backend tests/syntax, test validator sinkronisasi
-  branch, dan Flutter analyze/widget tests pada push dan pull request.
+- GitHub Actions menjalankan pemeriksaan backend dan Flutter pada setiap push
+  dan pull request, lalu menerbitkan status `PR Quality Gate` sebagai satu
+  pemeriksaan yang dapat diwajibkan sebelum merge.
+- Hook pre-push tersedia di `.githooks/pre-push`. Aktifkan satu kali per clone
+  dengan `git config core.hooksPath .githooks`; siapkan dependency lokal sesuai
+  petunjuk di [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- Agar merge benar-benar diblokir ketika pemeriksaan gagal, maintainer perlu
+  mewajibkan status `PR Quality Gate` pada branch protection/ruleset GitHub.
 
 Versi tool yang dipakai CI: Node.js 22 dan Flutter 3.47.9 stable. Gunakan versi
 tersebut untuk hasil lokal yang konsisten.
@@ -17,7 +23,7 @@ Backend checks:
 ```bash
 cd backend
 npm test
-node --test ../.github/scripts/validate-sync-config.test.js
+npm run test:sync-config
 npm run check
 npm run format:check
 ```

@@ -3,13 +3,7 @@ name: Quality Checks
 
 on:
   push:
-    branches:
-      - main
-
   pull_request:
-    branches:
-      - main
-
   workflow_dispatch:
 
 permissions:
@@ -48,7 +42,7 @@ jobs:
         run: npm test
 
       - name: Test sync config validator
-        run: node --test ../.github/scripts/validate-sync-config.test.js
+        run: npm run test:sync-config
 
       - name: Check backend syntax
         run: npm run check
@@ -86,3 +80,22 @@ jobs:
 
       - name: Run Flutter tests
         run: flutter test
+
+  quality_gate:
+    name: PR Quality Gate
+    if: always()
+    needs:
+      - backend
+      - flutter
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all quality checks to pass
+        env:
+          BACKEND_RESULT: ${{ needs.backend.result }}
+          FLUTTER_RESULT: ${{ needs.flutter.result }}
+        run: |
+          if [ "$BACKEND_RESULT" != "success" ] || [ "$FLUTTER_RESULT" != "success" ]; then
+            echo "::error::Quality gate blocked: backend=$BACKEND_RESULT, flutter=$FLUTTER_RESULT"
+            exit 1
+          fi
+          echo "All required quality checks passed."
