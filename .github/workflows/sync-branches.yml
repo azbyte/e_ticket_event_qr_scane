@@ -124,6 +124,8 @@ jobs:
           success=()
           failed=()
           skipped=()
+          conflicts=()
+          conflict_files=()
 
           for child in "${children[@]}"; do
             echo "::group::Sinkronisasi $child"
@@ -136,15 +138,12 @@ jobs:
               continue
             fi
 
-            # Checkout / buat branch lokal child dari remote.
-            if git rev-parse --verify "refs/heads/$child" >/dev/null 2>&1; then
-              git checkout "$child"
-            else
-              git checkout -b "$child" "$remote/$child"
-            fi
+            # Mulai selalu dari tip remote terbaru, bukan dari branch lokal
+            # yang mungkin tertinggal.
+            git checkout -B "$child" "$remote/$child"
 
             # Up-to-date: source sudah merupakan ancestral dari child -> lewati.
-            if git merge-base --is-ancestor "$remote/$source" HEAD; then
+            if git merge-base --is-ancestor "$remote/$source" "$remote/$child"; then
               echo "UP_TO_DATE: $child sudah menyertakan perubahan dari $source"
               skipped+=("$child (sudah up-to-date)")
               echo "::endgroup::"
@@ -154,45 +153,35 @@ jobs:
             # Integrasikan source ke child dengan merge biasa (bukan rebase /
             # reset paksa / force push). Riwayat dan pekerjaan developer
             # dipertahankan.
-            if git merge --no-edit "$remote/$source"; then
-              if git push "$remote" "$child"; then
-                success+=("$child")
-                echo "Berhasil disinkronkan: $child"
+            if ! git merge --no-edit "$remote/$source"; then
+              mapfile -t unresolved < <(git diff --name-only --diff-filter=U)
+              conflicts+=("$child")
+              if [ ${#unresolved[@]} -gt 0 ]; then
+                for file in "${unresolved[@]}"; do
+                  conflict_files+=("$child: $file")
+                  echo "::warning file=$file::Konflik merge pada branch $child"
+                done
               else
-                # Push ditolak karena remote berubah: fetch ulang dan periksa
-                # kondisi terbaru sebelum mencoba kembali. Tidak ada force push.
-                echo "Push ditolak untuk $child, fetch ulang..."
-                git fetch "$remote" --prune
-                # Periksa kondisi REMOTE target (bukan HEAD lokal, yang mungkin
-                # sudah memiliki commit merge yang belum berhasil di-push).
-                if git merge-base --is-ancestor "$remote/$source" "$remote/$child"; then
-                  echo "UP_TO_DATE_AFTER_FETCH: $child sudah menyertakan perubahan dari $source"
-                  skipped+=("$child (sudah up-to-date setelah fetch)")
-                else
-                  git merge --no-edit "$remote/$source" 2>/dev/null && {
-                    if git push "$remote" "$child"; then
-                      success+=("$child (berhasil setelah retry)")
-                      echo "Berhasil disinkronkan (retry): $child"
-                    else
-                      failed+=("$child (push ditolak setelah retry)")
-                      echo "::warning::Gagal push $child setelah retry"
-                    fi
-                  } || {
-                    git merge --abort 2>/dev/null || true
-                    git checkout "$child" -- . 2>/dev/null || true
-                    failed+=("$child (konflik setelah fetch ulang)")
-                    echo "::warning::Gagal disinkronkan: $child (konflik, perlu resolusi manual)"
-                  }
-                fi
+                conflict_files+=("$child: daftar file konflik tidak tersedia; lihat log merge")
               fi
-            else
-              # Konflik: batalkan merge, jangan ubah isi branch, jangan memilih
-              # versi secara otomatis, laporkan untuk diselesaikan manual.
-              # Kegagalan satu child tidak menghentikan child lain.
-              git merge --abort 2>/dev/null || true
-              git checkout "$child" -- . 2>/dev/null || true
+              if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+                git merge --abort
+              fi
               failed+=("$child (konflik, perlu resolusi manual)")
-              echo "::warning::Gagal disinkronkan: $child (konflik, perlu resolusi manual)"
+              echo "::warning::Konflik saat menggabungkan $source ke $child; lihat panduan pada ringkasan job."
+            elif git push "$remote" "$child"; then
+              success+=("$child")
+              echo "Berhasil disinkronkan: $child"
+            else
+              # Jangan mencoba mengatasi penolakan push dengan force push atau
+              # retry berbasis branch yang mungkin sudah berubah.
+              git fetch "$remote" --prune
+              if git merge-base --is-ancestor "$remote/$source" "$remote/$child"; then
+                skipped+=("$child (sudah up-to-date setelah fetch)")
+              else
+                failed+=("$child (push ditolak; periksa perubahan remote dan izin branch)")
+                echo "::warning::Push ke $child ditolak; periksa apakah branch berubah atau dilindungi."
+              fi
             fi
             echo "::endgroup::"
           done
@@ -220,6 +209,27 @@ jobs:
             if [ ${#failed[@]} -gt 0 ]; then
               echo "### Gagal disinkronkan (perlu perhatian manual)"
               for b in "${failed[@]}"; do echo "- $b"; done
+              echo ""
+            fi
+            if [ ${#conflict_files[@]} -gt 0 ]; then
+              echo "### File yang mengalami konflik"
+              for file in "${conflict_files[@]}"; do echo "- \`$file\`"; done
+              echo ""
+              echo "### Langkah resolusi konflik"
+              echo "Tidak ada sisi konflik yang dipilih otomatis. Untuk setiap branch yang tercantum:"
+              echo ""
+              echo '```bash'
+              echo "git fetch $remote"
+              for child in "${conflicts[@]}"; do
+                echo "git switch $child"
+                echo "git merge $remote/$source"
+                echo "# Selesaikan file yang tercantum, lalu git add <file> atau git rm <file>"
+                echo "git merge --continue"
+                echo "git push $remote $child"
+              done
+              echo '```'
+              echo ""
+              echo "Untuk konflik teks, tinjau kedua perubahan dan hapus marker konflik. Untuk file biner atau konflik modify/delete, tentukan apakah file dipertahankan atau dihapus sebelum staging. Jalankan kembali pemeriksaan kualitas sebelum push."
               echo ""
             fi
             if [ ${#skipped[@]} -eq 0 ] && [ ${#success[@]} -eq 0 ] && [ ${#failed[@]} -eq 0 ]; then
