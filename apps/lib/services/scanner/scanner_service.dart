@@ -158,7 +158,7 @@ class ScannerService {
       };
     }
 
-    return _api.post('/tickets/validate', body: {'token': token});
+    return _api.post('/tickets/validate', body: {'ticket_code': token});
   }
 
   /// Records check-in after successful scan.

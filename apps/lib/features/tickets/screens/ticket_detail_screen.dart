@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_utils.dart' as app_date;
@@ -8,12 +9,10 @@ import '../widgets/qr_ticket_display.dart';
 
 /// Ticket detail screen — e-ticket with QR code (PRD sections 4.6, 7.2 F).
 class TicketDetailScreen extends StatefulWidget {
-  const TicketDetailScreen({
-    super.key,
-    this.ticketId,
-  });
+  const TicketDetailScreen({super.key, this.ticketId, this.orderId});
 
   final String? ticketId;
+  final String? orderId;
 
   @override
   State<TicketDetailScreen> createState() => _TicketDetailScreenState();
@@ -26,13 +25,16 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _effectiveTicketId = widget.ticketId ?? 'tkt-001-a';
+    _effectiveTicketId =
+        widget.ticketId ?? (AppConfig.mockMode ? 'tkt-001-a' : '');
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final routeArg = ModalRoute.of(context)?.settings.arguments;
       if (routeArg is String && routeArg.isNotEmpty) {
         _effectiveTicketId = routeArg;
       }
-      _ticketProvider.loadTicket(_effectiveTicketId);
+      if (_effectiveTicketId.isNotEmpty) {
+        _ticketProvider.loadTicket(_effectiveTicketId, orderId: widget.orderId);
+      }
     });
   }
 
@@ -67,11 +69,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          color: fg,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-        ),
+        style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -79,9 +77,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('E-Ticket Resmi'),
-      ),
+      appBar: AppBar(title: const Text('E-Ticket Resmi')),
       body: ListenableBuilder(
         listenable: _ticketProvider,
         builder: (context, _) {
@@ -106,12 +102,21 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error_outline, size: 56, color: Colors.redAccent),
+                    const Icon(
+                      Icons.error_outline,
+                      size: 56,
+                      color: Colors.redAccent,
+                    ),
                     const SizedBox(height: 16),
                     const Text('E-Ticket tidak ditemukan.'),
                     const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: () => _ticketProvider.loadTicket(_effectiveTicketId),
+                      onPressed: _effectiveTicketId.isEmpty
+                          ? null
+                          : () => _ticketProvider.loadTicket(
+                              _effectiveTicketId,
+                              orderId: widget.orderId,
+                            ),
                       child: const Text('Coba Lagi'),
                     ),
                   ],
@@ -146,7 +151,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: isValid ? AppTheme.primaryColor : Colors.grey.shade700,
+                          color: isValid
+                              ? AppTheme.primaryColor
+                              : Colors.grey.shade700,
                           borderRadius: const BorderRadius.only(
                             topLeft: Radius.circular(24),
                             topRight: Radius.circular(24),
@@ -167,7 +174,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                                   ),
                                 ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.white24,
                                     borderRadius: BorderRadius.circular(6),
@@ -216,7 +226,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                               25,
                               (index) => Expanded(
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 2,
+                                  ),
                                   child: Container(
                                     height: 1.5,
                                     color: Colors.grey.shade300,
@@ -229,14 +241,16 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                             left: -12,
                             child: CircleAvatar(
                               radius: 12,
-                              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                              backgroundColor: Theme.of(context)
+                                  .scaffoldBackgroundColor,
                             ),
                           ),
                           Positioned(
                             right: -12,
                             child: CircleAvatar(
                               radius: 12,
-                              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                              backgroundColor: Theme.of(context)
+                                  .scaffoldBackgroundColor,
                             ),
                           ),
                         ],
@@ -265,13 +279,18 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                             if (ticket.issuedAt != null)
                               _buildDetailRow(
                                 'Waktu Diterbitkan',
-                                app_date.DateUtils.formatDateTime(ticket.issuedAt),
+                                app_date.DateUtils.formatDateTime(
+                                  ticket.issuedAt,
+                                ),
                               ),
-                            if (ticket.isCheckedIn && ticket.checkedInAt != null) ...[
+                            if (ticket.isCheckedIn &&
+                                ticket.checkedInAt != null) ...[
                               const SizedBox(height: 8),
                               _buildDetailRow(
                                 'Waktu Check-in',
-                                app_date.DateUtils.formatDateTime(ticket.checkedInAt),
+                                app_date.DateUtils.formatDateTime(
+                                  ticket.checkedInAt,
+                                ),
                               ),
                             ],
                           ],
@@ -294,7 +313,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.lightbulb_outline, color: AppTheme.primaryColor, size: 24),
+                      const Icon(
+                        Icons.lightbulb_outline,
+                        color: AppTheme.primaryColor,
+                        size: 24,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -302,12 +325,20 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                           children: [
                             const Text(
                               'Panduan Check-in di Lokasi Acara',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryColor),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: AppTheme.primaryColor,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'Tingkatkan kecerahan layar smartphone Anda saat mendekati meja registrasi. Tunjukkan QR Code ini kepada panitia untuk dipindai sekali saat masuk.',
-                              style: TextStyle(fontSize: 12, height: 1.4, color: Colors.grey.shade800),
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 1.4,
+                                color: Colors.grey.shade800,
+                              ),
                             ),
                           ],
                         ),
@@ -328,10 +359,17 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+        Text(
+          label,
+          style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+        ),
         Text(
           value,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Colors.black87),
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+            color: Colors.black87,
+          ),
         ),
       ],
     );

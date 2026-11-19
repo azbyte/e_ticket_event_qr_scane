@@ -129,7 +129,7 @@ class CheckInService {
           .toList();
     }
     final result = await _api.get('/events/$eventId/attendees');
-    final data = result['data'] as List? ?? [];
+    final data = result['attendees'] as List? ?? [];
     return data.cast<Map<String, dynamic>>();
   }
 

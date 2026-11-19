@@ -1,13 +1,15 @@
 const asyncHandler = require('express-async-handler');
-const { supabaseAdmin } = require('../config/supabase');
+const { query } = require('../config/db');
 
 const listAccounts = asyncHandler(async (req, res) => {
-  let query = supabaseAdmin
-    .from('profiles').select('id, name, email, username, role, avatar_url, created_at, disabled_at');
-  if (req.query.role) query = query.eq('role', req.query.role);
-  const { data, error } = await query.order('created_at', { ascending: false });
-  if (error) throw error;
-  res.json({ success: true, count: data.length, accounts: data });
+  const where = req.query.role ? `role = $1` : '';
+  const params = req.query.role ? [req.query.role] : [];
+  const rows = await query(
+    `SELECT id, name, email, username, role, avatar_url, created_at, disabled_at
+     FROM profiles ${where ? `WHERE ${where}` : ''} ORDER BY created_at DESC`,
+    params
+  );
+  res.json({ success: true, count: rows.length, accounts: rows });
 });
 
 const updateAccountStatus = asyncHandler(async (req, res) => {
@@ -16,12 +18,16 @@ const updateAccountStatus = asyncHandler(async (req, res) => {
     throw new Error('Administrators cannot disable their own account');
   }
   const disabled_at = req.body.disabled ? new Date().toISOString() : null;
-  const { data, error } = await supabaseAdmin.from('profiles')
-    .update({ disabled_at }).eq('id', req.params.id)
-    .select('id, name, email, role, disabled_at').maybeSingle();
-  if (error) throw error;
-  if (!data) { res.status(404); throw new Error('Account not found'); }
-  res.json({ success: true, user: data });
+  const updated = await query(
+    `UPDATE profiles SET disabled_at = $1 WHERE id = $2 RETURNING id, name, email, role, disabled_at`,
+    [disabled_at, req.params.id]
+  );
+  const user = updated[0];
+  if (!user) {
+    res.status(404);
+    throw new Error('Account not found');
+  }
+  res.json({ success: true, user });
 });
 
 module.exports = { listAccounts, updateAccountStatus };

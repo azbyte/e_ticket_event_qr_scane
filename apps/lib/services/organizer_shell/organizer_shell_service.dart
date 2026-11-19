@@ -1,14 +1,13 @@
 /// Organizer shell and dashboard aggregation service (FR-66).
 ///
-/// Dashboard values are derived from the same local event repository used by
-/// Event Management; they are not platform revenue or backend data.
+/// Dashboard values are derived from the repository selected for the app mode.
 library;
 
 import 'package:flutter/foundation.dart';
 
 import '../organizer_events/organizer_event_contract.dart';
 import '../organizer_events/organizer_event_repository.dart';
-import '../organizer_events/mock_organizer_event_repository.dart';
+import '../organizer_events/organizer_event_repository_factory.dart';
 
 class OrganizerDashboardMetrics {
   final int totalEvents;
@@ -46,7 +45,7 @@ class OrganizerShellService {
   OrganizerShellService._(this._repository);
 
   static final OrganizerShellService instance = OrganizerShellService._(
-    MockOrganizerEventRepository.shared(),
+    createOrganizerEventRepository(),
   );
 
   @Deprecated('Use OrganizerShellService.instance in the Organizer UI.')
@@ -58,7 +57,7 @@ class OrganizerShellService {
 
   final OrganizerEventRepository _repository;
 
-  /// Loads a local summary for events owned by [organizerId].
+  /// Loads a summary for events owned by [organizerId].
   Future<OrganizerDashboardMetrics> getDashboardMetrics(
     String organizerId,
   ) async {

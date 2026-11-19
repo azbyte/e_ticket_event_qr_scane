@@ -79,7 +79,10 @@ jobs:
         run: flutter analyze --no-fatal-infos
 
       - name: Run Flutter tests
-        run: flutter test
+        run: flutter test --dart-define=MOCK_MODE=true
+
+      - name: Verify API mode does not fall back to mock data
+        run: flutter test test/services/api_mode_no_fallback_test.dart --dart-define=MOCK_MODE=false
 
   quality_gate:
     name: PR Quality Gate

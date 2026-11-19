@@ -53,12 +53,9 @@ abstract class OrganizerEventRepository {
   });
 
   /// Menghapus draft yang belum diajukan (PRD 5.3 "hapus bila aman").
-  Future<void> deleteEvent({
-    required String ownerId,
-    required String eventId,
-  });
+  Future<void> deleteEvent({required String ownerId, required String eventId});
 
-  /// Mengajukan moderasi pertama (DRAFT → PENDING_REVIEW).
+  /// Mengajukan moderasi pertama (DRAFT ΓåÆ PENDING_REVIEW).
   Future<EventModel> submitForReview({
     required String ownerId,
     required String eventId,

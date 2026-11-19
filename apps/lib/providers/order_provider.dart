@@ -8,7 +8,7 @@ import '../services/order/order_service.dart';
 
 class OrderProvider extends ChangeNotifier {
   OrderProvider([OrderService? orderService])
-      : _orderService = orderService ?? OrderService();
+    : _orderService = orderService ?? OrderService();
 
   static final OrderProvider instance = OrderProvider();
 
@@ -58,21 +58,31 @@ class OrderProvider extends ChangeNotifier {
 
   Future<OrderModel?> createOrder({
     required String eventId,
-    required String attendeeName,
-    required String attendeeEmail,
+    String attendeeName = '',
+    String attendeeEmail = '',
     String? attendeePhone,
     required Map<String, int> selectedTicketQuantities,
+    List<Map<String, String>> attendees = const [],
+    String? idempotencyKey,
   }) async {
     _setLoading(true);
     _error = null;
     try {
+      final primaryAttendee = attendees.isEmpty ? null : attendees.first;
       final payload = <String, dynamic>{
         'event_id': eventId,
-        'attendee_name': attendeeName,
-        'attendee_email': attendeeEmail,
-        'items': selectedTicketQuantities,
+        'attendee_name': primaryAttendee?['name'] ?? attendeeName,
+        'attendee_email': primaryAttendee?['email'] ?? attendeeEmail,
+        'items': Map.fromEntries(
+          selectedTicketQuantities.entries.where((entry) => entry.value > 0),
+        ),
+        if (attendees.isNotEmpty) 'attendees': attendees,
       };
-      if (attendeePhone != null) payload['attendee_phone'] = attendeePhone;
+      final primaryPhone = primaryAttendee?['phone'] ?? attendeePhone;
+      if (primaryPhone != null) payload['attendee_phone'] = primaryPhone;
+      if (idempotencyKey != null) {
+        payload['idempotency_key'] = idempotencyKey;
+      }
 
       final data = await _orderService.createOrder(payload);
       final newOrder = OrderModel.fromJson(data);

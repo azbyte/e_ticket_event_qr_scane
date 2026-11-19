@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:e_ticket_event_qr_scane/features/admin/screens/event_moderation_screen.dart';
-import 'package:e_ticket_event_qr_scane/services/admin/admin_audit_log_service.dart';
 import 'package:e_ticket_event_qr_scane/services/organizer_events/mock_organizer_event_repository.dart';
-import 'package:e_ticket_event_qr_scane/services/organizer_events/organizer_event_contract.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -39,87 +37,27 @@ void main() {
       },
     );
 
-    testWidgets('Aksi Setujui menyetujui event dan mengubah status', (
+    testWidgets('Admin memantau event pending tanpa approval manual', (
       tester,
     ) async {
       await tester.pumpWidget(createModerationWidget());
       await tester.pumpAndSettle();
 
-      // Cari tombol Setujui
-      final approveButtons = find.widgetWithText(FilledButton, 'Setujui');
-      expect(approveButtons, findsWidgets);
-
-      await tester.tap(approveButtons.first);
-      await tester.pumpAndSettle();
-
-      // Dialog konfirmasi setujui
-      expect(find.text('Setujui Event?'), findsOneWidget);
-      final confirmBtn = find.widgetWithText(
-        FilledButton,
-        'Setujui & Publikasikan',
-      );
-      await tester.tap(confirmBtn);
-      await tester.pumpAndSettle();
-
-      // SnackBar muncul
-      expect(find.textContaining('telah disetujui & tayang'), findsOneWidget);
-
-      final moderatedEvent = await repository.getEvent(
-        ownerId: 'org-001',
-        eventId: 'evt-1002',
-      );
-      expect(moderatedEvent.status, OrganizerEventStatus.approved);
-      expect(moderatedEvent.isPublic, isTrue);
-
-      final auditLogs = await tester.runAsync(
-        () => AdminAuditLogService.instance.getAuditLogs(
-          actionFilter: 'EVENT_APPROVED',
-          entityFilter: 'EVENT',
-          searchQuery: 'evt-1002',
-        ),
-      );
-      expect(auditLogs, isNotEmpty);
+      expect(find.text('Webinar Produk Digital 2026'), findsOneWidget);
+      expect(find.text('Setujui'), findsNothing);
+      expect(find.text('Minta Revisi'), findsNothing);
     });
 
-    testWidgets('Aksi Minta Revisi wajib mengisi catatan perbaikan', (
-      tester,
-    ) async {
+    testWidgets('Admin tidak meminta revisi secara manual', (tester) async {
       await tester.pumpWidget(createModerationWidget());
       await tester.pumpAndSettle();
 
-      final revisionButtons = find.widgetWithText(
-        OutlinedButton,
-        'Minta Revisi',
-      );
-      expect(revisionButtons, findsWidgets);
-
-      await tester.tap(revisionButtons.first);
+      expect(find.text('Butuh Revisi'), findsOneWidget);
+      await tester.tap(find.text('Butuh Revisi'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Minta Revisi Event'), findsOneWidget);
-      final submitBtn = find.widgetWithText(
-        FilledButton,
-        'Kirim Catatan Revisi',
-      );
-
-      // Tap tanpa isi
-      await tester.tap(submitBtn);
-      await tester.pumpAndSettle();
-
-      expect(find.text('Catatan revisi wajib diisi.'), findsOneWidget);
-
-      // Isi catatan
-      final noteField = find.byType(TextFormField);
-      await tester.enterText(
-        noteField,
-        'Mohon perjelas jadwal pemateri sesi 2.',
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(submitBtn);
-      await tester.pumpAndSettle();
-
-      expect(find.textContaining('Permintaan revisi dikirim'), findsOneWidget);
+      expect(find.text('Minta Revisi'), findsNothing);
+      expect(find.byType(TextFormField), findsNothing);
     });
 
     testWidgets('Aksi Tangguhkan pada event yang tayang (FR-88)', (

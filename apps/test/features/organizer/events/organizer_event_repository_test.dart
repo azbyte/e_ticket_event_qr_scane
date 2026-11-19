@@ -79,7 +79,7 @@ void main() {
     });
   });
 
-  group('MockOrganizerEventRepository — scope Owner', () {
+  group('MockOrganizerEventRepository ΓÇö scope Owner', () {
     test('hanya mengembalikan event milik Owner aktif', () async {
       final repo = MockOrganizerEventRepository(latency: Duration.zero);
       final events = await repo.listEvents(ownerId: ownerId);
@@ -127,7 +127,7 @@ void main() {
     });
   });
 
-  group('MockOrganizerEventRepository — integrasi moderasi Admin', () {
+  group('MockOrganizerEventRepository ΓÇö integrasi moderasi Admin', () {
     test('Admin membaca store bersama dan keputusan terlihat oleh Owner', () async {
       final repo = MockOrganizerEventRepository(latency: Duration.zero);
       final platformEvents = await repo.listPlatformEvents();
@@ -162,7 +162,7 @@ void main() {
     });
   });
 
-  group('MockOrganizerEventRepository — lifecycle event', () {
+  group('MockOrganizerEventRepository ΓÇö lifecycle event', () {
     test('event baru selalu berstatus draft dan bukan publik', () async {
       final repo = MockOrganizerEventRepository(latency: Duration.zero);
       final created = await repo.createEvent(
@@ -200,7 +200,7 @@ void main() {
       );
     });
 
-    test('alur moderasi: draft → pending → revisi → ajukan ulang', () async {
+    test('alur moderasi: draft ΓåÆ pending ΓåÆ revisi ΓåÆ ajukan ulang', () async {
       final repo = MockOrganizerEventRepository(latency: Duration.zero);
       final created = await repo.createEvent(
         ownerId: ownerId,
@@ -281,7 +281,7 @@ void main() {
     });
   });
 
-  group('MockOrganizerEventRepository — kategori tiket', () {
+  group('MockOrganizerEventRepository ΓÇö kategori tiket', () {
     OrganizerTicketTypeDraft buildTicketDraft({
       String name = 'Kategori Uji',
       int quota = 50,
@@ -389,7 +389,7 @@ void main() {
     });
   });
 
-  group('MockOrganizerEventRepository — ringkasan', () {
+  group('MockOrganizerEventRepository ΓÇö ringkasan', () {
     test('ringkasan event menjumlahkan kuota dan penjualan demo', () async {
       final repo = MockOrganizerEventRepository(latency: Duration.zero);
       final summary = await repo.eventSummary(

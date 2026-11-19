@@ -1,19 +1,23 @@
 const express = require('express');
 const router = express.Router();
 const {
-  createTicket,
   getMyTickets,
+  getTicketById,
   verifyTicket,
+  resendTicketEmail,
 } = require('../controllers/ticketController');
-const { authMiddleware } = require('../middleware/authMiddleware');
+const { validateTicket } = require('../controllers/checkInController');
+const { authMiddleware, optionalAuth } = require('../middleware/authMiddleware');
 const { validationMiddleware } = require('../middleware/validationMiddleware');
-const {
-  createTicketValidator,
-  verifyTicketValidator,
-} = require('../validators/ticketValidator');
+const { verifyTicketValidator } = require('../validators/ticketValidator');
+const { scanLimiter } = require('../middleware/rateLimitMiddleware');
 
-router.post('/', authMiddleware, [...createTicketValidator, validationMiddleware], createTicket);
-router.get('/my-tickets', authMiddleware, getMyTickets);
-router.post('/verify', authMiddleware, [...verifyTicketValidator, validationMiddleware], verifyTicket);
+// Tidak ada lagi POST /api/tickets (legacy): tiket hanya terbit lewat order yang
+// sudah dibayar. Lihat POST /api/orders dan POST /api/payments/simulate.
+router.get('/my-tickets', optionalAuth, getMyTickets);
+router.get('/:id', optionalAuth, getTicketById);
+router.post('/:id/email', optionalAuth, resendTicketEmail);
+router.post('/validate', authMiddleware, scanLimiter, [...verifyTicketValidator, validationMiddleware], validateTicket);
+router.post('/verify', authMiddleware, scanLimiter, [...verifyTicketValidator, validationMiddleware], verifyTicket);
 
 module.exports = router;

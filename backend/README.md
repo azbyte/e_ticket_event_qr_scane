@@ -3,6 +3,35 @@
 Backend API untuk aplikasi mobile e-ticket event dengan verifikasi QR code.
 Dibangun dengan **Node.js + Express + JavaScript** dan database **PostgreSQL via Supabase**.
 
+## Fondasi Prisma
+
+- Schema target berada di [`prisma/schema.prisma`](prisma/schema.prisma).
+- Analisis entitas, relasi, konflik kontrak, dan prasyarat migration ada di
+  [`docs/DATABASE.md`](../docs/DATABASE.md).
+- Backend menjalankan query melalui PostgreSQL langsung (`pg`) di
+  `src/config/db.js`. `src/config/supabase.js` hanya alias kompatibilitas dan
+  tidak lagi membuat Supabase JS client.
+- Migration Prisma **sudah diterapkan** pada database yang dikonfigurasi
+  `DATABASE_URL` dan tercatat di `_prisma_migrations` (6 migration, terakhir
+  `20261118000100_fix_payment_status_enum`).
+- `npx prisma migrate diff --from-schema-datasource prisma/schema.prisma
+  --to-schema-datamodel prisma/schema.prisma --script` menghasilkan
+  `-- This is an empty migration.` yang berarti struktur database aktual sesuai
+  schema.
+- Function PostgreSQL `moderate_event`, `create_event_order`,
+  `simulate_event_payment`, dan `expire_event_order_reservations` tersedia.
+- RLS **belum diaktifkan pada seluruh 32 tabel aplikasi** (0 policy), sementara role
+  Supabase `anon` dan `authenticated` masih memiliki 7 privilege penuh pada setiap
+  tabel (SELECT/INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER). Artinya data
+  dapat dibaca dan diubah lewat Supabase REST bila `anon` key diketahui.
+  Backend terhubung sebagai pemilik tabel (`postgres`), sehingga pengaktifan RLS
+  tidak akan memutus backend. Ini prasyarat wajib sebelum rilis.
+- Verifikasi schema berlapis: `npm run verify:db-schema` (introspeksi `prisma db
+  pull` + `migrate diff` dua arah + perbandingan jumlah index). Hasil terakhir:
+  tidak ada perbedaan.
+- Audit read-only: `node scripts/audit-db.js`. Rekonsiliasi function yang hilang
+  pada database lama: `node scripts/apply-db-functions.js --apply`.
+
 ## Struktur Folder
 
 ```
@@ -17,11 +46,15 @@ backend/
     ├── app.js            # Express app setup & middleware
     ├── config/
     │   ├── env.js        # Validasi & ekspor environment variables
-    │   └── supabase.js   # Inisialisasi Supabase client
+    │   └── supabase.js   # Alias kompatibilitas (tanpa Supabase JS client)
     ├── controllers/
     │   ├── authController.js      # Register, login, profile
-    │   ├── eventController.js     # CRUD event
-    │   └── ticketController.js    # Buat tiket, lihat tiket, verifikasi QR
+    │   ├── eventController.js     # CRUD, visibilitas, dan moderasi event
+    │   ├── eventMetricsController.js # Ringkasan event, grafik, dan moderasi
+    │   ├── orderController.js    # Checkout dan akses order
+    │   ├── paymentController.js  # Pembayaran Virtual Account simulasi
+    │   ├── ticketController.js    # Buat tiket, lihat tiket, verifikasi QR
+    │   └── ticketTypeController.js # CRUD kategori tiket
     ├── middleware/
     │   ├── authMiddleware.js      # Verifikasi JWT
     │   ├── errorMiddleware.js     # Global error handler
@@ -34,7 +67,11 @@ backend/
     ├── routes/
     │   ├── authRoutes.js
     │   ├── eventRoutes.js
-    │   └── ticketRoutes.js
+    │   ├── organizerRoutes.js
+    │   ├── orderRoutes.js
+    │   ├── paymentRoutes.js
+    │   ├── ticketRoutes.js
+    │   └── ticketTypeRoutes.js
     ├── services/
     │   ├── authService.js   # Logic auth (token, hash password)
     │   └── qrService.js     # Generate & parse QR code
@@ -52,60 +89,119 @@ backend/
 ### Auth
 | Method | Endpoint | Deskripsi | Akses |
 |--------|----------|-----------|-------|
-| POST | `/api/auth/register` | Register pengguna baru | Public |
+| POST | `/api/auth/register` | Register pengguna baru (role organizer) | Public |
 | POST | `/api/auth/login` | Login & dapatkan JWT | Public |
 | GET | `/api/auth/me` | Profil pengguna login | Private |
+| PUT | `/api/auth/me` | Perbarui nama/avatar | Private |
+| POST | `/api/auth/logout` | Cabut token (revoked_tokens) | Private |
 
 ### Events
 | Method | Endpoint | Deskripsi | Akses |
 |--------|----------|-----------|-------|
-| GET | `/api/events` | Daftar semua event | Public |
-| GET | `/api/events/:id` | Detail event | Public |
-| POST | `/api/events` | Buat event baru | Private (organizer) |
-| PUT | `/api/events/:id` | Update event | Private (organizer) |
-| DELETE | `/api/events/:id` | Hapus event | Private (organizer) |
+| GET | `/api/events/public` | Event yang disetujui dan dipublikasikan | Public |
+| GET | `/api/events/mine` | Event milik Organizer login | Organizer |
+| GET | `/api/events` | Semua event untuk moderasi | Admin |
+| GET | `/api/events/:id` | Detail event publik atau milik pengguna berhak | Public/owner/Admin |
+| POST | `/api/events` | Buat draft event | Organizer |
+| PUT | `/api/events/:id` | Perbarui event yang statusnya dapat diedit | Owner/Admin |
+| DELETE | `/api/events/:id` | Hapus draft event | Owner/Admin |
+| POST | `/api/events/:id/submit-review` | Ajukan event untuk moderasi | Organizer |
+| GET/POST | `/api/events/:id/ticket-types` | Baca/buat kategori tiket | Public/Organizer |
+| PUT/DELETE | `/api/events/:id/ticket-types/:ticketTypeId` | Ubah/hapus kategori tiket | Organizer |
+| GET | `/api/events/:id/summary` | Ringkasan operasional event | Organizer/Admin |
+| GET | `/api/events/:id/sales` | Seri tiket/check-in 7 hari | Organizer/Admin |
+| GET/POST | `/api/events/:id/members` | Daftar/tambah staf event + izin | Owner |
+| PUT | `/api/events/:id/members/:userId/permissions` | Ganti izin staf | Owner |
+| DELETE | `/api/events/:id/members/:userId` | Hapus staf | Owner |
+| GET/POST | `/api/events/:id/invitations` | Daftar/buat undangan staf | Owner/Admin |
+| DELETE | `/api/events/:id/invitations/:invitationId` | Cabut undangan | Owner/Admin |
+| POST | `/api/invitations/:token/accept` | Terima undangan (email harus cocok) | Private |
+| GET | `/api/invitations/me` | Undangan pending milik pengguna | Private |
+| GET | `/api/organizer/overview` | Ringkasan event Organizer | Organizer |
+| GET | `/api/organizer/events/summaries` | Ringkasan per event Organizer | Organizer |
+| PUT | `/api/admin/events/:id/moderation` | Keputusan moderasi atomik dan audit | Admin |
+| GET | `/api/admin/accounts` | Daftar akun | Admin |
+| PUT | `/api/admin/accounts/:id/status` | Aktif/nonaktifkan akun | Admin |
 
 ### Tickets
 | Method | Endpoint | Deskripsi | Akses |
 |--------|----------|-----------|-------|
-| POST | `/api/tickets` | Beli/buat tiket & generate QR | Private |
-| GET | `/api/tickets/my-tickets` | Tiket milik user login | Private |
-| POST | `/api/tickets/verify` | Verifikasi QR tiket saat scan | Private (staff) |
+| POST | `/api/tickets` | Terbitkan tiket langsung (khusus owner event, legacy; alur utama via order) | Organizer/Admin |
+| GET | `/api/tickets/my-tickets` | Tiket milik user login; guest mengirim `order_id` + header `X-Order-Access-Token` | Private/order token |
+| GET | `/api/tickets/:id` | Detail tiket milik user login atau `order_id` + header `X-Order-Access-Token` | Private/order token |
+| POST | `/api/tickets/validate` | Validasi QR tanpa mutasi; wajib izin petugas event | Private (staff) |
+| POST | `/api/tickets/verify` | Verifikasi QR dan tandai tiket used secara atomik | Private (staff) |
+
+### Check-in
+| Method | Endpoint | Deskripsi | Akses |
+|---|---|---|---|
+| POST | `/api/check-ins` | Check-in online idempoten (satu check-in per tiket) | Private (staff) |
+| GET | `/api/check-ins/events/:eventId/check-ins` | Riwayat check-in event | Private (staff) |
+| POST | `/api/check-ins/sync` | Sinkronisasi antrean check-in offline | Private (staff) |
+| GET | `/api/events/:eventId/attendees` | Daftar peserta/tiket event | Owner/staff |
+
+### Notifikasi dan laporan dukungan
+| Method | Endpoint | Deskripsi | Akses |
+|---|---|---|---|
+| GET | `/api/notifications` | Daftar notifikasi pengguna (`?unread=true`) | Private |
+| POST | `/api/notifications/:id/read` | Tandai satu notifikasi dibaca | Private |
+| POST | `/api/notifications/read-all` | Tandai semua notifikasi dibaca | Private |
+| GET/POST | `/api/support-reports` | Daftar/buat laporan dukungan | Private |
+| GET | `/api/support-reports/:id` | Detail laporan + aktivitas | Pelapor/admin/penanggung jawab |
+| PUT/POST | `/api/support-reports/:id/status` | Ubah status | Admin/penanggung jawab |
+| PUT/POST | `/api/support-reports/:id/priority` | Ubah prioritas | Admin/penanggung jawab |
+| POST | `/api/support-reports/:id/reply` | Balasan publik | Pelapor/admin/penanggung jawab |
+| POST | `/api/support-reports/:id/internal-note` | Catatan internal | Admin/penanggung jawab |
+
+### Orders and simulated payments
+| Method | Endpoint | Deskripsi | Akses |
+|--------|----------|-----------|-------|
+| POST | `/api/orders` | Buat order dengan harga/kuota hasil validasi database; guest menerima token akses sekali | Public/Participant |
+| GET | `/api/orders` | Riwayat order akun login | Private |
+| GET | `/api/orders/:id` | Detail order; guest wajib menyertakan header `X-Order-Access-Token` | Owner/guest token |
+| GET | `/api/payments/:orderId` | Status VA simulasi; guest wajib menyertakan header `X-Order-Access-Token` | Owner/guest token |
+| POST | `/api/payments/simulate` | Simulasikan hasil pembayaran pada lingkungan yang diizinkan | Owner/guest token |
+
+Endpoint simulasi dinonaktifkan secara default. Aktifkan hanya pada environment
+non-produksi dengan `SIMULATED_PAYMENTS_ENABLED=true`; simulasi ini bukan
+integrasi bank atau payment gateway.
 
 ## Instalasi
 
 ```bash
-# Masuk ke folder backend
 cd backend
-
-# Install dependencies
 npm install
-
-# Salin file environment
 cp .env.example .env
-
-# Isi nilai SUPABASE_URL, SUPABASE_ANON_KEY, dll di file .env
-
-# Jalankan development server
+# Isi DATABASE_URL, DIRECT_URL, JWT_SECRET, dan ALLOWED_ORIGINS.
+npx prisma migrate status --schema prisma/schema.prisma
+npx prisma validate --schema prisma/schema.prisma
 npm run dev
-
-# Atau production
-npm start
 ```
 
-## Roles, demo accounts, and event staff
+Untuk database yang sudah memiliki tabel tetapi belum memiliki riwayat migrasi,
+lakukan rekonsiliasi setelah memverifikasi
+`prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --script`
+kosong:
 
-1. Configure `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
-   and a strong `JWT_SECRET` in `backend/.env`. The service-role key must never
-   be included in the mobile application.
-2. Apply `supabase/migrations/202611040001_role_access_and_event_members.sql`
-   to the Supabase project using its SQL editor.
-3. Set `SEED_DEMO_ACCOUNTS=true` in the server `.env` and run `npm start` once.
-   Startup creates or updates the demo Supabase Auth users and bcrypt-hashed
-   profiles idempotently. Set it back to `false` afterwards if preferred.
-4. Point Flutter at the running API using
-   `--dart-define=API_BASE_URL=http://10.0.2.2:5000/api` for Android emulator
-   (use the reachable backend hostname for physical devices/other targets).
+```bash
+npx prisma migrate resolve --applied <nama-migration>   # untuk setiap baseline
+node scripts/apply-db-functions.js --apply              # bila function PL/pgSQL hilang
+npx prisma migrate deploy
+```
+
+Jangan gunakan `prisma migrate reset` atau `db push` pada database berisi data.
+
+## Roles, demo accounts, dan staf event
+
+1. Isi `DATABASE_URL` (aplikasi) dan `DIRECT_URL` (migrasi) dengan kredensial
+   PostgreSQL/Supabase. Jangan menaruh kredensial di Flutter atau repositori.
+2. Jalankan `npx prisma migrate deploy` dan pastikan
+   `npx prisma migrate status` menyatakan schema up to date.
+3. Set `SEED_DEMO_ACCOUNTS=true` lalu jalankan `npm start` sekali. Seeder bersifat
+   idempotent (upsert berdasarkan email) dan tidak menghapus profil.
+   Set kembali ke `false` setelah selesai.
+4. Arahkan Flutter ke API dengan
+   `--dart-define=API_BASE_URL=http://10.0.2.2:5000/api` (emulator Android).
 
 Demo credentials:
 
@@ -114,66 +210,43 @@ Demo credentials:
 | Admin | `admin` | `admin@event.com` | `Admin123!` |
 | Organizer | `organizer` | `organizer@event.com` | `Organizer123!` |
 
-The legacy `/api/auth/register` endpoint intentionally creates an organizer;
-the requested role is never accepted from public input. Event CRUD uses server-
-validated JWT roles and filters organizer updates/deletes by `created_by`.
-Membership operations require event ownership and store separate staff
-relationships in `event_members`.
+`/api/auth/register` selalu membuat role organizer; role tidak diterima dari
+input publik. Otorisasi event menggunakan role dari database dan `created_by`.
+Staf event disimpan di `event_members` beserta izin granular di
+`event_member_permissions`; undangan memakai `event_invitations` dengan hash
+token dan masa berlaku.
 
 ## Variabel Environment (.env)
 
 | Variabel | Deskripsi | Contoh |
 |----------|-----------|--------|
 | `PORT` | Port server | `5000` |
+| `HOST` | Bind address | `0.0.0.0` |
 | `NODE_ENV` | Environment | `development` |
-| `SUPABASE_URL` | URL project Supabase | `https://xxxx.supabase.co` |
-| `SUPABASE_ANON_KEY` | Anon key Supabase | `...` |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (admin) | `...` |
-| `JWT_SECRET` | Secret untuk sign JWT | `rahasia` |
-| `JWT_EXPIRES_in` | Masa berlaku token | `7d` |
-| `CORS_ORIGIN` | URL frontend yang diizinkan | `http://localhost:3000` |
+| `DATABASE_URL` | Koneksi aplikasi (pooled) | `postgresql://...` |
+| `DIRECT_URL` | Koneksi langsung untuk migrasi | `postgresql://...` |
+| `JWT_SECRET` | Secret untuk sign JWT | nilai acak panjang |
+| `JWT_EXPIRES_IN` | Masa berlaku token | `7d` |
+| `ALLOWED_ORIGINS` | Daftar origin CORS dipisah koma | `http://localhost:3000` |
+| `CORS_ORIGIN` | Alias lama CORS (kompatibilitas) | `http://localhost:3000` |
+| `SIMULATED_PAYMENTS_ENABLED` | Aktifkan simulasi pembayaran non-produksi | `false` |
+| `SEED_DEMO_ACCOUNTS` | Seed akun demo idempotent saat startup | `false` |
 
-## Database Schema (Supabase)
+## Database Schema
 
-Tabel yang diperlukan di Supabase:
+Sumber kebenaran schema adalah `prisma/schema.prisma` dan migration di
+`prisma/migrations/`. Database aktual memiliki 32 tabel aplikasi, 19 enum,
+54 foreign key, dan 105 index aplikasi; seluruhnya cocok dengan schema
+(`prisma migrate diff` kosong). Gunakan `node scripts/audit-db.js` untuk
+memeriksa tabel, kolom, constraint, index, enum, function, RLS, dan riwayat
+migrasi. Ringkasan relasi ada di `docs/DATABASE.md`.
 
-```sql
--- Profiles (extends Supabase Auth)
-create table profiles (
-  id uuid references auth.users on delete cascade primary key,
-  name text,
-  email text unique,
-  password_hash text,
-  role text default 'customer',
-  avatar_url text,
-  created_at timestamp with time zone default timezone('utc'::text, now())
-);
-
--- Events
-create table events (
-  id uuid default gen_random_uuid() primary key,
-  title text not null,
-  description text,
-  event_date timestamp with time zone,
-  location text,
-  total_tickets integer default 0,
-  price numeric default 0,
-  created_by uuid references profiles(id),
-  created_at timestamp with time zone default timezone('utc'::text, now())
-);
-
--- Tickets
-create table tickets (
-  id uuid default gen_random_uuid() primary key,
-  ticket_code text unique not null,
-  event_id uuid references events(id) on delete cascade,
-  user_id uuid references profiles(id),
-  qr_code_data text,
-  status text default 'active',
-  purchased_at timestamp with time zone default timezone('utc'::text, now()),
-  used_at timestamp with time zone
-);
-```
+Catatan keamanan: RLS **belum diaktifkan** (0/32 tabel, 0 policy) dan role
+`anon`/`authenticated` masih memiliki privilege penuh (SELECT/INSERT/UPDATE/
+DELETE/TRUNCATE/REFERENCES/TRIGGER) pada seluruh tabel `public`. Karena backend
+terhubung sebagai pemilik tabel (`postgres`), mengaktifkan RLS tidak memutus
+backend, tetapi wajib dilakukan sebelum rilis agar data tidak dapat diakses lewat
+Supabase REST dengan `anon` key.
 
 ## Integrasi dengan Flutter (Frontend)
 

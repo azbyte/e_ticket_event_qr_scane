@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const { supabaseAdmin } = require('../config/supabase');
+const { query, getOne } = require('../config/db');
 
 const demoAccounts = [
   { username: 'admin', email: 'admin@event.com', name: 'Super Admin', password: 'Admin123!', role: 'admin' },
@@ -8,63 +8,29 @@ const demoAccounts = [
 
 const seedDemoAccounts = async () => {
   if (process.env.SEED_DEMO_ACCOUNTS !== 'true') return;
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error('SEED_DEMO_ACCOUNTS=true requires SUPABASE_SERVICE_ROLE_KEY');
+  if (!process.env.DATABASE_URL) {
+    throw new Error('SEED_DEMO_ACCOUNTS=true requires DATABASE_URL');
   }
 
   for (const account of demoAccounts) {
-    const { data: existing, error: lookupError } = await supabaseAdmin
-      .from('profiles').select('id, role, username').eq('email', account.email).maybeSingle();
-    if (lookupError) throw lookupError;
-
-    let userId = existing?.id;
+    // Idempotent: perbarui profil yang sudah ada tanpa menghapus baris.
+    // Menghapus profil dapat memutus relasi/histori (event, order, audit).
+    const passwordHash = await bcrypt.hash(account.password, 12);
+    const existing = await getOne('SELECT id FROM profiles WHERE email = $1', [account.email]);
     if (existing) {
-      const { data: existingAuth } = await supabaseAdmin.auth.admin.getUserById(existing.id);
-      if (!existingAuth?.user) {
-        const { data: recreated, error: createError } = await supabaseAdmin.auth.admin.createUser({
-          email: account.email,
-          password: account.password,
-          email_confirm: true,
-          user_metadata: { name: account.name, username: account.username },
-        });
-        if (createError) throw createError;
-        userId = recreated.user.id;
-      } else {
-      const { error: resetError } = await supabaseAdmin.auth.admin.updateUserById(existing.id, { password: account.password, email_confirm: true });
-      if (resetError) throw resetError;
-      }
+      await query(
+        `UPDATE profiles
+         SET name = $1, username = $2, password_hash = $3, role = $4
+         WHERE id = $5`,
+        [account.name, account.username, passwordHash, account.role, existing.id]
+      );
+    } else {
+      await query(
+        `INSERT INTO profiles (id, name, email, username, password_hash, role, created_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, NOW())`,
+        [account.name, account.email, account.username, passwordHash, account.role]
+      );
     }
-    if (!userId) {
-      const { data, error } = await supabaseAdmin.auth.admin.createUser({
-        email: account.email,
-        password: account.password,
-        email_confirm: true,
-        user_metadata: { name: account.name, username: account.username },
-      });
-      if (error) {
-        if (error.code !== 'email_exists') throw error;
-        const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-        if (listError) throw listError;
-        userId = users.users.find((user) => user.email === account.email)?.id;
-        if (!userId) throw error;
-        const { error: resetError } = await supabaseAdmin.auth.admin.updateUserById(userId, { password: account.password, email_confirm: true });
-        if (resetError) throw resetError;
-      } else {
-        userId = data.user.id;
-      }
-    }
-
-    const password_hash = await bcrypt.hash(account.password, 12);
-    const { error: profileError } = await supabaseAdmin.from('profiles').upsert({
-      id: userId,
-      name: account.name,
-      username: account.username,
-      email: account.email,
-      password_hash,
-      role: account.role,
-      disabled_at: null,
-    }, { onConflict: 'id' });
-    if (profileError) throw profileError;
     console.log(`Demo ${account.role} account ready: ${account.email}`);
   }
 };

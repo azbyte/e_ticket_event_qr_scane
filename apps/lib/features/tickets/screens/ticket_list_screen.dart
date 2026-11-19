@@ -9,7 +9,9 @@ import 'ticket_detail_screen.dart';
 
 /// Ticket list screen (attendee ticket repository) — PRD section 3.1 #11.
 class TicketListScreen extends StatefulWidget {
-  const TicketListScreen({super.key});
+  const TicketListScreen({super.key, this.orderId});
+
+  final String? orderId;
 
   @override
   State<TicketListScreen> createState() => _TicketListScreenState();
@@ -22,9 +24,13 @@ class _TicketListScreenState extends State<TicketListScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _ticketProvider.loadTickets();
+      _loadTickets();
     });
   }
+
+  Future<void> _loadTickets() => _ticketProvider.loadTickets(
+    query: widget.orderId == null ? null : {'order_id': widget.orderId},
+  );
 
   Widget _buildStatusBadge(String status) {
     Color bg;
@@ -59,11 +65,7 @@ class _TicketListScreenState extends State<TicketListScreen> {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          color: fg,
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-        ),
+        style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -71,9 +73,7 @@ class _TicketListScreenState extends State<TicketListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Tiket Saya'),
-      ),
+      appBar: AppBar(title: const Text('Tiket Saya')),
       body: ListenableBuilder(
         listenable: _ticketProvider,
         builder: (context, _) {
@@ -97,15 +97,16 @@ class _TicketListScreenState extends State<TicketListScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error_outline, size: 56, color: Colors.redAccent),
-                    const SizedBox(height: 16),
-                    Text(
-                      _ticketProvider.error!,
-                      textAlign: TextAlign.center,
+                    const Icon(
+                      Icons.error_outline,
+                      size: 56,
+                      color: Colors.redAccent,
                     ),
                     const SizedBox(height: 16),
+                    Text(_ticketProvider.error!, textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: () => _ticketProvider.loadTickets(),
+                      onPressed: _loadTickets,
                       child: const Text('Coba Lagi'),
                     ),
                   ],
@@ -123,23 +124,36 @@ class _TicketListScreenState extends State<TicketListScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.confirmation_number_outlined, size: 76, color: Colors.grey.shade400),
+                    Icon(
+                      Icons.confirmation_number_outlined,
+                      size: 76,
+                      color: Colors.grey.shade400,
+                    ),
                     const SizedBox(height: 16),
                     const Text(
                       'Belum Ada Tiket',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Setelah Anda mendaftar atau menyelesaikan pembayaran event, tiket elektronik Anda akan otomatis muncul di sini.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey.shade600, fontSize: 13, height: 1.4),
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: () {
                         Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(builder: (_) => const EventListScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const EventListScreen(),
+                          ),
                         );
                       },
                       child: const Text('Jelajahi Event Sekarang'),
@@ -151,7 +165,7 @@ class _TicketListScreenState extends State<TicketListScreen> {
           }
 
           return RefreshIndicator(
-            onRefresh: () => _ticketProvider.loadTickets(),
+            onRefresh: _loadTickets,
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: tickets.length,
@@ -161,13 +175,18 @@ class _TicketListScreenState extends State<TicketListScreen> {
 
                 return Card(
                   elevation: 2,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => TicketDetailScreen(ticketId: ticket.id),
+                          builder: (_) => TicketDetailScreen(
+                            ticketId: ticket.id,
+                            orderId: widget.orderId,
+                          ),
                         ),
                       );
                     },
@@ -178,7 +197,9 @@ class _TicketListScreenState extends State<TicketListScreen> {
                         Container(
                           height: 6,
                           width: double.infinity,
-                          color: ticket.isValid ? AppTheme.primaryColor : Colors.grey,
+                          color: ticket.isValid
+                              ? AppTheme.primaryColor
+                              : Colors.grey,
                         ),
                         Padding(
                           padding: const EdgeInsets.all(16),
@@ -186,11 +207,16 @@ class _TicketListScreenState extends State<TicketListScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Row(
                                     children: [
-                                      const Icon(Icons.qr_code_2, color: AppTheme.primaryColor, size: 20),
+                                      const Icon(
+                                        Icons.qr_code_2,
+                                        color: AppTheme.primaryColor,
+                                        size: 20,
+                                      ),
                                       const SizedBox(width: 6),
                                       Text(
                                         ticket.token,
@@ -217,24 +243,35 @@ class _TicketListScreenState extends State<TicketListScreen> {
                               const SizedBox(height: 4),
                               Text(
                                 'ID Pesanan: ${ticket.orderId}',
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
                               ),
                               if (ticket.issuedAt != null) ...[
                                 const SizedBox(height: 2),
                                 Text(
                                   'Diterbitkan: ${app_date.DateUtils.formatDateTime(ticket.issuedAt)}',
-                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
                                 ),
                               ],
                               const SizedBox(height: 14),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    ticket.isValid ? 'Tunjukkan saat check-in' : 'Telah digunakan',
+                                    ticket.isValid
+                                        ? 'Tunjukkan saat check-in'
+                                        : 'Telah digunakan',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: ticket.isValid ? Colors.green.shade700 : Colors.grey,
+                                      color: ticket.isValid
+                                          ? Colors.green.shade700
+                                          : Colors.grey,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
@@ -250,7 +287,11 @@ class _TicketListScreenState extends State<TicketListScreen> {
                                         ),
                                       ),
                                       const SizedBox(width: 4),
-                                      const Icon(Icons.chevron_right, size: 18, color: AppTheme.primaryColor),
+                                      const Icon(
+                                        Icons.chevron_right,
+                                        size: 18,
+                                        color: AppTheme.primaryColor,
+                                      ),
                                     ],
                                   ),
                                 ],

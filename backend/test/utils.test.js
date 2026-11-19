@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { successResponse, errorResponse } = require('../src/utils/response');
+const errorMiddleware = require('../src/middleware/errorMiddleware');
 const { TICKET_STATUS, USER_ROLES, HTTP_STATUS } = require('../src/utils/constants');
 
 function responseRecorder() {
@@ -50,6 +51,19 @@ test('errorResponse includes supplied validation errors', () => {
     success: false,
     message: 'Invalid input',
     errors: [{ field: 'email' }],
+  });
+});
+
+test('error middleware honors an explicit statusCode on operational errors', () => {
+  const response = responseRecorder();
+  const error = Object.assign(new Error('Forbidden'), { statusCode: 403 });
+
+  errorMiddleware(error, {}, response, () => {});
+
+  assert.equal(response.statusCode, 403);
+  assert.deepEqual(response.body, {
+    success: false,
+    message: 'Forbidden',
   });
 });
 

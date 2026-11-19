@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 
 import 'package:e_ticket_event_qr_scane/features/organizer/events/screens/organizer_event_detail_screen.dart';
 import 'package:e_ticket_event_qr_scane/features/organizer/screens/event_form_screen.dart';
 import 'package:e_ticket_event_qr_scane/features/organizer/screens/event_management_screen.dart';
+import 'package:e_ticket_event_qr_scane/models/user/user_model.dart';
+import 'package:e_ticket_event_qr_scane/models/user/user_role.dart';
+import 'package:e_ticket_event_qr_scane/providers/auth_provider.dart';
+import 'package:e_ticket_event_qr_scane/services/auth/auth_service.dart';
 import 'package:e_ticket_event_qr_scane/services/organizer_events/mock_organizer_event_repository.dart';
 import 'package:e_ticket_event_qr_scane/services/organizer_events/organizer_event_contract.dart';
 import 'package:e_ticket_event_qr_scane/services/organizer_events/organizer_event_fixtures.dart';
@@ -14,7 +19,18 @@ MockOrganizerEventRepository buildRepository() =>
     MockOrganizerEventRepository(latency: Duration.zero);
 
 Widget wrap(Widget child) =>
-    MaterialApp(theme: ThemeData(useMaterial3: true), home: child);
+    ChangeNotifierProvider<AuthProvider>.value(
+      value: AuthProvider(AuthService())
+        ..setUser(
+          const UserModel(
+            id: ownerId,
+            name: 'Demo Owner',
+            email: 'owner@example.test',
+            role: UserRole.organizer,
+          ),
+        ),
+      child: MaterialApp(theme: ThemeData(useMaterial3: true), home: child),
+    );
 
 void main() {
   testWidgets('daftar menampilkan event milik Owner beserta status', (
