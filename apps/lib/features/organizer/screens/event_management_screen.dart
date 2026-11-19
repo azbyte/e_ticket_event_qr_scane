@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/event/event_model.dart';
 import '../../../providers/event_provider.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../services/organizer_events/organizer_event_contract.dart';
 import '../../../services/organizer_events/organizer_event_fixtures.dart';
 import '../../../services/organizer_events/organizer_event_repository.dart';
-import '../../../services/organizer_events/mock_organizer_event_repository.dart';
+import '../../../services/organizer_events/organizer_event_repository_factory.dart';
 import '../../organizer/events/screens/organizer_event_detail_screen.dart';
 import '../../organizer/events/screens/organizer_event_preview_screen.dart';
 import '../../organizer/events/widgets/organizer_event_card.dart';
@@ -16,8 +19,7 @@ import 'event_form_screen.dart';
 
 /// Halaman "Event Saya" milik Owner (PRD 5.3).
 ///
-/// Daftar ini hanya memuat event milik Owner aktif dari fixture lokal; tidak ada
-/// request jaringan. Aksi yang tidak diizinkan oleh status event disembunyikan.
+/// Daftar event dimuat dari backend kecuali mode demo diaktifkan secara eksplisit.
 class EventManagementScreen extends StatefulWidget {
   const EventManagementScreen({super.key, this.ownerId, this.repository});
 
@@ -38,9 +40,12 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
   @override
   void initState() {
     super.initState();
+    final demoOwnerId = AppConfig.mockMode
+        ? OrganizerEventFixtures.demoOwnerId
+        : context.read<AuthProvider>().user?.id ?? '';
     _provider = EventProvider(
-      repository: widget.repository ?? MockOrganizerEventRepository.shared(),
-      ownerId: widget.ownerId ?? OrganizerEventFixtures.demoOwnerId,
+      repository: widget.repository ?? createOrganizerEventRepository(),
+      ownerId: widget.ownerId ?? demoOwnerId,
     );
     _provider.loadEvents();
   }
@@ -55,7 +60,10 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
   Future<void> _createEvent() async {
     final created = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
-        builder: (_) => EventFormScreen(repository: _provider.repository),
+        builder: (_) => EventFormScreen(
+          repository: _provider.repository,
+          ownerId: _provider.ownerId,
+        ),
       ),
     );
     if (created == true && mounted) {
@@ -81,6 +89,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
         builder: (_) => EventFormScreen(
           eventId: event.id,
           repository: _provider.repository,
+          ownerId: _provider.ownerId,
         ),
       ),
     );
@@ -90,6 +99,12 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
   }
 
   Future<void> _copyLink(EventModel event) async {
+    if (event.registrationUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tautan publik belum tersedia.')),
+      );
+      return;
+    }
     await Clipboard.setData(ClipboardData(text: event.registrationUrl));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

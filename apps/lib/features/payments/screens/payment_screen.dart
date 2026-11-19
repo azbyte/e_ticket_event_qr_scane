@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_utils.dart' as app_date;
@@ -11,10 +12,7 @@ import 'payment_status_screen.dart';
 
 /// Payment screen — simulated Virtual Account (PRD sections 4.7, 7.2 E).
 class PaymentScreen extends StatefulWidget {
-  const PaymentScreen({
-    super.key,
-    this.orderId,
-  });
+  const PaymentScreen({super.key, this.orderId});
 
   final String? orderId;
 
@@ -29,21 +27,24 @@ class _PaymentScreenState extends State<PaymentScreen> {
   @override
   void initState() {
     super.initState();
-    _effectiveOrderId = widget.orderId ?? 'ORD-20261028-002';
+    _effectiveOrderId =
+        widget.orderId ?? (AppConfig.mockMode ? 'ORD-20261028-002' : '');
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final routeArg = ModalRoute.of(context)?.settings.arguments;
       if (routeArg is String && routeArg.isNotEmpty) {
         _effectiveOrderId = routeArg;
       }
-      _paymentProvider.loadPayment(_effectiveOrderId);
+      if (_effectiveOrderId.isNotEmpty) {
+        _paymentProvider.loadPayment(_effectiveOrderId);
+      }
     });
   }
 
   String _formatCurrency(double amount) {
     final str = amount.toInt().toString().replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (Match m) => '${m[1]}.',
-        );
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
     return 'Rp $str';
   }
 
@@ -59,17 +60,26 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   Future<void> _handleSimulation({required bool success}) async {
     final payment = _paymentProvider.payment;
-    final va = payment?.virtualAccountNumber ?? '88092812345678';
+    final va = payment?.virtualAccountNumber ?? '';
 
     final result = await _paymentProvider.simulatePayment(
       orderId: _effectiveOrderId,
       virtualAccountNumber: va,
       simulateSuccess: success,
     );
+    if (_paymentProvider.error != null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(_paymentProvider.error!)));
+      }
+      return;
+    }
 
     // Refresh order and ticket list state
-    await OrderProvider.instance.loadOrders();
-    await TicketProvider.instance.loadTickets();
+    await OrderProvider.instance.loadOrder(_effectiveOrderId);
+    await TicketProvider.instance.loadTickets(
+      query: {'order_id': _effectiveOrderId},
+    );
 
     if (!mounted) return;
 
@@ -87,9 +97,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Pembayaran Virtual Account'),
-      ),
+      appBar: AppBar(title: const Text('Pembayaran Virtual Account')),
       body: ListenableBuilder(
         listenable: _paymentProvider,
         builder: (context, _) {
@@ -114,12 +122,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error_outline, size: 56, color: Colors.redAccent),
+                    const Icon(
+                      Icons.error_outline,
+                      size: 56,
+                      color: Colors.redAccent,
+                    ),
                     const SizedBox(height: 16),
                     const Text('Data pembayaran tidak ditemukan.'),
                     const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: () => _paymentProvider.loadPayment(_effectiveOrderId),
+                      onPressed: _effectiveOrderId.isEmpty
+                          ? null
+                          : () =>
+                                _paymentProvider.loadPayment(_effectiveOrderId),
                       child: const Text('Coba Lagi'),
                     ),
                   ],
@@ -129,8 +144,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
           }
 
           final isPaid = payment.status == AppConstants.paymentStatusPaid;
-          final vaNumber = payment.virtualAccountNumber ?? '88092812345678';
-          final bankName = payment.vaBank ?? 'BCA Virtual Account';
+          final vaNumber = payment.virtualAccountNumber;
+          final bankName = payment.vaBank ?? 'VA Simulasi';
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
@@ -145,7 +160,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     color: isPaid ? Colors.green.shade50 : Colors.amber.shade50,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isPaid ? Colors.green.shade200 : Colors.amber.shade300,
+                      color: isPaid
+                          ? Colors.green.shade200
+                          : Colors.amber.shade300,
                     ),
                   ),
                   child: Row(
@@ -161,11 +178,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              isPaid ? 'Pembayaran Berhasil' : 'Menunggu Pembayaran',
+                              isPaid
+                                  ? 'Pembayaran Berhasil'
+                                  : 'Menunggu Pembayaran',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
-                                color: isPaid ? Colors.green.shade900 : Colors.amber.shade900,
+                                color: isPaid
+                                    ? Colors.green.shade900
+                                    : Colors.amber.shade900,
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -175,7 +196,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                   : 'Batas waktu: ${app_date.DateUtils.formatDateTime(payment.expiredAt ?? DateTime.now().add(const Duration(hours: 24)))}',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: isPaid ? Colors.green.shade700 : Colors.amber.shade900,
+                                color: isPaid
+                                    ? Colors.green.shade700
+                                    : Colors.amber.shade900,
                               ),
                             ),
                           ],
@@ -187,145 +210,192 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 const SizedBox(height: 24),
 
                 // Virtual Account Card
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                    border: Border.all(color: Colors.grey.shade200),
+                if (vaNumber != null) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              bankName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.indigo.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                'VA SIMULASI',
+                                style: TextStyle(
+                                  color: AppTheme.primaryColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 28),
+
+                        // VA Number Row
+                        Text(
+                          'Nomor Virtual Account',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              vaNumber,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () => _copyToClipboard(
+                                vaNumber,
+                                'Nomor Virtual Account',
+                              ),
+                              icon: const Icon(Icons.copy, size: 16),
+                              label: const Text('Salin'),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+
+                        // Amount to Pay Row
+                        Text(
+                          'Total Pembayaran',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _formatCurrency(payment.amount),
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primaryColor,
+                              ),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () => _copyToClipboard(
+                                payment.amount.toInt().toString(),
+                                'Nominal pembayaran',
+                              ),
+                              icon: const Icon(Icons.copy, size: 16),
+                              label: const Text('Salin'),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'ID Pesanan: ${payment.orderId}',
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: 24),
+
+                  // Payment Instructions
+                  const Text(
+                    'Petunjuk Pembayaran (Simulasi)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 10),
+                  ExpansionTile(
+                    leading: const Icon(Icons.phone_android),
+                    title: const Text('Mobile Banking'),
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            bankName,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          '1. Buka aplikasi m-Banking Anda.\n'
+                          '2. Pilih menu Transfer > Virtual Account.\n'
+                          '3. Masukkan nomor VA: $vaNumber\n'
+                          '4. Periksa nominal: ${_formatCurrency(payment.amount)}\n'
+                          '5. Konfirmasi pembayaran dan simpan bukti transfer.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            height: 1.5,
+                            color: Colors.grey.shade800,
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.indigo.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              'VA SIMULASI',
-                              style: TextStyle(color: AppTheme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Divider(height: 28),
-
-                      // VA Number Row
-                      Text('Nomor Virtual Account', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            vaNumber,
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: () => _copyToClipboard(vaNumber, 'Nomor Virtual Account'),
-                            icon: const Icon(Icons.copy, size: 16),
-                            label: const Text('Salin'),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
-
-                      // Amount to Pay Row
-                      Text('Total Pembayaran', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            _formatCurrency(payment.amount),
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.primaryColor,
-                            ),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: () => _copyToClipboard(payment.amount.toInt().toString(), 'Nominal pembayaran'),
-                            icon: const Icon(Icons.copy, size: 16),
-                            label: const Text('Salin'),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'ID Pesanan: ${payment.orderId}',
-                        style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                        ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 24),
-
-                // Payment Instructions
-                const Text(
-                  'Petunjuk Pembayaran (Simulasi)',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                const SizedBox(height: 10),
-                ExpansionTile(
-                  leading: const Icon(Icons.phone_android),
-                  title: const Text('Mobile Banking'),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        '1. Buka aplikasi m-Banking Anda.\n'
-                        '2. Pilih menu Transfer > Virtual Account.\n'
-                        '3. Masukkan nomor VA: $vaNumber\n'
-                        '4. Periksa nominal: ${_formatCurrency(payment.amount)}\n'
-                        '5. Konfirmasi pembayaran dan simpan bukti transfer.',
-                        style: TextStyle(fontSize: 13, height: 1.5, color: Colors.grey.shade800),
+                  ExpansionTile(
+                    leading: const Icon(Icons.local_atm),
+                    title: const Text('ATM Transfer'),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          '1. Masukkan kartu ATM dan PIN.\n'
+                          '2. Pilih menu Transaksi Lainnya > Transfer > Virtual Account.\n'
+                          '3. Masukkan nomor Virtual Account: $vaNumber\n'
+                          '4. Tagihan akan otomatis lunas.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            height: 1.5,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                ExpansionTile(
-                  leading: const Icon(Icons.local_atm),
-                  title: const Text('ATM Transfer'),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        '1. Masukkan kartu ATM dan PIN.\n'
-                        '2. Pilih menu Transaksi Lainnya > Transfer > Virtual Account.\n'
-                        '3. Masukkan nomor Virtual Account: $vaNumber\n'
-                        '4. Tagihan akan otomatis lunas.',
-                        style: TextStyle(fontSize: 13, height: 1.5, color: Colors.grey.shade800),
-                      ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
 
                 const SizedBox(height: 32),
 
@@ -339,11 +409,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       icon: const Icon(Icons.check_circle_outline),
                       label: const Text(
                         'Simulasikan Pembayaran Berhasil',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green.shade600,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
                   ),
@@ -356,9 +431,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.red,
                         side: const BorderSide(color: Colors.red),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                      child: const Text('Simulasikan Pembayaran Gagal / Dibatalkan'),
+                      child: const Text(
+                        'Simulasikan Pembayaran Gagal / Dibatalkan',
+                      ),
                     ),
                   ),
                 ] else ...[
@@ -380,7 +459,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       icon: const Icon(Icons.confirmation_number_outlined),
                       label: const Text('Lihat E-Ticket Saya'),
                       style: ElevatedButton.styleFrom(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
                   ),

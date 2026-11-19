@@ -4,26 +4,31 @@
 
 Repository berisi aplikasi Flutter di `apps/` dan API Node.js di `backend/`.
 Flutter menargetkan Android/Web, menggunakan Provider, HTTP, secure storage, dan
-mode mock/demo yang aktif secara default (`MOCK_MODE=false` untuk API). Backend
-menggunakan JavaScript CommonJS, Express 4, JWT, Supabase JS/PostgreSQL, validasi
-`express-validator`, serta QR generator. Struktur backend aktual berada di
-`backend/src/{config,controllers,middleware,models,routes,services,utils,validators}`.
+API backend secara default (`MOCK_MODE=true` untuk demo/mock eksplisit). Backend
+menggunakan JavaScript CommonJS, Express 4, JWT, koneksi PostgreSQL langsung
+(`pg`), validasi `express-validator`, serta QR generator. Struktur backend aktual
+berada di `backend/src/{config,controllers,middleware,models,routes,services,utils,validators}`.
 
 Alur umum API adalah routes → middleware (auth/role/validation) → controllers →
-services/models → Supabase. Periksa kode dan migration di
-`backend/supabase/migrations/` untuk kontrak aktual. README backend berisi bagian
-schema/endpoint historis yang mungkin tidak sama dengan implementasi sekarang;
-jangan gunakan bagian itu sebagai sumber kebenaran tanpa verifikasi.
+services/models → PostgreSQL (`src/config/db.js`). Schema dan migration aktual
+berada di `backend/prisma/`; verifikasi struktur dengan `node
+backend/scripts/audit-db.js` dan `npx prisma migrate status`. README backend
+memuat ringkasan endpoint; kode dan migration tetap menjadi sumber kebenaran.
 
 Flutter mengorganisasi kode di `apps/lib/` menjadi `core`, `features`, `models`,
 `providers`, dan `services`. UI menggunakan tema/material yang telah ada.
-Perubahan UI perlu mempertahankan mock dan integrasi API yang terpisah.
+Mode demo dan API tetap terpisah. Tidak semua modul saat ini sudah memiliki
+endpoint backend; API mode harus menampilkan error, bukan memakai data mock
+sebagai fallback.
 
 ## Alur kerja
 
 1. Baca `AGENTS.md`, PRD, README dan modul terdampak. Periksa status/diff Git.
 2. Hindari perubahan bisnis, database dan dependency saat tugas hanya tooling.
-3. Gunakan fixtures sintetis; tidak perlu Supabase untuk unit/widget test.
+3. Gunakan fixtures sintetis; jalankan test demo dengan
+   `flutter test --dart-define=MOCK_MODE=true`. Tes API tanpa fallback dijalankan
+   dengan `flutter test test/services/api_mode_no_fallback_test.dart
+   --dart-define=MOCK_MODE=false`. Tidak perlu Supabase untuk unit/widget test.
 4. Frontend, dari `apps/`: `flutter pub get`, `flutter analyze`, `flutter test`.
 5. Backend, dari `backend/`: `npm ci`, `npm test`,
    `npm run test:sync-config`,

@@ -10,16 +10,16 @@ library;
 
 import 'package:flutter/foundation.dart';
 
+import '../core/config/app_config.dart';
 import '../models/event/event_model.dart';
 import '../models/event/ticket_type_model.dart';
 import '../services/event/event_service.dart';
 import '../services/ticket/ticket_type_service.dart';
-import '../services/mock/mock_attendee_repository.dart';
 import '../services/organizer_events/organizer_event_contract.dart';
 import '../services/organizer_events/organizer_event_exceptions.dart';
 import '../services/organizer_events/organizer_event_fixtures.dart';
 import '../services/organizer_events/organizer_event_repository.dart';
-import '../services/organizer_events/mock_organizer_event_repository.dart';
+import '../services/organizer_events/organizer_event_repository_factory.dart';
 
 /// Status pemuatan daftar event.
 enum EventLoadStatus { idle, loading, ready, error, accessDenied }
@@ -30,18 +30,18 @@ class EventProvider extends ChangeNotifier {
     EventService? eventService,
     this._ticketTypeService,
     String? ownerId,
-  }) : _repository = repository ?? MockOrganizerEventRepository.shared(),
+  }) : _repository = repository ?? createOrganizerEventRepository(),
        _eventService = eventService,
        _isPublicProvider = eventService != null,
-       _ownerId = ownerId ?? OrganizerEventFixtures.demoOwnerId;
+       _ownerId =
+           ownerId ??
+           (AppConfig.mockMode ? OrganizerEventFixtures.demoOwnerId : '');
 
   final OrganizerEventRepository _repository;
   final EventService? _eventService;
   final TicketTypeService? _ticketTypeService;
   final bool _isPublicProvider;
   final String _ownerId;
-  final MockAttendeeRepository _attendeeRepository =
-      MockAttendeeRepository.instance;
   String? _publicLoadError;
   String _selectedCategory = 'Semua';
 
@@ -163,6 +163,8 @@ class EventProvider extends ChangeNotifier {
   Future<void> loadEvents() async {
     if (_eventService != null) {
       _publicLoadError = null;
+      _selectedEvent = null;
+      _ticketTypes = const <TicketTypeModel>[];
       _status = EventLoadStatus.loading;
       notifyListeners();
       try {
@@ -189,6 +191,8 @@ class EventProvider extends ChangeNotifier {
     _status = EventLoadStatus.loading;
     _loadError = null;
     _actionError = null;
+    _selectedEvent = null;
+    _ticketTypes = const <TicketTypeModel>[];
     _events = const <EventModel>[];
     _summaries = const <String, OrganizerEventSummary>{};
     notifyListeners();
@@ -221,6 +225,8 @@ class EventProvider extends ChangeNotifier {
   Future<void> loadEvent(String eventId) async {
     if (_eventService != null) {
       _publicLoadError = null;
+      _selectedEvent = null;
+      _ticketTypes = const <TicketTypeModel>[];
       _status = EventLoadStatus.loading;
       notifyListeners();
       try {
@@ -228,9 +234,8 @@ class EventProvider extends ChangeNotifier {
           await _eventService.getEvent(eventId),
         );
         _events = <EventModel>[_selectedEvent!];
-        _ticketTypes = _ticketTypeService == null
-            ? _attendeeRepository.getTicketTypesByEventId(eventId)
-            : await _ticketTypeService.getTicketTypesByEventId(eventId);
+        _ticketTypes = await (_ticketTypeService ?? TicketTypeService())
+            .getTicketTypesByEventId(eventId);
         _publicLoadError = null;
         _status = EventLoadStatus.ready;
       } on Exception catch (error) {
@@ -242,6 +247,8 @@ class EventProvider extends ChangeNotifier {
     }
     _status = EventLoadStatus.loading;
     _loadError = null;
+    _selectedEvent = null;
+    _ticketTypes = const <TicketTypeModel>[];
     notifyListeners();
     try {
       _selectedEvent = await _repository.getEvent(
@@ -360,18 +367,12 @@ class EventProvider extends ChangeNotifier {
     return result ?? false;
   }
 
-  /// Mengajukan moderasi (draft) atau mengajukan ulang (revisi/ditolak).
+  /// Mengajukan moderasi atau mengajukan ulang event.
   Future<EventModel?> submitForReview(String eventId, {bool resubmit = false}) {
     return _runAction(() async {
       final updated = resubmit
-          ? await _repository.resubmitForReview(
-              ownerId: ownerId,
-              eventId: eventId,
-            )
-          : await _repository.submitForReview(
-              ownerId: ownerId,
-              eventId: eventId,
-            );
+          ? await _repository.resubmitForReview(ownerId: ownerId, eventId: eventId)
+          : await _repository.submitForReview(ownerId: ownerId, eventId: eventId);
       if (_selectedEvent?.id == eventId) _selectedEvent = updated;
       await loadEvents();
       return updated;

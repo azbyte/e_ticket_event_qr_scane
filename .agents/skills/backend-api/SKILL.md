@@ -1,38 +1,20 @@
 ---
 name: backend-api
-description: Mengembangkan atau meninjau endpoint, middleware, validasi, autentikasi, authorization, QR ticket dan persistence Supabase pada backend Express.
+description: Implementasi atau review backend Express/API e-ticket: route, validasi, JWT/role, ownership, QR/check-in, dan persistence Supabase/PostgreSQL.
 ---
 
-# Skill Backend API
+# Backend API
 
-Baca `AGENTS.md`, `docs/ARCHITECTURE.md`, route/controller/service terdampak,
-`backend/src/config/`, dan migration terkait. Proyek memakai Express CommonJS,
-Supabase, JWT; jangan menerapkan pola NestJS/Prisma dari proyek lain.
+Gunakan untuk endpoint, middleware, business logic atau persistence. Ikuti source/migration aktual; jangan anggap roadmap PRD, README historis, Prisma atau mock sebagai kontrak/runtime. Baca `AGENTS.md`, arsitektur terkait dan hanya route/controller/service/model/config/migration yang terdampak.
 
-## 1. Jalur Endpoint
-1. Ikuti urutan route → middleware → controller → service/model yang sudah ada.
-2. Pertahankan response/error contract yang konsisten.
-3. Dokumentasikan perubahan endpoint pada PRD dan interface contract.
+## Implementasi
+- Ikuti pola Express CommonJS dan alur route → middleware → controller → service/model; pertahankan response/error contract dan gunakan validasi/error middleware server.
+- Operasi sensitif: verifikasi JWT, role, izin, ownership/keanggotaan dan tenant di server; periksa RLS/policy aktual dan jangan mengandalkan RLS sebagai pengganti authorization endpoint. Tombol tersembunyi bukan kontrol akses.
+- Gunakan akses data terparameterisasi; jaga constraint, transaksi dan konsistensi multi-write. Jangan ubah schema/API/role tanpa mandat; migration perlu aman, kompatibel, dan idempotent bila sesuai.
+- Rahasiakan secret, token, QR bearer data dan PII dari Flutter, log, fixture, laporan. Pembayaran simulasi bukan transaksi gateway.
+- QR/check-in: otorisasi event, expiry, replay dan race/concurrency. Order/pembayaran: idempotency dan status konsisten.
 
-## 2. Validasi dan Keamanan
-1. Validasi masukan di server. Periksa autentikasi, role, ownership event/tiket,
-   dan batas tenant pada setiap pembacaan/mutasi sensitif.
-2. Organizer/staff hanya memiliki akses pada event dengan ownership/keanggotaan
-   yang sah; role frontend atau hidden button bukan authorization.
-3. Kunci service role/JWT secret hanya di backend environment; jangan log token,
-   password, QR bearer data sensitif, atau PII. Jangan menaruh rahasia di Flutter.
-4. Jangan mengubah skema atau migration tanpa kebutuhan teknis yang disetujui;
-   buat perubahan idempotent dan pertimbangkan kompatibilitas bila diperlukan.
-
-## 3. Test dan Integrasi
-1. Tambahkan test unit terhadap fungsi murni/helper tanpa panggilan Supabase.
-2. Untuk QR/check-in: pikirkan replay/scan ganda dan concurrency.
-3. Untuk tiket: order dan pembayaran jaga idempotency serta jangan menyamakan
-   simulasi dengan transaksi gateway.
-4. Integrasi DB/provider hanya diuji bila environment uji ada.
-
-## 4. Perintah Validasi
-Jalankan: `npm test`, `npm run check`, `npm run format:check`.
-`npm run lint` adalah alias pemeriksaan syntax yang sama dengan `npm run check`;
-tidak perlu menjalankan keduanya.
-Dokumentasikan batas integrasi dan hasil.
+## Validasi
+- Uji logika murni dengan unit test; integration/provider/DB hanya pada environment uji sintetis.
+- Endpoint/backend: `npm test`, `npm run check`; tambah `npm run format:check` bila format/JSON berubah. `npm run lint` adalah alias `check`.
+- Laporkan kontrak/dokumentasi yang terdampak, checks/hasil dan integrasi yang belum diuji. Sebelum PR gunakan `pr-quality-gate`.

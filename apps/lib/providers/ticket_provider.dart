@@ -8,7 +8,7 @@ import '../services/ticket/ticket_service.dart';
 
 class TicketProvider extends ChangeNotifier {
   TicketProvider([TicketService? ticketService])
-      : _ticketService = ticketService ?? TicketService();
+    : _ticketService = ticketService ?? TicketService();
 
   static final TicketProvider instance = TicketProvider();
 
@@ -40,11 +40,11 @@ class TicketProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> loadTicket(String ticketId) async {
+  Future<bool> loadTicket(String ticketId, {String? orderId}) async {
     _setLoading(true);
     _error = null;
     try {
-      final data = await _ticketService.getTicket(ticketId);
+      final data = await _ticketService.getTicket(ticketId, orderId: orderId);
       _selectedTicket = TicketModel.fromJson(data);
       notifyListeners();
       return true;

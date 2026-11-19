@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_utils.dart' as app_date;
-import '../../../models/event/event_model.dart';
 import '../../../models/event/ticket_type_model.dart';
-import '../../../services/mock/mock_attendee_repository.dart';
 import '../../../providers/event_provider.dart';
 import '../../registration/screens/registration_screen.dart';
 
@@ -19,11 +17,7 @@ class EventDetailScreen extends StatefulWidget {
 }
 
 class _EventDetailScreenState extends State<EventDetailScreen> {
-  final MockAttendeeRepository _repository = MockAttendeeRepository.instance;
   final EventProvider _provider = EventProvider.instance;
-  EventModel? _fallbackEvent;
-  List<TicketTypeModel> _fallbackTicketTypes = const <TicketTypeModel>[];
-  String? _fallbackError;
   late String _effectiveEventId;
 
   @override
@@ -41,20 +35,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 
   void _loadEvent() {
-    _provider.loadEvent(_effectiveEventId).then((_) {
-      if (_provider.selectedEvent != null || !mounted) return;
-      setState(() {
-        try {
-          _fallbackEvent = _repository.getEventById(_effectiveEventId);
-          _fallbackTicketTypes = _repository.getTicketTypesByEventId(
-            _effectiveEventId,
-          );
-          _fallbackError = null;
-        } catch (error) {
-          _fallbackError = error.toString();
-        }
-      });
-    });
+    _provider.loadEvent(_effectiveEventId);
   }
 
   String _formatCurrency(double amount) {
@@ -71,12 +52,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     return ListenableBuilder(
       listenable: _provider,
       builder: (context, _) {
-        final event = _provider.selectedEvent ?? _fallbackEvent;
-        final ticketTypes = _provider.ticketTypes.isNotEmpty
-            ? _provider.ticketTypes
-            : _fallbackTicketTypes;
+        final event = _provider.selectedEvent;
+        final ticketTypes = _provider.ticketTypes;
         final loading = _provider.isLoading;
-        final error = _provider.loadError ?? _provider.error ?? _fallbackError;
+        final error = _provider.loadError ?? _provider.error;
 
         return Scaffold(
           body: loading

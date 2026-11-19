@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_constants.dart';
@@ -7,7 +9,6 @@ import '../../../models/event/event_model.dart';
 import '../../../models/event/ticket_type_model.dart';
 import '../../../providers/order_provider.dart';
 import '../../../providers/event_provider.dart';
-import '../../../services/mock/mock_attendee_repository.dart';
 import '../../payments/screens/payment_screen.dart';
 
 /// Registration screen — choose ticket types & quantity + attendee info (PRD sections 3.1 #5,#6, 4.4, 7.2 D).
@@ -23,69 +24,165 @@ class RegistrationScreen extends StatefulWidget {
 
 class _RegistrationScreenState extends State<RegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
+  final Map<String, TextEditingController> _nameControllers = {};
+  final Map<String, TextEditingController> _emailControllers = {};
+  final Map<String, TextEditingController> _phoneControllers = {};
 
   final Map<String, int> _selectedQuantities = {};
   bool _isSubmitting = false;
+  final String _idempotencyKey = _newIdempotencyKey();
 
-  late EventModel _event;
+  EventModel? _event;
   List<TicketTypeModel> _ticketTypes = [];
-  final MockAttendeeRepository _repository = MockAttendeeRepository.instance;
   final EventProvider _eventProvider = EventProvider.instance;
+  bool _isLoadingEvent = true;
+  String? _loadError;
+
+  static String _newIdempotencyKey() {
+    final random = Random.secure();
+    return List<int>.generate(
+      32,
+      (_) => random.nextInt(256),
+    ).map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
+  }
+
+  String _attendeeKey(String ticketTypeId, int index) => '$ticketTypeId:$index';
+
+  void _syncAttendeeControllers() {
+    final activeKeys = <String>{};
+    for (final entry in _selectedQuantities.entries) {
+      for (var index = 0; index < entry.value; index++) {
+        final key = _attendeeKey(entry.key, index);
+        activeKeys.add(key);
+        _nameControllers.putIfAbsent(key, TextEditingController.new);
+        _emailControllers.putIfAbsent(key, TextEditingController.new);
+        _phoneControllers.putIfAbsent(key, TextEditingController.new);
+      }
+    }
+
+    for (final controllers in [
+      _nameControllers,
+      _emailControllers,
+      _phoneControllers,
+    ]) {
+      final removedKeys = controllers.keys
+          .where((key) => !activeKeys.contains(key))
+          .toList();
+      for (final key in removedKeys) {
+        controllers.remove(key)?.dispose();
+      }
+    }
+  }
+
+  List<Map<String, String>> _attendeePayload() {
+    final attendees = <Map<String, String>>[];
+    for (final ticketType in _ticketTypes) {
+      final quantity = _selectedQuantities[ticketType.id] ?? 0;
+      for (var index = 0; index < quantity; index++) {
+        final key = _attendeeKey(ticketType.id, index);
+        attendees.add({
+          'ticket_type_id': ticketType.id,
+          'name': _nameControllers[key]!.text.trim(),
+          'email': _emailControllers[key]!.text.trim(),
+          if (_phoneControllers[key]!.text.trim().isNotEmpty)
+            'phone': _phoneControllers[key]!.text.trim(),
+        });
+      }
+    }
+    return attendees;
+  }
+
+  List<Widget> _buildAttendeeForms() {
+    final fields = <Widget>[];
+    for (final ticketType in _ticketTypes) {
+      final quantity = _selectedQuantities[ticketType.id] ?? 0;
+      for (var index = 0; index < quantity; index++) {
+        final key = _attendeeKey(ticketType.id, index);
+        fields.addAll([
+          Text(
+            '${ticketType.name} - Peserta ${index + 1}',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            key: ValueKey('attendee-name-$key'),
+            controller: _nameControllers[key],
+            decoration: const InputDecoration(
+              labelText: 'Nama Lengkap *',
+              prefixIcon: Icon(Icons.person_outline),
+            ),
+            validator: (value) =>
+                InputValidator.required(value, field: 'Nama peserta'),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            key: ValueKey('attendee-email-$key'),
+            controller: _emailControllers[key],
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              labelText: 'Alamat Email Aktif *',
+              prefixIcon: Icon(Icons.email_outlined),
+            ),
+            validator: InputValidator.email,
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            key: ValueKey('attendee-phone-$key'),
+            controller: _phoneControllers[key],
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              labelText: 'Nomor WhatsApp / HP (Opsional)',
+              prefixIcon: Icon(Icons.phone_outlined),
+            ),
+          ),
+          const SizedBox(height: 18),
+        ]);
+      }
+    }
+    return fields;
+  }
 
   @override
   void initState() {
     super.initState();
-    if (widget.event != null) {
-      _event = widget.event!;
-      _loadTicketTypes(_event.id);
-    } else {
-      final id = widget.eventId ?? 'evt-001';
-      EventModel found;
-      try {
-        found = _repository.getEventById(id);
-      } catch (_) {
-        found = _buildFallbackEvent(id);
-      }
-      _event = found;
-      _loadTicketTypes(_event.id);
-    }
+    _loadEvent(widget.event?.id ?? widget.eventId ?? '');
   }
 
-  Future<void> _loadTicketTypes(String eventId) async {
+  Future<void> _loadEvent(String eventId) async {
+    if (eventId.isEmpty) {
+      setState(() {
+        _isLoadingEvent = false;
+        _loadError = 'ID event tidak tersedia.';
+      });
+      return;
+    }
+
     await _eventProvider.loadEvent(eventId);
-    final ticketTypes = _eventProvider.ticketTypes.isNotEmpty
-        ? _eventProvider.ticketTypes
-        : _repository.getTicketTypesByEventId(eventId);
     if (mounted) {
       setState(() {
-        _ticketTypes = ticketTypes;
+        _event = _eventProvider.selectedEvent ?? widget.event;
+        _ticketTypes = _eventProvider.ticketTypes;
+        _loadError = _eventProvider.loadError ?? _eventProvider.error;
+        _isLoadingEvent = false;
         for (final tt in _ticketTypes) {
           _selectedQuantities[tt.id] = 0;
         }
+        _syncAttendeeControllers();
       });
     }
   }
 
-  EventModel _buildFallbackEvent(String id) {
-    return EventModel(
-      id: id,
-      organizerId: 'org-001',
-      title: 'Event Pilihan',
-      startDateTime: DateTime.now().add(const Duration(days: 7)),
-      endDateTime: DateTime.now().add(const Duration(days: 7, hours: 4)),
-      eventType: 'offline',
-      status: AppConstants.eventStatusPublished,
-    );
-  }
-
   @override
   void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
+    for (final controllers in [
+      _nameControllers,
+      _emailControllers,
+      _phoneControllers,
+    ]) {
+      for (final controller in controllers.values) {
+        controller.dispose();
+      }
+    }
     super.dispose();
   }
 
@@ -143,10 +240,19 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     setState(() {
       _selectedQuantities[ticketTypeId] = newQty;
+      _syncAttendeeControllers();
     });
   }
 
   Future<void> _submitOrder() async {
+    final event = _event;
+    if (event == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Detail event belum tersedia.')),
+      );
+      return;
+    }
+
     if (_totalTicketCount == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -163,13 +269,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     setState(() => _isSubmitting = true);
 
     final newOrder = await OrderProvider.instance.createOrder(
-      eventId: _event.id,
-      attendeeName: _nameController.text.trim(),
-      attendeeEmail: _emailController.text.trim(),
-      attendeePhone: _phoneController.text.trim().isNotEmpty
-          ? _phoneController.text.trim()
-          : null,
+      eventId: event.id,
       selectedTicketQuantities: _selectedQuantities,
+      attendees: _attendeePayload(),
+      idempotencyKey: _idempotencyKey,
     );
 
     setState(() => _isSubmitting = false);
@@ -194,6 +297,37 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingEvent) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Pemesanan Tiket')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final event = _event;
+    if (event == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Pemesanan Tiket')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_loadError ?? 'Event tidak ditemukan.'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () =>
+                      _loadEvent(widget.event?.id ?? widget.eventId ?? ''),
+                  child: const Text('Coba Lagi'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Pemesanan Tiket')),
       body: SingleChildScrollView(
@@ -226,7 +360,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _event.title,
+                            event.title,
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
@@ -234,7 +368,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _event.location ?? (_event.onlineUrl ?? 'Online'),
+                            event.location ?? (event.onlineUrl ?? 'Online'),
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey.shade700,
@@ -369,44 +503,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Tiket elektronik akan dikirimkan langsung ke alamat email ini.',
+                'Isi data setiap peserta. E-ticket akan dikirim ke alamat email masing-masing.',
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
               ),
               const SizedBox(height: 14),
 
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Nama Lengkap *',
-                  hintText: 'Misal: Budi Santoso',
-                  prefixIcon: Icon(Icons.person_outline),
-                ),
-                validator: (val) =>
-                    InputValidator.required(val, field: 'Nama lengkap'),
-              ),
-              const SizedBox(height: 12),
-
-              TextFormField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: 'Alamat Email Aktif *',
-                  hintText: 'budi@example.com',
-                  prefixIcon: Icon(Icons.email_outlined),
-                ),
-                validator: InputValidator.email,
-              ),
-              const SizedBox(height: 12),
-
-              TextFormField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: 'Nomor WhatsApp / HP (Opsional)',
-                  hintText: '081234567890',
-                  prefixIcon: Icon(Icons.phone_outlined),
-                ),
-              ),
+              if (_totalTicketCount == 0)
+                const Text('Pilih tiket untuk menambahkan data peserta.')
+              else
+                ..._buildAttendeeForms(),
 
               const SizedBox(height: 24),
 

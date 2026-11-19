@@ -8,11 +8,11 @@ class EventService {
   final MockAttendeeRepository _mockRepo = MockAttendeeRepository.instance;
 
   Future<List<Map<String, dynamic>>> listEvents({Map<String, dynamic>? query}) async {
-    final events = _mockRepo.getEvents(
-      query: query?['q']?.toString() ?? query?['search']?.toString(),
-      category: query?['category']?.toString(),
-    );
     if (AppConfig.mockMode) {
+      final events = _mockRepo.getEvents(
+        query: query?['q']?.toString() ?? query?['search']?.toString(),
+        category: query?['category']?.toString(),
+      );
       return events.map((event) => event.toJson()).toList(growable: false);
     }
     final response = await _api.get('/events/public', query: query);
@@ -50,6 +50,7 @@ class EventService {
     final response = await _api.get('/events/$id/members');
     return (response['members'] as List? ?? const []).cast<Map<String, dynamic>>();
   }
+
   Future<void> addMember(String id, String identity, {List<String> permissions = const ['VIEW_EVENT']}) async {
     await _api.post('/events/$id/members', body: {
       if (identity.contains('@')) 'email': identity.trim() else 'username': identity.trim(),
@@ -60,10 +61,13 @@ class EventService {
   Future<void> updateMemberPermissions(String eventId, String userId, List<String> permissions) async {
     await _api.put('/events/$eventId/members/$userId/permissions', body: {'permissions': permissions});
   }
+
   Future<void> removeMember(String id, String userId) async { await _api.delete('/events/$id/members/$userId'); }
+
   Future<List<Map<String, dynamic>>> platformEvents() async {
     final response = await _api.get('/events');
     return (response['events'] as List? ?? const []).cast<Map<String, dynamic>>();
   }
+
   Future<Map<String, dynamic>> submitForReview(String id) => _api.post('/events/$id/submit-review');
 }

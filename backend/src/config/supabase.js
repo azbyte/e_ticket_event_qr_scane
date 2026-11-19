@@ -1,25 +1,12 @@
-const { createClient } = require('@supabase/supabase-js');
-const config = require('./env');
+/**
+ * DEPRECATED: was previously used to create Supabase JS clients.
+ * All controllers now use direct PostgreSQL via ../config/db.
+ * This module is kept for compatibility but does not start a client.
+ */
 
-const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-  },
-});
+const { query, getOne } = require('./db');
 
-const supabaseAdmin = createClient(
-  config.supabaseUrl,
-  config.supabaseServiceRoleKey,
-  {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  }
-);
+const supabase = { query, getOne };
+const supabaseAdmin = { query, getOne };
 
-module.exports = {
-  supabase,
-  supabaseAdmin,
-};
+module.exports = { supabase, supabaseAdmin, query, getOne };

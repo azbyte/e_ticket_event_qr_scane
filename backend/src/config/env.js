@@ -1,21 +1,60 @@
 require('dotenv').config();
 
-const requiredEnv = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'JWT_SECRET'];
+const requiredEnv = ['DATABASE_URL', 'JWT_SECRET'];
 
-requiredEnv.forEach((key) => {
-  if (!process.env[key]) {
-    throw new Error(`Missing required environment variable: ${key}`);
+const missingEnv = requiredEnv.filter((key) => !process.env[key]);
+  if (missingEnv.length > 0) {
+    console.error('❌ Missing required environment variables:');
+    missingEnv.forEach((key) => {
+      console.error(`   - ${key}`);
+    });
+    console.error(
+      '   Backend cannot start. Set these in your .env file (never commit .env).'
+    );
+    process.exit(1);
   }
-});
+
+// CORS_ORIGIN dipertahankan untuk kompatibilitas; ALLOWED_ORIGINS dipakai
+// sebagai daftar origin terpisah koma pada deployment saat ini.
+const configuredOrigins = String(
+  process.env.CORS_ORIGIN || process.env.ALLOWED_ORIGINS || ''
+).trim();
+const corsOrigins = configuredOrigins
+  ? configuredOrigins.split(',').map((origin) => origin.trim()).filter(Boolean)
+  : [];
 
 module.exports = {
   port: process.env.PORT || 5000,
   host: process.env.HOST || '0.0.0.0',
   nodeEnv: process.env.NODE_ENV || 'development',
-  supabaseUrl: process.env.SUPABASE_URL,
-  supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
-  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  databaseUrl: process.env.DATABASE_URL,
+  directUrl: process.env.DIRECT_URL,
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  corsOrigin: process.env.CORS_ORIGIN || '*',
+  // Secret khusus token QR tiket. Fallback ke JWT_SECRET agar deployment lama
+  // tetap berjalan, tetapi produksi wajib memakai nilai terpisah.
+  ticketTokenSecret: process.env.TICKET_TOKEN_SECRET || process.env.JWT_SECRET,
+  ticketTokenSecretIsDedicated: Boolean(process.env.TICKET_TOKEN_SECRET),
+  corsOrigin: corsOrigins.length === 0 ? '*' : (corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins),
+  simulatedPaymentsEnabled: process.env.SIMULATED_PAYMENTS_ENABLED === 'true',
+  seedDemoAccounts: process.env.SEED_DEMO_ACCOUNTS === 'true',
+  // URL publik aplikasi, dipakai untuk tautan e-ticket di email.
+  appPublicUrl: (process.env.APP_PUBLIC_URL || 'http://localhost:5000').replace(/\/$/, ''),
+  // Email (SMTP). Bila host kosong, pengiriman email dinonaktifkan secara jujur
+  // (delivery dicatat PENDING dengan alasan, bukan diklaim terkirim).
+  smtp: {
+    host: process.env.SMTP_HOST || '',
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: process.env.SMTP_SECURE === 'true',
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.EMAIL_FROM || 'no-reply@eticket.local',
+  },
+  rateLimit: {
+    windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
+    authMax: Number(process.env.RATE_LIMIT_AUTH_MAX || 20),
+    scanMax: Number(process.env.RATE_LIMIT_SCAN_MAX || 600),
+    globalMax: Number(process.env.RATE_LIMIT_GLOBAL_MAX || 1200),
+  },
+  maxJsonBody: process.env.MAX_JSON_BODY || '2mb',
 };

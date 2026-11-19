@@ -9,10 +9,28 @@ perlu menjalankan semua skill untuk setiap perubahan.
 
 | Skill | Kapan digunakan |
 |---|---|
-| [flutter-ui](.agents/skills/flutter-ui/SKILL.md) | UI, tema, komponen dan accessibility |
-| [backend-api](.agents/skills/backend-api/SKILL.md) | Express/API, auth, role, Supabase |
-| [review](.agents/skills/review/SKILL.md) | Review perubahan dan risiko |
-| [pr-quality-gate](.agents/skills/pr-quality-gate/SKILL.md) | Pemeriksaan kualitas lokal sebelum Pull Request (termasuk mode targeted berdasarkan dampak perubahan, sebelumnya skill `verification`), sinkron dengan CI/CD |
-| [debug](.agents/skills/debug/SKILL.md) | Reproduksi dan diagnosis bug |
-| [requirements](.agents/skills/requirements/SKILL.md) | Klarifikasi requirement, role, dan perubahan kontrak |
-| [workspace](.agents/skills/workspace/SKILL.md) | Memelihara instruksi, skill, tooling dan dokumentasi developer |
+| [flutter-ui](.agents/skills/flutter-ui/SKILL.md) | UI Flutter; relevan bersama backend hanya jika perubahan juga menyentuh UI atau integrasi tampilannya |
+| [backend-api](.agents/skills/backend-api/SKILL.md) | Endpoint Express, middleware, auth, role, validasi, dan persistence Supabase |
+| [review](.agents/skills/review/SKILL.md) | Review diff Flutter maupun backend, termasuk kontrak, regresi, dan akses kontrol |
+| [pr-quality-gate](.agents/skills/pr-quality-gate/SKILL.md) | Pemeriksaan kualitas backend/Flutter: mode targeted sesuai dampak atau gate lengkap sebelum PR |
+| [debug](.agents/skills/debug/SKILL.md) | Reproduksi dan diagnosis bug backend Express/API maupun Flutter |
+| [requirements](.agents/skills/requirements/SKILL.md) | Requirement, role, acceptance criteria, serta kontrak API/data backend maupun Flutter |
+| [workspace](.agents/skills/workspace/SKILL.md) | Memelihara instruksi, skill, tooling, konfigurasi, dan dokumentasi developer |
+
+## Alur pemilihan skill untuk backend
+
+- Implementasi atau perubahan kontrak endpoint: `backend-api`; tambahkan
+  `requirements` untuk perubahan perilaku, role, acceptance criteria, atau
+  payload yang dikonsumsi klien.
+- Bug atau error backend: `debug`; libatkan `backend-api` bila diagnosis
+  menyentuh route, middleware, authorization, validasi, atau persistence.
+- Pemeriksaan diff backend: `review`.
+- Validasi perubahan backend: `pr-quality-gate`; pilih checks sesuai dampak,
+  dan gunakan gate lengkap sebelum PR.
+- Instruksi, workflow, konfigurasi, atau tooling backend: `workspace`.
+- Jika backend dan UI Flutter berubah bersama, gunakan juga `flutter-ui` untuk
+  memvalidasi tampilan dan state klien. Untuk backend saja, skill UI tidak perlu
+  dijalankan.
+
+Skill yang tercantum adalah panduan yang dipilih sesuai cakupan, bukan prosedur
+yang harus seluruhnya dijalankan pada setiap tugas.

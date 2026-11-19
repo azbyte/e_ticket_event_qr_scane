@@ -499,7 +499,7 @@ class MockOrganizerEventRepository implements OrganizerEventRepository {
     _ensureUniqueTicketName(eventId, draft.name, exceptId: ticketTypeId);
 
     // Harga/kuota baru hanya berlaku untuk order berikutnya; order lama
-    // mempertahankan snapshot harga (PRD 9.7 butir 8–9).
+    // mempertahankan snapshot harga (PRD 9.7 butir 8ΓÇô9).
     final updated = existing.copyWith(
       name: draft.name.trim(),
       description: _trimToNull(draft.description),

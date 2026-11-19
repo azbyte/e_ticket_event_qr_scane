@@ -20,9 +20,9 @@ class PaymentStatusScreen extends StatelessWidget {
 
   String _formatCurrency(double amount) {
     final str = amount.toInt().toString().replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (Match m) => '${m[1]}.',
-        );
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
     return 'Rp $str';
   }
 
@@ -45,7 +45,9 @@ class PaymentStatusScreen extends StatelessWidget {
               // Animated icon / Circle
               CircleAvatar(
                 radius: 46,
-                backgroundColor: success ? Colors.green.shade50 : Colors.red.shade50,
+                backgroundColor: success
+                    ? Colors.green.shade50
+                    : Colors.red.shade50,
                 child: Icon(
                   success ? Icons.check_circle : Icons.cancel,
                   color: success ? Colors.green : Colors.red,
@@ -55,7 +57,9 @@ class PaymentStatusScreen extends StatelessWidget {
               const SizedBox(height: 20),
 
               Text(
-                success ? 'Pembayaran Berhasil Dikonfirmasi!' : 'Pembayaran Gagal / Dibatalkan',
+                success
+                    ? 'Pembayaran Berhasil Dikonfirmasi!'
+                    : 'Pembayaran Gagal / Dibatalkan',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 20,
@@ -91,7 +95,10 @@ class PaymentStatusScreen extends StatelessWidget {
                   children: [
                     _buildRow('ID Pesanan', effectiveOrderId),
                     const Divider(height: 20),
-                    _buildRow('Metode Pembayaran', payment?.vaBank ?? 'Virtual Account'),
+                    _buildRow(
+                      'Metode Pembayaran',
+                      payment?.vaBank ?? 'Virtual Account',
+                    ),
                     const Divider(height: 20),
                     if (payment?.virtualAccountNumber != null) ...[
                       _buildRow('Nomor VA', payment!.virtualAccountNumber!),
@@ -122,17 +129,25 @@ class PaymentStatusScreen extends StatelessWidget {
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (_) => const TicketListScreen()),
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              TicketListScreen(orderId: effectiveOrderId),
+                        ),
                         (route) => route.isFirst,
                       );
                     },
                     icon: const Icon(Icons.confirmation_number_outlined),
                     label: const Text(
                       'Buka E-Ticket Saya',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ),
@@ -143,7 +158,9 @@ class PaymentStatusScreen extends StatelessWidget {
                   child: OutlinedButton(
                     onPressed: () {
                       Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (_) => const EventListScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const EventListScreen(),
+                        ),
                         (route) => false,
                       );
                     },
@@ -158,7 +175,8 @@ class PaymentStatusScreen extends StatelessWidget {
                     onPressed: () {
                       Navigator.of(context).pushReplacement(
                         MaterialPageRoute(
-                          builder: (_) => PaymentScreen(orderId: effectiveOrderId),
+                          builder: (_) =>
+                              PaymentScreen(orderId: effectiveOrderId),
                         ),
                       );
                     },
@@ -172,7 +190,9 @@ class PaymentStatusScreen extends StatelessWidget {
                   child: OutlinedButton(
                     onPressed: () {
                       Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (_) => const EventListScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const EventListScreen(),
+                        ),
                         (route) => false,
                       );
                     },
@@ -187,11 +207,19 @@ class PaymentStatusScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRow(String label, String value, {bool isBold = false, Color? textColor}) {
+  Widget _buildRow(
+    String label,
+    String value, {
+    bool isBold = false,
+    Color? textColor,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+        Text(
+          label,
+          style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+        ),
         Text(
           value,
           style: TextStyle(

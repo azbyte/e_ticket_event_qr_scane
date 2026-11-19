@@ -1,33 +1,14 @@
 ---
 name: workspace
-description: Memelihara instruksi AI, skill, workflow, tools, dan dokumentasi developer di repository e-ticket tanpa mengubah aplikasi atau konfigurasi global.
+description: Audit atau ubah instruksi AI, Skill, workflow, konfigurasi dan dokumentasi developer repository tanpa mengubah aplikasi atau konfigurasi global.
 ---
 
-# Skill Pemeliharaan Workspace
+# Workspace Maintenance
 
-Baca `AGENTS.md`, katalog root `SKILL.md`, `CONTRIBUTING.md`, README, status Git
-dan file konfigurasi yang terkait. Tujuan hasil adalah workflow yang benar-benar
-dapat dipakai; bukan sekadar membuat banyak file.
+Gunakan untuk tooling/instruksi/dokumentasi workflow. Baca `AGENTS.md`, katalog `SKILL.md`, status Git, serta README/CONTRIBUTING/config yang relevan. Inventarisasi diff tracked/untracked terlebih dahulu; jangan menimpa atau mengatribusikan perubahan awal. Tujuannya workflow yang dapat dijalankan, bukan menambah file tanpa kebutuhan.
 
-## 1. Inventarisasi Perubahan
-1. Inventarisasi perubahan tracked/untracked dan manifest; bedakan hasil generate,
-   vendor, file awal yang untracked, dan file yang dibuat untuk tugas ini.
-2. Cari tool yang sudah tersedia sebelum menambah dependency. Cek versi runtime,
-   lockfile dan konfigurasi aktual.
-
-## 2. Pembuatan Skill
-1. Buat skill hanya untuk prosedur berulang yang berbeda; metadata `name` dan
-   `description` harus punya trigger jelas.
-2. Tambahkan routing di `AGENTS.md` dan `SKILL.md`, bukan berasumsi folder otomatis
-   dimuat assistant.
-
-## 3. Path dan Keamanan
-1. Jaga path relatif/case benar, secret tidak masuk, workflow permissions minimum.
-2. Jangan memasang konfigurasi IDE global. Jangan mengubah bisnis/API/schema.
-
-## 4. Validasi Katalog
-1. Dari root repository, validasi katalog dan skills via
-   `npm --prefix backend run validate:skills`.
-2. Jalankan pemeriksaan aplikasi terdampak, baca ulang link, tinjau diff dan
-   dokumentasikan hal yang gagal/terhalang.
-3. Validasi file tidak membuktikan assistant runtime memuatnya.
+- Ikuti tool, runtime, lockfile dan pola yang tersedia; jangan tambah dependency/config IDE global tanpa alasan.
+- Skill baru hanya untuk prosedur berulang yang berbeda. Beri metadata `name`/`description` dengan trigger jelas dan tambahkan routing katalog/instruksi; jangan mengasumsikan folder otomatis dimuat runtime.
+- Jaga path/link relatif, secret, least privilege dan batas perubahan. Jangan ubah business logic/API/database sebagai efek samping tooling.
+- Setelah mengubah Skill/katalog, jalankan `npm --prefix backend run validate:skills`; jalankan checks lain sesuai file terdampak, baca ulang link dan tinjau diff.
+- Laporkan PASS/FAIL/BLOCKED/NOT RUN. Validasi file tidak membuktikan runtime assistant memuatnya.

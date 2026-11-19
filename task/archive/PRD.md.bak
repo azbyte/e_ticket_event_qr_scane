@@ -2,7 +2,7 @@
 
 # E-Ticket Event Platform
 
--   **Versi:** 1.1 --- Penyesuaian fokus pengembangan frontend
+-   **Versi:** 1.2 --- Penyesuaian alur event, registrasi, tiket, dan panitia
 -   **Status:** Acuan desain UI/UX dan prototype frontend
 -   **Tahap saat ini:** Pengembangan tampilan aplikasi menggunakan data dummy
 -   **Platform:** Flutter Android dan Flutter Web
@@ -37,9 +37,12 @@ akhir, kedua metode registrasi direncanakan menggunakan alur Order,
 Payment, dan Ticket yang sama. Untuk tahap pengembangan saat ini, alur
 tersebut hanya disimulasikan menggunakan data dummy di frontend.
 
-Admin mengelola platform secara keseluruhan. Admin dapat memoderasi
-event, mengelola akun, mengatur paket layanan, memantau transaksi dan
-pendapatan platform, menangani keluhan, serta melihat audit log.
+Admin mengelola platform secara keseluruhan. Admin memantau event dan
+operasional platform, mengelola akun, paket layanan, transaksi dan
+pendapatan, menangani keluhan, serta melihat audit log. Sistem melakukan
+validasi event secara otomatis sebelum event dipublikasikan. Admin dapat
+menangguhkan event jika ditemukan pelanggaran dan wajib mencatat alasan
+serta audit log.
 
 ## 1.2 Visi Produk
 
@@ -75,6 +78,11 @@ acara.
 -   Pembayaran MVP adalah simulasi Virtual Account, bukan transaksi bank
     sungguhan.
 -   Semua tindakan administratif penting harus memiliki jejak audit.
+-   Event divalidasi otomatis oleh sistem; persetujuan manual Admin bukan
+    prasyarat publikasi event.
+-   Setiap event memiliki dua tautan berbeda: link pendaftaran peserta
+    dan link akses registrasi panitia. Akses panitia tetap wajib login dan
+    diperiksa berdasarkan keanggotaan serta permission event.
 -   Fitur yang belum masuk MVP harus tetap ditandai sebagai pengembangan
     lanjutan, bukan dianggap sudah tersedia.
 
@@ -82,23 +90,19 @@ acara.
 
 MVP dinyatakan berhasil apabila:
 
--   Organizer dapat membuat event, mengatur tiket, dan mengajukan
-    moderasi.
--   Admin dapat memeriksa dan memutuskan pengajuan event.
--   Event yang dipublikasikan memiliki URL publik.
--   Participant dapat mendaftar tanpa membuat akun.
--   Organizer/Staff yang memiliki izin dapat membantu registrasi
-    peserta.
--   Kedua metode registrasi menghasilkan Order dan tiket dengan aturan
-    yang sama.
--   Pembayaran simulasi dapat berhasil, gagal, atau kedaluwarsa.
--   Tiket hanya diterbitkan setelah pembayaran dikonfirmasi backend atau
-    pesanan gratis berhasil.
--   QR Code unik dapat divalidasi.
--   Check-in online mencegah satu tiket digunakan lebih dari sekali.
--   Akses Staff dibatasi sesuai event dan permission.
--   Admin dapat memantau event, pengguna, transaksi, pendapatan, paket,
-    dan keluhan sesuai cakupan tahap implementasi.
+- Organizer dapat membuat event, mengatur kategori tiket, periode pendaftaran, dan desain tiket.
+- Sistem memvalidasi event secara otomatis dan memublikasikan event yang lolos validasi.
+- Setelah event dibuat dan lolos validasi, Organizer memperoleh link pendaftaran peserta beserta QR Code serta link registrasi panitia yang terpisah.
+- Link registrasi panitia hanya dapat digunakan oleh Staff yang sudah login dan memiliki akses/permission pada event terkait.
+- Participant dapat mendaftar tanpa membuat akun.
+- Organizer/Staff yang memiliki izin dapat membantu registrasi peserta dan menggunakan scanner sesuai permission.
+- Satu Order hanya berisi satu tiket untuk satu Attendee; pendaftaran beberapa orang dilakukan melalui Order terpisah.
+- Satu event hanya memiliki kategori tiket yang seluruhnya gratis atau seluruhnya berbayar.
+- Event gratis menerbitkan tiket setelah registrasi berhasil; event berbayar menerbitkan tiket setelah pembayaran dikonfirmasi backend.
+- E-ticket dibuat dalam PDF landscape, memiliki QR unik, dan dikirim sebagai lampiran email ke alamat peserta.
+- QR Code unik dapat divalidasi dan check-in online mencegah satu tiket digunakan lebih dari sekali.
+- Akses Staff dibatasi sesuai event dan permission.
+- Admin dapat memantau event dan menangguhkan event yang melanggar dengan alasan serta audit log.
 
 ## 1.6 Fokus Pengembangan Saat Ini: UI/Frontend dengan Data Dummy
 
@@ -245,9 +249,9 @@ dengan mengganti ID pada URL atau request API.
   Mengatur                        Tidak             Ya          Tidak           Tidak
   kategori/harga/kuota                                                
 
-  Mengajukan moderasi             Tidak             Ya          Tidak           Tidak
+  Menjalankan validasi event       Tidak             Ya          Tidak           Tidak
 
-  Menyetujui/menolak              Tidak          Tidak          Tidak              Ya
+  Memantau/menangguhkan event     Tidak          Tidak          Tidak              Ya
   event                                                               
 
   Registrasi mandiri                 Ya  Tidak sebagai  Tidak sebagai           Tidak
@@ -331,16 +335,21 @@ event. - Pencarian berdasarkan nama event. - Filter kategori, tanggal,
 dan tipe event. - Pagination atau infinite scroll.
 
 Aturan: - Hanya event yang berstatus publik dan memenuhi jadwal
-publikasi yang ditampilkan. - Event draft, menunggu moderasi, ditolak,
-atau ditangguhkan tidak boleh muncul sebagai event yang dapat dipesan.
+publikasi yang ditampilkan. - Event draft, gagal validasi, dibatalkan, atau ditangguhkan tidak boleh
+muncul sebagai event yang dapat dipesan.
 
 ### 3.1.3 Detail Event Publik
 
 Komponen: - Poster/banner. - Nama event dan deskripsi. -
 Penyelenggara. - Tanggal dan waktu beserta zona waktu. - Lokasi atau
 tautan event online. - Tipe event: offline, online, atau hybrid. -
-Kategori tiket, harga, periode penjualan, dan ketersediaan kuota. -
+Kategori tiket, harga, periode pendaftaran, dan ketersediaan kuota. -
 Informasi kontak/bantuan. - Tombol Daftar/Beli Tiket.
+
+Aturan: halaman detail event publik menggunakan link pendaftaran
+peserta. Link registrasi panitia tidak ditampilkan sebagai tautan publik
+dan hanya tersedia pada detail event di dashboard Organizer untuk
+dibagikan kepada Staff yang telah diundang/diotorisasi.
 
 Aksi: - Memilih kategori tiket. - Melanjutkan ke formulir registrasi. -
 Membagikan URL event.
@@ -349,16 +358,9 @@ Membagikan URL event.
 
 Tujuan: memungkinkan calon peserta mendaftar tanpa akun.
 
-Komponen: - Ringkasan event. - Pilihan kategori tiket dan jumlah. - Form
-data setiap peserta/tiket: nama dan email, serta nomor telepon jika
-diperlukan. - Email kontak pemesan. - Ringkasan harga, biaya layanan
-jika berlaku, dan total. - Persetujuan ketentuan. - Tombol Buat Pesanan.
+Komponen: - Ringkasan event. - Pilihan satu kategori tiket. - Form data peserta: nama dan email, serta nomor telepon jika diperlukan. - Email peserta digunakan untuk pengiriman e-ticket. - Ringkasan harga dan biaya layanan jika berlaku. - Persetujuan ketentuan. - Tombol Daftar/Buat Pesanan.
 
-Aturan: - Peserta tidak wajib login. - Data setiap tiket harus terhubung
-dengan satu identitas peserta (`Attendee`). - Backend memvalidasi
-periode penjualan, kuota, batas jumlah tiket, dan harga. - Harga yang
-digunakan pada OrderItem harus disimpan sebagai snapshot agar perubahan
-harga berikutnya tidak mengubah pesanan lama.
+Aturan: - Peserta tidak wajib login. - Satu Order hanya berisi satu tiket untuk satu Attendee. - Peserta yang ingin mendaftarkan beberapa orang harus membuat beberapa Order terpisah. - Satu event hanya boleh memiliki kategori tiket yang seluruhnya gratis atau seluruhnya berbayar. - Backend memvalidasi periode pendaftaran, kuota, dan harga. - Harga yang digunakan pada Order disimpan sebagai snapshot.
 
 ### 3.1.5 Konfirmasi Pesanan
 
@@ -382,8 +384,16 @@ pembayaran bank sungguhan.
 
 Komponen: - Nama event. - Nama pemegang tiket. - Kategori tiket. - Nomor
 tiket. - QR Code unik. - Status tiket. - Jadwal dan lokasi event. -
-Petunjuk penggunaan tiket. - Tautan bantuan. - Unduh/cetak PDF dapat
-menjadi fitur lanjutan.
+Petunjuk penggunaan tiket. - Tautan bantuan. - File tiket PDF yang
+dapat diunduh.
+
+Tiket menggunakan orientasi landscape. Organizer memperoleh template
+tiket dalam format PDF dan PNG dengan ukuran tiket serta area/posisi QR
+Code yang telah ditandai. Organizer mendesain tiket berdasarkan template
+tersebut dan mengunggah desain final. Sistem menempatkan QR unik setiap
+tiket pada area QR yang ditentukan, kemudian menghasilkan PDF final untuk
+dikirim ke email peserta. Ukuran fisik tiket, resolusi PNG, dan batas
+ukuran file perlu ditetapkan sebelum implementasi final.
 
 Aturan: - QR Code hanya memuat token/URL validasi yang aman, bukan data
 pribadi lengkap. - Tiket hanya dapat dibuka melalui akun pemilik atau
@@ -537,11 +547,10 @@ dimiliki Owner.
 
 Tujuan: memberi ringkasan kondisi seluruh event milik Organizer.
 
-Komponen: - Total event. - Event draft. - Event menunggu moderasi. -
-Event dipublikasikan/aktif. - Tiket terjual. - Pesanan menunggu
-pembayaran. - Total peserta. - Total check-in. - Ringkasan penjualan
-kotor. - Daftar event terbaru. - Notifikasi revisi atau keputusan
-moderasi.
+Komponen: - Total event. - Event draft. - Event dipublikasikan/aktif. -
+Event ditangguhkan. - Tiket terjual. - Pesanan menunggu pembayaran. -
+Total peserta. - Total check-in. - Ringkasan penjualan kotor. - Daftar
+event terbaru. - Notifikasi hasil validasi atau tindakan administratif.
 
 Fitur: - Memilih event untuk melihat detail. - Membuat event baru. -
 Melihat event yang membutuhkan tindakan. - Membuka laporan event.
@@ -554,16 +563,16 @@ platform.
 
 Komponen: - Tabel/kartu seluruh event milik Owner. - Nama event. -
 Tanggal pelaksanaan. - Status event. - Jumlah tiket terjual. - Jumlah
-peserta. - Status moderasi. - Tombol aksi.
+peserta. - Status validasi. - Tombol aksi.
 
-Filter: - Semua. - Draft. - Menunggu moderasi. - Perlu revisi. -
-Disetujui/dipublikasikan. - Selesai. - Ditolak. -
-Ditangguhkan/dibatalkan.
+Filter: - Semua. - Draft. - Dipublikasikan. - Selesai. -
+Ditangguhkan/dibatalkan. - Perlu perbaikan validasi.
 
 Aksi: - Membuka detail event. - Mengedit event jika status
-mengizinkan. - Mengajukan moderasi. - Membuka URL publik untuk event
-yang sudah dipublikasikan. - Menyalin tautan publik. - Melihat QR
-registrasi publik.
+mengizinkan. - Melihat status validasi otomatis. - Membuka URL publik
+untuk event yang sudah lolos validasi. - Menyalin link pendaftaran
+peserta dan link registrasi panitia. - Melihat QR Code pendaftaran
+peserta.
 
 ## 5.4 Halaman Buat/Edit Event
 
@@ -599,22 +608,36 @@ Form dibagi ke beberapa bagian agar mudah digunakan.
 -   Kuota.
 -   Periode penjualan.
 -   Status aktif.
--   Batas pembelian per Order.
+-   Satu tiket per Order (quantity selalu 1).
 
 ### E. Pengaturan Registrasi
 
+-   Tanggal dan waktu mulai pendaftaran.
+-   Tanggal dan waktu penutupan pendaftaran.
 -   Informasi peserta yang wajib diisi.
 -   Batas waktu pembayaran mengikuti kebijakan platform.
 -   Pengaturan kuota.
+-   Pesan email khusus dari Organizer (opsional). Jika diisi, email memuat
+    informasi standar, pesan Organizer, dan lampiran PDF tiket. Jika
+    kosong, email hanya memuat informasi standar dan lampiran PDF.
 -   Informasi yang tampil pada halaman publik.
 
-Aksi: - Simpan sebagai draft. - Pratinjau halaman publik. - Ajukan
-moderasi.
+### F. Desain Tiket
 
-Aturan: - Event baru berstatus DRAFT. - Event yang diajukan berubah
-menjadi PENDING_REVIEW. - Perubahan penting pada event yang sudah
-dipublikasikan dapat memerlukan moderasi ulang sesuai kebijakan. - Owner
-tidak dapat mengubah status moderasi secara manual.
+-   Unduh template tiket PDF dan PNG berorientasi landscape.
+-   Template menunjukkan ukuran tiket dan area/posisi QR Code.
+-   Organizer mengunggah desain tiket final berdasarkan template.
+-   Sistem memvalidasi format, ukuran, dan area QR sebelum desain
+    digunakan.
+
+Aksi: - Simpan sebagai draft. - Pratinjau halaman publik. - Jalankan
+validasi event.
+
+Aturan: - Event baru berstatus DRAFT. - Sistem memvalidasi kelengkapan
+data event, periode pendaftaran, kategori tiket, dan desain tiket. - Event yang lolos validasi otomatis dapat dipublikasikan. -
+Event yang gagal validasi tetap DRAFT sampai Organizer memperbaikinya. -
+Admin tidak perlu menyetujui event sebelum publikasi, tetapi dapat
+memantau dan menangguhkan event yang melanggar kebijakan.
 
 ## 5.5 Halaman Detail Event
 
@@ -629,30 +652,33 @@ Setiap tab dijelaskan di bawah.
 
 ### 5.5.1 Tab Ringkasan
 
-Komponen: - Status event. - Jadwal dan lokasi. - Tiket terjual. -
-Pesanan pending. - Peserta terdaftar. - Check-in berhasil. - Grafik
-penjualan dan check-in sederhana. - URL publik dan QR registrasi.
+Komponen: - Status event/validasi. - Jadwal dan lokasi. - Periode
+pendaftaran. - Tiket terjual. - Pesanan pending. - Peserta terdaftar. -
+Check-in berhasil. - Grafik penjualan dan check-in sederhana. - Link
+pendaftaran peserta beserta QR Code. - Link registrasi panitia.
 
-Fitur: - Menyalin tautan. - Melihat halaman publik. - Membuka laporan
-event.
+Fitur: - Menyalin masing-masing tautan. - Melihat halaman publik. -
+Membuka halaman registrasi panitia. - Membuka laporan event.
 
 ### 5.5.2 Tab Informasi Event
 
 Fitur: - Melihat informasi event. - Mengedit informasi jika status event
-mengizinkan. - Melihat catatan revisi Admin. - Mengajukan ulang setelah
-revisi.
+mengizinkan. - Melihat hasil validasi otomatis dan memperbaiki bagian
+yang belum memenuhi ketentuan.
 
 ### 5.5.3 Tab Kategori Tiket
 
-Fitur: - Membuat kategori tiket. - Mengubah nama dan deskripsi. -
-Mengatur harga. - Mengatur kuota. - Mengatur periode penjualan. -
-Mengaktifkan/menonaktifkan kategori. - Melihat tiket terjual dan sisa
+Fitur: - Membuat kategori tiket. - Mengubah nama dan deskripsi sebelum
+ada transaksi. - Menetapkan harga saat kategori dibuat. - Menaikkan kuota.
+- Mengaktifkan/menonaktifkan kategori. - Melihat tiket terjual dan sisa
 kuota.
 
-Batasan: - Tidak boleh mengubah harga pesanan yang sudah dibuat. -
-Perubahan kuota tidak boleh membuat jumlah terjual + jumlah yang sedang
-ditahan melebihi batas baru. - Perubahan kategori yang sudah memiliki
-transaksi harus mempertahankan riwayat transaksi.
+Batasan: - Harga TicketType tidak dapat diubah setelah kategori dibuat.
+- Kuota hanya boleh dinaikkan, tidak boleh diturunkan. - TicketType yang
+sudah memiliki transaksi tidak boleh dihapus permanen; hanya dapat dinonaktifkan. - Menonaktifkan kategori menghentikan Order baru, tetapi
+Order yang sudah dibuat tetap dapat diselesaikan sampai batas waktu
+pembayarannya berakhir. - Perubahan kategori harus mempertahankan
+riwayat transaksi.
 
 ### 5.5.4 Tab Peserta & Pesanan
 
@@ -662,7 +688,15 @@ check-in. - Metode registrasi: SELF_SERVICE atau ASSISTED.
 
 Fitur: - Pencarian nama/email/nomor Order. - Filter kategori tiket. -
 Filter status pembayaran. - Filter status check-in. - Melihat detail
-peserta dan pesanan. - Ekspor CSV jika permission/paket mengizinkan.
+peserta dan pesanan. - Ekspor Excel (.xlsx) jika permission/paket
+mengizinkan.
+
+Pengurutan default: peserta dengan pembayaran PAID ditampilkan lebih
+dahulu. Peserta event gratis (`NOT_REQUIRED`) dan status lainnya
+ditampilkan setelahnya. Di dalam setiap kelompok status, urutkan
+berdasarkan nomor registrasi asli dari yang paling awal. Nomor registrasi diberikan saat
+Order dibuat dan tidak berubah ketika status pembayaran berubah. File
+Excel menggunakan urutan dan nomor registrasi yang sama.
 
 Batasan: - Organizer tidak boleh mengubah pembayaran menjadi PAID secara
 manual. - Organizer tidak boleh melihat data event Organizer lain. -
@@ -670,24 +704,15 @@ Data sensitif hanya ditampilkan sesuai kebutuhan operasional.
 
 ### 5.5.5 Tab Registrasi Manual
 
-Tujuan: Owner membantu calon peserta yang tidak mendaftar sendiri.
+Tujuan: Owner atau Staff dengan permission `ASSIST_REGISTRATION` membantu calon peserta yang tidak mendaftar sendiri.
 
-Komponen: - Form nama pemesan/kontak. - Email kontak. - Pilihan kategori
-tiket. - Jumlah tiket. - Form data untuk setiap peserta. - Ringkasan
-biaya. - Tombol Buat Pesanan.
+Komponen: - Form nama peserta. - Email peserta. - Nomor telepon jika diperlukan. - Pilihan satu kategori tiket. - Ringkasan biaya. - Tombol Buat Registrasi.
 
-Alur: 1. Owner membuka Registrasi Manual. 2. Memilih kategori dan jumlah
-tiket. 3. Mengisi data setiap peserta. 4. Backend memvalidasi kuota dan
-harga. 5. Backend membuat Order dengan `registration_method = ASSISTED`.
-6. `assisted_by_member_id` diisi dengan keanggotaan Owner. 7. Sistem
-membuat instruksi pembayaran yang sama seperti registrasi mandiri. 8.
-Setelah pembayaran berhasil atau pesanan gratis dinyatakan berhasil,
-tiket diterbitkan.
+Aturan: - Setiap tindakan registrasi panitia membuat satu Order untuk satu Attendee. - Untuk beberapa peserta, panitia mengulangi proses registrasi. - Registrasi bantuan tetap mengikuti periode pendaftaran, kuota, serta aturan pembayaran. - Untuk event gratis, tiket diterbitkan setelah registrasi berhasil. Untuk event berbayar, tiket diterbitkan setelah pembayaran dikonfirmasi berhasil. - `assisted_by_member_id` mencatat Owner/Staff yang melakukan registrasi.
 
-Batasan: - Owner tidak boleh melewati proses pembayaran untuk event
-berbayar. - Owner tidak boleh mengubah status pembayaran secara
-manual. - Registrasi manual tetap mengikuti kuota dan periode
-penjualan. - Semua aktivitas dicatat dengan identitas pelaku.
+Batasan: - Panitia tidak boleh melewati proses pembayaran untuk event berbayar. - Panitia tidak boleh mengubah status pembayaran secara manual. - Semua aktivitas dicatat dengan identitas pelaku.
+
+
 
 ### 5.5.6 Tab Tim Event
 
@@ -738,7 +763,7 @@ Organizer tidak dapat melihat transaksi Organizer lain.
 ### 5.5.9 Tab Riwayat Aktivitas
 
 Menampilkan tindakan penting pada event, misalnya: - Event
-dibuat/diubah. - Event diajukan untuk moderasi. - Kategori tiket
+dibuat/diubah. - Hasil validasi event dicatat. - Kategori tiket
 diubah. - Staff diundang/dicabut. - Registrasi manual dibuat. - Check-in
 dilakukan. - Pengaturan event diubah.
 
@@ -747,12 +772,11 @@ terkait. - Ringkasan perubahan.
 
 ## 5.6 Halaman Organizer Staff
 
-Staff menggunakan dashboard lebih sederhana daripada Owner. Staff tidak
-melihat menu pengelolaan bisnis atau pengaturan event.
+Staff menggunakan dashboard lebih sederhana daripada Owner. Staff tidak melihat menu pengelolaan bisnis atau pengaturan event. Link registrasi panitia yang ditampilkan pada detail event Organizer membuka area operasional event setelah Staff login dan lolos pemeriksaan keanggotaan serta permission.
 
 ### Navigasi Staff
 
-``` text
+```text
 Dashboard Staff
 Event yang Ditugaskan
 ├── Ringkasan Event
@@ -768,46 +792,25 @@ Logout
 
 ### Dashboard Staff
 
-Komponen: - Daftar event yang ditugaskan. - Jadwal event. - Status
-event. - Ringkasan tugas/permission. - Tombol menuju fitur yang
-diizinkan.
+Komponen: - Daftar event yang ditugaskan. - Jadwal event. - Status event. - Ringkasan tugas/permission. - Tombol menuju fitur yang diizinkan.
 
 ### Event yang Ditugaskan
 
-Fitur: - Melihat hanya event yang keanggotaannya ACTIVE. - Membuka
-ringkasan event. - Membuka scanner jika memiliki permission. - Membuka
-data peserta jika memiliki permission.
+Fitur: - Melihat hanya event yang keanggotaannya ACTIVE. - Membuka ringkasan event. - Membuka scanner jika memiliki permission. - Membuka data peserta jika memiliki permission.
 
 ### Registrasi Manual Staff
 
-Hanya tampil jika Staff memiliki `ASSIST_REGISTRATION`.
-
-Fitur: - Mengisi data peserta. - Memilih kategori dan jumlah tiket. -
-Membuat pesanan assisted. - Melihat hasil pembuatan Order.
-
-Batasan: - Tidak dapat mengubah harga atau kuota. - Tidak dapat
-menyatakan pembayaran berhasil. - Tidak dapat mengubah pengaturan
-event. - `assisted_by_member_id` mencatat Staff yang melakukan
-registrasi.
+Hanya tampil jika Staff memiliki `ASSIST_REGISTRATION`. Staff mengisi data satu peserta untuk setiap Order. Untuk beberapa peserta, proses diulang. Batasan: tidak dapat mengubah harga atau kuota, menyatakan pembayaran berhasil, atau mengubah pengaturan event.
 
 ### Scanner Staff
 
-Hanya tampil jika Staff memiliki permission scanner/check-in.
-
-Fitur: - Memindai QR. - Melihat hasil validasi. - Melakukan check-in
-jika memiliki `CHECK_IN_TICKET`. - Melihat riwayat scan jika memiliki
-`VIEW_SCAN_HISTORY`. - Melihat status sinkronisasi offline.
+Hanya tampil jika Staff memiliki permission scanner/check-in. Link registrasi panitia dapat mengarahkan Staff ke halaman operasional event; fitur registrasi bantuan dan scanner ditampilkan sesuai permission yang diberikan Owner. Staff dapat memindai QR tiket, melihat hasil validasi, melakukan check-in jika memiliki `CHECK_IN_TICKET`, melihat riwayat scan jika memiliki `VIEW_SCAN_HISTORY`, dan melihat status sinkronisasi offline.
 
 ### Batasan Staff
 
-Staff tidak boleh: - Membuat event. - Mengedit informasi utama event. -
-Membuat/mengubah kategori tiket. - Mengubah harga dan kuota. - Mengelola
-langganan. - Mengundang atau mencabut Staff lain. - Mengakses event yang
-tidak ditugaskan. - Mengakses dashboard Admin. - Mengubah status
-pembayaran. - Melihat laporan jika tidak memiliki permission.
+Staff tidak boleh membuat event, mengedit informasi utama event, membuat/mengubah kategori tiket, mengubah harga dan kuota, mengelola langganan, mengundang atau mencabut Staff lain, mengakses event yang tidak ditugaskan, mengakses dashboard Admin, mengubah status pembayaran, atau melihat laporan tanpa permission.
 
-Jika permission tidak tersedia, menu dan endpoint terkait harus ditolak.
-Menyembunyikan menu saja tidak cukup.
+
 
 ------------------------------------------------------------------------
 
@@ -846,7 +849,7 @@ Navigasi Admin:
 Dashboard Bisnis
 Manajemen Event
 ├── Semua Event
-├── Menunggu Moderasi
+├── Perlu Perhatian
 └── Detail Event
 Manajemen Pengguna
 ├── Organizer
@@ -881,7 +884,7 @@ halaman.
 -   Event aktif.
 -   Event mendatang.
 -   Event selesai.
--   Event menunggu moderasi.
+-   Event yang gagal validasi atau ditangguhkan.
 -   Total Organizer.
 -   Total akun Participant.
 -   Total tiket diterbitkan/terjual.
@@ -893,8 +896,7 @@ halaman.
 Definisi: - Event aktif: event sudah dipublikasikan dan waktu saat ini
 berada di antara waktu mulai dan selesai. - Event mendatang: event sudah
 dipublikasikan tetapi belum dimulai. - Event selesai: event sudah
-melewati waktu selesai. - Event menunggu moderasi: event berada pada
-status PENDING_REVIEW. - Pendapatan platform berbeda dari total
+melewati waktu selesai. - Event bermasalah: event yang gagal validasi atau ditangguhkan Admin. - Pendapatan platform berbeda dari total
 penjualan tiket.
 
 ### Grafik
@@ -909,7 +911,7 @@ penjualan tiket.
 
 ### Daftar aktivitas dan perhatian
 
--   Event baru menunggu moderasi.
+-   Event baru dan event yang ditangguhkan untuk ditinjau.
 -   Event yang membutuhkan tindakan.
 -   Keluhan prioritas tinggi.
 -   Transaksi bermasalah.
@@ -921,21 +923,21 @@ Rentang tanggal khusus.
 ## 6.3 Manajemen Event
 
 Halaman daftar: - Semua event pada platform. - Nama event. - Organizer
-pemilik. - Kategori. - Jadwal. - Status publikasi/moderasi. - Jumlah
+pemilik. - Kategori. - Jadwal. - Status publikasi/validasi. - Jumlah
 tiket terjual. - Filter dan pencarian.
 
 Halaman detail: - Informasi event. - Data Organizer. - Kategori dan
-harga tiket. - Statistik peserta dan transaksi. - Riwayat moderasi. -
+harga tiket. - Statistik peserta dan transaksi. - Riwayat validasi otomatis. -
 Riwayat tindakan administratif.
 
-Aksi Admin: - Menyetujui event. - Menolak event dengan alasan. - Meminta
-revisi dengan catatan. - Menangguhkan event dengan alasan. - Membuka
+Aksi Admin: - Memantau seluruh event dan hasil validasi otomatis. -
+Menangguhkan event dengan alasan jika ditemukan pelanggaran. - Membuka
 kembali event yang ditangguhkan jika sesuai kebijakan.
 
-Aturan: - Setiap keputusan moderasi menyimpan Admin, waktu, keputusan,
-dan alasan. - Admin tidak mengubah data event diam-diam. - Jika Admin
-melakukan koreksi administratif, perubahan harus masuk AuditLog. - Event
-yang belum disetujui tidak dapat dipesan publik.
+Aturan: - Admin bukan pemberi persetujuan rutin sebelum event
+dipublikasikan. - Sistem melakukan validasi otomatis. - Setiap tindakan
+penangguhan/pembukaan kembali menyimpan Admin, waktu, keputusan, alasan,
+dan AuditLog. - Admin tidak mengubah data event diam-diam.
 
 ## 6.4 Manajemen Pengguna
 
@@ -1072,7 +1074,7 @@ Informasi: - Aktor. - Role. - Aksi. - Entitas yang diubah. - ID
 entitas. - Waktu. - Ringkasan nilai sebelum/sesudah jika aman
 disimpan. - IP/device metadata jika diperlukan.
 
-Aksi yang wajib dicatat: - Login administratif penting. - Moderasi
+Aksi yang wajib dicatat: - Login administratif penting. - Hasil validasi
 event. - Penangguhan event. - Penonaktifan akun. - Perubahan paket. -
 Perubahan harga paket. - Perubahan komisi/biaya. - Perubahan status
 keluhan. - Perubahan langganan secara administratif.
@@ -1117,48 +1119,50 @@ database, API, dan UI.
 
 # 8. Alur Bisnis Utama
 
-## 8.1 Pembuatan dan Moderasi Event
+## 8.1 Pembuatan dan Publikasi Event
 
-1.  Organizer login.
-2.  Organizer membuat event.
-3.  Organizer mengatur kategori tiket dan kuota.
-4.  Event disimpan sebagai DRAFT.
-5.  Organizer mengajukan event.
-6.  Event menjadi PENDING_REVIEW.
-7.  Admin meninjau event.
-8.  Admin menyetujui, menolak, atau meminta revisi.
-9.  Jika disetujui dan dipublikasikan, URL publik tersedia.
-10. Organizer membagikan URL/QR registrasi.
+1.  Organizer login dan membuat event.
+2.  Organizer mengatur informasi event, periode pendaftaran, kategori
+    tiket, kuota, pesan email opsional, dan desain tiket.
+3.  Event disimpan sebagai DRAFT.
+4.  Organizer menjalankan validasi event.
+5.  Sistem memeriksa kelengkapan dan aturan event secara otomatis.
+6.  Jika lolos, event dipublikasikan sesuai jadwal dan sistem membuat
+    link pendaftaran peserta serta link registrasi panitia.
+7.  Sistem menyediakan QR Code yang mengarah ke link pendaftaran
+    peserta.
+8.  Organizer mengundang Staff dan memberikan permission. Link
+    registrasi panitia hanya dapat digunakan oleh Staff yang telah
+    login dan lolos pemeriksaan akses.
+9.  Admin memantau event dan dapat menangguhkan event jika ditemukan
+    pelanggaran, dengan alasan dan AuditLog.
 
 ## 8.2 Registrasi Mandiri
 
-1.  Participant membuka URL event.
-2.  Participant memilih tiket.
-3.  Participant mengisi data pemesan dan setiap peserta.
-4.  Backend memeriksa kuota, periode penjualan, dan batas pembelian.
-5.  Backend membuat Order, OrderItem, Attendee, dan Payment.
-6.  Participant melihat instruksi Virtual Account simulasi.
-7.  Backend memproses simulasi pembayaran.
-8.  Jika berhasil, Order menjadi PAID.
-9.  Backend menerbitkan tiket satu per Attendee.
-10. Sistem mengirim email e-ticket.
+1. Participant membuka link pendaftaran peserta atau memindai QR pendaftaran event.
+2. Participant memilih satu kategori tiket.
+3. Participant mengisi data dirinya dan email penerima e-ticket.
+4. Backend memeriksa kuota dan periode pendaftaran.
+5. Backend membuat satu Order, satu OrderItem dengan `quantity = 1`, dan satu Attendee.
+6. Jika event gratis, tiket diterbitkan setelah registrasi berhasil tanpa membuat pembayaran berbayar.
+7. Jika event berbayar, backend membuat Payment dan menampilkan instruksi Virtual Account simulasi.
+8. Setelah pembayaran dikonfirmasi berhasil, Order menjadi PAID dan tiket diterbitkan.
+9. Sistem menghasilkan PDF tiket landscape dengan QR unik dan mengirimkannya sebagai lampiran email ke peserta.
+
+
 
 ## 8.3 Registrasi Dibantu Owner/Staff
 
-1.  Owner/Staff membuka event yang dapat diakses.
-2.  Sistem memeriksa permission `ASSIST_REGISTRATION`.
-3.  Pengguna mengisi data pemesan dan peserta.
-4.  Backend memeriksa kuota, periode penjualan, dan batas pembelian.
-5.  Backend membuat struktur Order yang sama dengan registrasi mandiri.
-6.  `registration_method` diisi `ASSISTED`.
-7.  `assisted_by_member_id` mencatat Owner/Staff yang melakukan
-    tindakan.
-8.  Pembayaran diproses menggunakan simulasi yang sama.
-9.  Tiket diterbitkan setelah pembayaran berhasil atau pesanan gratis
-    berhasil.
+1. Panitia membuka link registrasi panitia dan login.
+2. Sistem memeriksa keanggotaan event serta permission `ASSIST_REGISTRATION`.
+3. Panitia mengisi data satu peserta.
+4. Backend memeriksa kuota dan periode pendaftaran.
+5. Backend membuat satu Order, satu OrderItem (`quantity = 1`), dan satu Attendee dengan `registration_method = ASSISTED`.
+6. `assisted_by_member_id` mencatat Owner/Staff yang melakukan tindakan.
+7. Untuk event gratis, tiket diterbitkan setelah registrasi berhasil. Untuk event berbayar, instruksi pembayaran dibuat dan tiket diterbitkan setelah pembayaran dikonfirmasi berhasil.
+8. Sistem mengirim e-ticket PDF ke email peserta.
 
-Tidak boleh ada jalur khusus yang melewati validasi kuota, harga, atau
-pembayaran.
+
 
 ## 8.4 Check-in Online
 
@@ -1203,18 +1207,17 @@ terhubung.
 
 ## 9.1 Status Event
 
-Status yang disarankan: - `DRAFT` - `PENDING_REVIEW` -
-`REVISION_REQUESTED` - `APPROVED` - `PUBLISHED` - `REJECTED` -
-`SUSPENDED` - `COMPLETED` - `CANCELLED`
+Status yang digunakan: - `DRAFT` - `PUBLISHED` - `SUSPENDED` - `COMPLETED` - `CANCELLED`.
 
-`APPROVED` dan `PUBLISHED` dapat menjadi status terpisah: disetujui
-berarti lolos moderasi, sedangkan dipublikasikan berarti sudah tersedia
-untuk umum.
+Hasil validasi otomatis disimpan sebagai metadata/status validasi terpisah, misalnya `VALID` atau `NEEDS_CORRECTION`. Event yang gagal validasi tetap `DRAFT` sampai diperbaiki. Event yang lolos validasi dapat dipublikasikan tanpa persetujuan manual Admin. Admin dapat menangguhkan event yang telah dipublikasikan jika ditemukan pelanggaran.
+
+
 
 ## 9.2 Status Order
 
 -   `PENDING_PAYMENT`
 -   `PAID`
+-   `CONFIRMED` untuk registrasi event gratis yang berhasil tanpa pembayaran
 -   `EXPIRED`
 -   `CANCELLED`
 
@@ -1222,6 +1225,8 @@ Status Order dan Payment disimpan terpisah.
 
 ## 9.3 Status Payment
 
+-   `NOT_REQUIRED` untuk event gratis; status ini menegaskan bahwa Order
+    tidak memerlukan pembayaran dan tidak boleh dilabeli `PAID`.
 -   `PENDING`
 -   `PAID`
 -   `EXPIRED`
@@ -1262,7 +1267,18 @@ Status Order dan Payment disimpan terpisah.
     expired/cancelled.
 7.  Proses pembayaran dan penerbitan tiket harus idempoten.
 8.  Harga pada OrderItem disimpan sebagai snapshot.
-9.  Perubahan harga TicketType tidak mengubah Order lama.
+9.  Harga TicketType bersifat tetap setelah kategori dibuat.
+10. Kuota TicketType hanya dapat dinaikkan dan tidak dapat diturunkan.
+11. TicketType yang telah memiliki transaksi tidak dapat dihapus
+    permanen; kategori hanya dapat dinonaktifkan. Penonaktifan hanya
+    menghentikan Order baru dan tidak membatalkan Order pending yang
+    masih berada dalam masa pembayaran.
+12. Satu Order hanya boleh berisi satu tiket dan satu Attendee.
+13. Semua TicketType dalam satu Event harus memiliki tipe harga yang
+    sama: seluruhnya gratis atau seluruhnya berbayar.
+14. Event memiliki waktu mulai dan tutup pendaftaran. Order baru hanya
+    dapat dibuat selama periode pendaftaran terbuka. Order berbayar yang
+    telah dibuat tetap dapat dibayar sampai batas waktu pembayarannya.
 
 ## 9.8 Aturan Paket dan Komisi
 
@@ -1307,16 +1323,17 @@ relasi final harus ditetapkan pada schema Prisma.
   ------------------- ------------------------------------------------------
   `EventCategory`     Kategori umum event.
   `Event`             Data event.
-  `EventModeration`   Riwayat keputusan moderasi Admin.
-  `TicketType`        Kategori tiket, harga, kuota, dan periode penjualan.
+  `EventValidation`   Hasil validasi otomatis event dan riwayat koreksi.
+  `TicketType`        Kategori tiket, harga tetap, kuota, dan status.
 
 ## 10.3 Registration & Payment
 
   -----------------------------------------------------------------------
   Model                               Fungsi
   ----------------------------------- -----------------------------------
-  `EventOrder`                        Pesanan, sumber registrasi,
-                                      pemesan, total, dan status.
+  `EventOrder`                        Satu pesanan untuk satu tiket/
+                                      Attendee, sumber registrasi,
+                                      nomor registrasi, dan status.
 
   `OrderItem`                         Rincian kategori tiket dan jumlah
                                       dalam pesanan.
@@ -1383,7 +1400,7 @@ erDiagram
     EVENT ||--o{ EVENT_MEMBER : has
     EVENT_MEMBER ||--o{ EVENT_MEMBER_PERMISSION : grants
     EVENT ||--o{ EVENT_INVITATION : invites
-    EVENT ||--o{ EVENT_MODERATION : moderation
+    EVENT ||--o{ EVENT_VALIDATION : validation
     EVENT_CATEGORY ||--o{ EVENT : categorizes
     EVENT ||--o{ TICKET_TYPE : offers
 
@@ -1392,9 +1409,10 @@ erDiagram
     EVENT_MEMBER o|--o{ EVENT_ORDER : assists
     EVENT_ORDER ||--|{ ORDER_ITEM : contains
     TICKET_TYPE ||--o{ ORDER_ITEM : selected
-    ORDER_ITEM ||--|{ ATTENDEE : has
+    ORDER_ITEM ||--|| ATTENDEE : has
     EVENT_ORDER ||--o{ ORDER_PAYMENT : payments
     ATTENDEE ||--o| TICKET : receives
+    EVENT ||--o| EVENT_TICKET_DESIGN : uses
     TICKET ||--o{ SCAN_LOG : scanned
     TICKET ||--o{ CHECK_IN : checkins
 
@@ -1412,18 +1430,18 @@ erDiagram
     USER ||--o{ AUDIT_LOG : performs
 ```
 
-Catatan: - Peserta tanpa akun tetap dapat memiliki Order dan Attendee.
-`user_id` pada Order boleh kosong. - EventOrder menyimpan
-`registration_method` bernilai `SELF_SERVICE` atau `ASSISTED`. - Untuk
-registrasi dibantu, `assisted_by_member_id` menunjuk EventMember yang
-melakukan registrasi. - EventMemberPermission hanya berlaku pada event
-terkait. - Constraint satu Owner aktif per event harus dijamin oleh
-backend dan/atau database. - Satu tiket hanya boleh memiliki satu
-CheckIn sukses. ScanLog boleh menyimpan banyak percobaan. -
-PlatformTransaction harus memiliki tepat satu sumber transaksi yang
-valid: Order atau Subscription. - Model database dapat disesuaikan saat
-implementasi selama seluruh kebutuhan dan aturan bisnis PRD tetap
-terpenuhi.
+Catatan:
+- Peserta tanpa akun tetap dapat memiliki Order dan Attendee; `user_id` pada Order boleh kosong.
+- Event menyimpan `registration_open_at`, `registration_close_at`, dan `organizer_email_message` (opsional).
+- `EventTicketDesign` menyimpan file desain, format, dimensi, posisi QR (`x`, `y`, `width`, `height`), status validasi, dan versi desain.
+- Sistem menghasilkan dua link terpisah: link pendaftaran peserta dan link registrasi panitia. Link panitia memerlukan autentikasi dan pemeriksaan keanggotaan/permission event.
+- `EventOrder` memiliki satu nomor registrasi yang dibuat saat Order dibuat dan tidak berubah. Setiap Order hanya mempunyai satu OrderItem (`quantity = 1`) dan satu Attendee.
+- `registration_method` bernilai `SELF_SERVICE` atau `ASSISTED`; untuk registrasi dibantu, `assisted_by_member_id` menunjuk EventMember yang melakukan registrasi.
+- `TicketEmailDelivery` menyimpan status email dan percobaan ulang; kegagalan email tidak boleh membuat tiket ganda atau menghapus tiket.
+- Event memiliki satu desain tiket aktif; setiap tiket yang diterbitkan menyimpan referensi versi desain yang digunakan agar file tiket lama tetap konsisten.
+- Satu tiket hanya boleh memiliki satu CheckIn sukses. ScanLog boleh menyimpan banyak percobaan.
+- PlatformTransaction harus memiliki tepat satu sumber transaksi yang valid: Order atau Subscription.
+- Model database dapat disesuaikan saat implementasi selama seluruh kebutuhan dan aturan bisnis PRD tetap terpenuhi.
 
 ------------------------------------------------------------------------
 
@@ -1444,39 +1462,50 @@ terpenuhi.
 -   **FR-08:** Backend memeriksa role, status akun, keanggotaan event,
     dan permission pada setiap endpoint privat.
 
-## 11.2 Event dan Moderasi
+## 11.2 Event dan Validasi Otomatis
 
 -   **FR-09:** Organizer Owner dapat membuat dan mengedit event.
 -   **FR-10:** Event baru berstatus DRAFT.
--   **FR-11:** Owner dapat mengajukan event untuk moderasi.
--   **FR-12:** Admin dapat menyetujui, menolak, atau meminta revisi.
--   **FR-13:** Event yang belum disetujui tidak dapat dipesan publik.
--   **FR-14:** Event yang dipublikasikan memiliki URL publik.
--   **FR-15:** QR publik event mengarah ke halaman event/registrasi dan
-    berbeda dari QR tiket individual.
--   **FR-16:** Admin dapat menangguhkan event dengan alasan dan audit
-    log.
+-   **FR-11:** Sistem memvalidasi kelengkapan dan aturan event secara
+    otomatis.
+-   **FR-12:** Event yang lolos validasi dapat dipublikasikan tanpa
+    persetujuan manual Admin.
+-   **FR-13:** Event yang gagal validasi tetap DRAFT dan menampilkan
+    kesalahan yang harus diperbaiki Organizer.
+-   **FR-14:** Event yang dipublikasikan memiliki link pendaftaran
+    peserta dan link registrasi panitia yang berbeda.
+-   **FR-15:** Sistem menyediakan QR Code yang mengarah ke link
+    pendaftaran peserta; QR ini berbeda dari QR tiket individual.
+-   **FR-16:** Admin memantau event dan dapat menangguhkan event dengan
+    alasan serta AuditLog jika ditemukan pelanggaran.
 
 ## 11.3 Kategori Tiket dan Kuota
 
 -   **FR-17:** Owner dapat membuat beberapa TicketType.
--   **FR-18:** TicketType memiliki nama, deskripsi, harga, kuota,
-    periode penjualan, dan status.
+-   **FR-18:** TicketType memiliki nama, deskripsi, harga tetap, kuota,
+    dan status.
 -   **FR-19:** Sistem membatasi pemesanan berdasarkan kuota.
--   **FR-20:** Sistem mendukung beberapa tiket dalam satu Order.
--   **FR-21:** Kuota dikelola secara aman untuk mencegah overselling.
--   **FR-22:** Perubahan harga tidak mengubah Order lama.
+-   **FR-20:** Satu Order hanya berisi satu tiket dan satu Attendee;
+    beberapa peserta didaftarkan melalui beberapa Order terpisah.
+-   **FR-21:** Kuota dikelola secara aman; kuota hanya dapat dinaikkan.
+-   **FR-22:** Harga TicketType tidak dapat diubah setelah dibuat.
+-   **FR-22A:** TicketType yang memiliki transaksi hanya dapat
+    dinonaktifkan, bukan dihapus permanen. Order yang telah dibuat tetap
+    dapat diselesaikan sampai batas waktu pembayaran.
 
 ## 11.4 Registrasi dan Order
 
 -   **FR-23:** Participant dapat mendaftar melalui URL publik tanpa
     akun.
--   **FR-24:** Participant dapat memilih kategori dan jumlah tiket.
--   **FR-25:** Sistem meminta data setiap Attendee.
+-   **FR-24:** Participant memilih satu kategori tiket untuk satu Order.
+-   **FR-25:** Sistem meminta data satu Attendee untuk setiap Order.
+-   **FR-25A:** Satu Event hanya boleh memiliki kategori yang seluruhnya
+    gratis atau seluruhnya berbayar.
 -   **FR-26:** Sistem menampilkan ringkasan harga dan biaya sebelum
     Order dibuat.
 -   **FR-27:** Sistem membuat nomor Order unik.
--   **FR-28:** Order memiliki batas waktu pembayaran.
+-   **FR-28:** Event memiliki tanggal/waktu buka dan tutup pendaftaran;
+    Order berbayar memiliki batas waktu pembayaran.
 -   **FR-29:** Kuota yang ditahan dilepas saat Order expired/cancelled.
 -   **FR-30:** Owner dapat membantu registrasi.
 -   **FR-31:** Staff dapat membantu registrasi hanya jika memiliki
@@ -1488,7 +1517,9 @@ terpenuhi.
 
 ## 11.5 Simulasi Pembayaran
 
--   **FR-34:** MVP menyediakan simulasi Virtual Account.
+-   **FR-34:** Event gratis menerbitkan tiket setelah registrasi berhasil
+    tanpa proses pembayaran. Event berbayar menggunakan simulasi Virtual
+    Account.
 -   **FR-35:** Sistem menampilkan nomor VA simulasi, nominal, referensi,
     dan batas waktu.
 -   **FR-36:** Status Payment mencakup PENDING, PAID, EXPIRED, FAILED,
@@ -1507,10 +1538,15 @@ terpenuhi.
 -   **FR-43:** Setiap tiket memiliki ID dan token QR unik.
 -   **FR-44:** QR tidak memuat password atau data pribadi lengkap.
 -   **FR-45:** Participant dapat membuka e-ticket.
--   **FR-46:** Sistem mengirim e-ticket melalui email.
+-   **FR-46:** Sistem mengirim e-ticket PDF sebagai lampiran email ke
+    alamat email peserta. Email memuat informasi standar event dan
+    pesan khusus Organizer jika diisi.
 -   **FR-47:** Kegagalan email tidak menghapus tiket yang sudah
     diterbitkan.
 -   **FR-48:** Sistem menyimpan status pengiriman dan menyediakan retry.
+-   **FR-48A:** Sistem menghasilkan PDF tiket landscape dari desain
+    Organizer dan menempatkan QR unik pada area QR yang ditetapkan
+    template.
 -   **FR-49:** Status tiket minimal VALID, CHECKED_IN, CANCELLED, dan
     REVOKED.
 
@@ -1548,7 +1584,8 @@ terpenuhi.
 -   **FR-68:** Owner dapat mencari dan memfilter peserta.
 -   **FR-69:** Sistem mencatat metode registrasi mandiri/dibantu.
 -   **FR-70:** Owner dapat melihat laporan penjualan dan kehadiran.
--   **FR-71:** Ekspor CSV tersedia sesuai prioritas dan hak paket.
+-   **FR-71:** Ekspor Excel (.xlsx) tersedia sesuai hak paket dan
+    permission, menggunakan pengurutan peserta yang sama dengan dashboard.
 -   **FR-72:** Owner dapat melihat aktivitas event.
 -   **FR-73:** Staff hanya melihat menu dan data sesuai permission.
 
@@ -1566,7 +1603,7 @@ terpenuhi.
 ## 11.11 Dashboard dan Manajemen Bisnis Admin
 
 -   **FR-80:** Admin dapat melihat total event, event aktif, mendatang,
-    selesai, dan menunggu moderasi.
+    selesai, serta event ditangguhkan/perlu perhatian.
 -   **FR-81:** Admin dapat melihat jumlah Organizer dan Participant.
 -   **FR-82:** Admin dapat melihat jumlah Order dan tiket.
 -   **FR-83:** Admin dapat melihat transaksi dan pendapatan platform.
@@ -1726,14 +1763,19 @@ Endpoint berikut merupakan kelompok awal, bukan kontrak final.
 **Organizer Events** - `GET /organizer/events` -
 `POST /organizer/events` - `GET /organizer/events/:eventId` -
 `PATCH /organizer/events/:eventId` -
-`POST /organizer/events/:eventId/submit-review`
+`POST /organizer/events/:eventId/validate` - `POST /organizer/events/:eventId/publish` -
+`GET /organizer/events/:eventId/registration-links` -
+`POST /organizer/events/:eventId/ticket-design/template` -
+`POST /organizer/events/:eventId/ticket-design`
 
 **Ticket Types** - `POST /organizer/events/:eventId/ticket-types` -
 `PATCH /organizer/ticket-types/:ticketTypeId` -
-`DELETE /organizer/ticket-types/:ticketTypeId` (hanya jika aman dan
-belum memiliki transaksi)
+`POST /organizer/ticket-types/:ticketTypeId/deactivate` (kategori
+yang memiliki transaksi tidak dihapus permanen)
 
-**Assisted Registration** -
+**Staff Event Access & Assisted Registration** -
+`GET /staff/events/:eventId/registration` -
+`POST /staff/events/:eventId/assisted-orders` -
 `POST /organizer/events/:eventId/assisted-orders`
 
 **Orders and Payments** - `GET /orders/:orderId` -
@@ -1751,10 +1793,8 @@ belum memiliki transaksi)
 `DELETE /organizer/events/:eventId/members/:memberId`
 
 **Admin** - `GET /admin/dashboard` - `GET /admin/events` -
-`POST /admin/events/:eventId/approve` -
-`POST /admin/events/:eventId/reject` -
-`POST /admin/events/:eventId/request-revision` -
-`POST /admin/events/:eventId/suspend` - `GET /admin/users` -
+`POST /admin/events/:eventId/suspend` -
+`POST /admin/events/:eventId/reopen` - `GET /admin/users` -
 `GET /admin/plans` - `POST /admin/plans` -
 `PATCH /admin/plans/:planId` - `GET /admin/subscriptions` -
 `GET /admin/transactions` - `GET /admin/revenue`
@@ -1787,18 +1827,25 @@ frontend-backend paralel.
 
 ## 14.2 Pengujian Event
 
--   Organizer membuat event.
--   Event tersimpan sebagai DRAFT.
--   Organizer mengajukan moderasi.
--   Admin meminta revisi.
--   Organizer memperbaiki dan mengajukan ulang.
--   Admin menyetujui.
--   Event dipublikasikan dan URL publik dapat diakses.
--   Event yang belum disetujui tidak dapat dipesan.
+-   Organizer membuat event dan mengatur periode pendaftaran.
+-   Sistem memvalidasi event secara otomatis.
+-   Event yang gagal validasi tetap DRAFT dan menampilkan alasan.
+-   Event yang lolos validasi dipublikasikan.
+-   Sistem menghasilkan link pendaftaran peserta dan link registrasi
+    panitia yang berbeda.
+-   QR pendaftaran membuka halaman pendaftaran peserta.
+-   Link panitia meminta login dan memeriksa permission event.
+-   Admin dapat menangguhkan event yang melanggar kebijakan dengan
+    alasan dan AuditLog.
 
 ## 14.3 Pengujian Registrasi dan Pembayaran
 
 -   Registrasi mandiri tanpa akun berhasil.
+-   Satu Order hanya menghasilkan satu tiket untuk satu Attendee.
+-   Peserta dapat membuat beberapa Order terpisah dari link yang sama.
+-   Event gratis menerbitkan tiket setelah registrasi berhasil.
+-   Event berbayar hanya menerbitkan tiket setelah pembayaran berhasil.
+-   Event tidak dapat mencampur kategori gratis dan berbayar.
 -   Registrasi dibantu Owner berhasil.
 -   Registrasi dibantu Staff dengan permission berhasil.
 -   Staff tanpa permission ditolak.
@@ -1807,6 +1854,9 @@ frontend-backend paralel.
 -   Pembayaran berhasil menerbitkan tiket.
 -   Pembayaran gagal/expired tidak menerbitkan tiket aktif.
 -   Proses pembayaran berulang tidak membuat tiket ganda.
+-   PDF tiket landscape memuat QR unik di area yang telah ditentukan pada template.
+-   Email tiket berisi informasi standar, pesan Organizer jika diisi, dan lampiran PDF.
+-   Kegagalan email dapat dicoba ulang tanpa menerbitkan tiket duplikat.
 
 ## 14.4 Pengujian Ticket dan Check-in
 
@@ -1883,13 +1933,14 @@ backend/API/database.
 -   Permission dasar.
 -   Struktur layout publik, Organizer, dan Admin.
 
-## Tahap 2 --- Integrasi Event dan Moderasi
+## Tahap 2 --- Integrasi Event dan Publikasi
 
--   CRUD event.
--   TicketType.
--   Moderasi Admin.
--   URL publik.
--   QR registrasi publik.
+-   CRUD event dan periode pendaftaran.
+-   Validasi otomatis event.
+-   TicketType dan aturan kategori gratis/berbayar.
+-   Template/desain tiket dan area QR.
+-   Link pendaftaran peserta dan QR publik.
+-   Link registrasi panitia dengan autentikasi/permission.
 
 ## Tahap 3 --- Integrasi Registrasi dan Pembayaran
 
@@ -1957,7 +2008,7 @@ Fitur berikut tidak boleh dianggap wajib pada implementasi awal:
 -   Offline multi-perangkat dengan konsistensi penuh.
 -   Pemisahan Admin menjadi beberapa sub-role.
 -   Aplikasi iOS yang dipublikasikan resmi.
--   Ekspor PDF/Excel lanjutan jika belum menjadi prioritas.
+-   Fitur ekspor PDF lanjutan jika belum menjadi prioritas.
 
 ------------------------------------------------------------------------
 
@@ -2037,8 +2088,17 @@ keputusan terbaru:
 -   Tiga role global: Participant, Organizer, Admin.
 -   Staff menjadi membership pada event, bukan role global.
 -   Owner dapat mengatur permission Staff per event.
--   Registrasi tersedia secara mandiri dan dibantu.
--   Pembayaran MVP menggunakan simulasi Virtual Account.
+-   Registrasi tersedia secara mandiri dan dibantu melalui dua link
+    berbeda: link pendaftaran peserta dan link registrasi panitia.
+-   Satu Order berisi satu tiket untuk satu peserta.
+-   Event menggunakan kategori tiket yang seluruhnya gratis atau
+    seluruhnya berbayar.
+-   Event divalidasi otomatis; Admin memantau dan dapat menangguhkan
+    event yang melanggar.
+-   Tiket menggunakan template landscape dengan area QR yang ditentukan
+    Organizer; tiket PDF dikirim melalui email.
+-   Pembayaran MVP menggunakan simulasi Virtual Account untuk event
+    berbayar; event gratis menerbitkan tiket setelah registrasi berhasil.
 -   Paket Organizer terdiri dari gratis dan berbayar.
 -   Platform memiliki komisi/biaya layanan sebagai jalur monetisasi.
 -   Admin merupakan satu role dengan kewenangan platform penuh untuk
@@ -2300,8 +2360,9 @@ perubahan keputusan produk. Tetap berlaku tanpa pengurangan:
 - Semua nama dan cakupan permission, larangan Staff, prinsip akses
   least-privilege, registrasi mandiri dan dibantu, alur Order/Payment/
   Ticket, pembayaran simulasi Virtual Account, status, aturan kuota,
-  paket/komisi, moderasi, pelaporan, audit, dan skema konseptual yang
-  telah didefinisikan di bagian sebelumnya.
+  paket/komisi, validasi otomatis event, pengawasan/penangguhan oleh Admin,
+  pelaporan, audit, dan skema konseptual yang telah didefinisikan di
+  bagian sebelumnya.
 - Seluruh halaman/rancangan pada bagian 3--6, persyaratan fungsional
   FR-01--FR-106, persyaratan nonfungsional, serta tahapan implementasi.
   Tidak ada bagian tersebut yang dibatalkan karena file belum tersedia.

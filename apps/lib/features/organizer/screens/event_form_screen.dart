@@ -1,22 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_utils.dart' as core;
 import '../../../models/event/event_model.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../services/organizer_events/organizer_event_contract.dart';
 import '../../../services/organizer_events/organizer_event_exceptions.dart';
 import '../../../services/organizer_events/organizer_event_fixtures.dart';
 import '../../../services/organizer_events/organizer_event_repository.dart';
 import '../../../services/organizer_events/organizer_event_validators.dart';
-import '../../../services/organizer_events/mock_organizer_event_repository.dart';
+import '../../../services/organizer_events/organizer_event_repository_factory.dart';
 import '../../organizer/events/screens/organizer_event_preview_screen.dart';
 import '../../organizer/events/widgets/organizer_feedback_view.dart';
 
 /// Form Buat/Edit Event milik Owner (PRD 5.4 A–E).
 ///
-/// Seluruh penyimpanan memakai repository mock lokal (tanpa HTTP). Owner tidak
-/// dapat mengubah status moderasi; status hanya berpindah lewat aksi
-/// "Ajukan moderasi" yang tersedia untuk draft/revisi.
+/// Penyimpanan memakai backend kecuali mode demo diaktifkan secara eksplisit.
 class EventFormScreen extends StatefulWidget {
   const EventFormScreen({
     super.key,
@@ -42,12 +43,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
   final _title = TextEditingController();
   final _description = TextEditingController();
   final _posterUrl = TextEditingController();
-  final _organizerName = TextEditingController(
-    text: OrganizerEventFixtures.demoOwnerName,
-  );
-  final _contactInfo = TextEditingController(
-    text: OrganizerEventFixtures.demoOwnerEmail,
-  );
+  late final TextEditingController _organizerName;
+  late final TextEditingController _contactInfo;
   final _location = TextEditingController();
   final _onlineUrl = TextEditingController();
   final _publicInfo = TextEditingController();
@@ -67,15 +64,29 @@ class _EventFormScreenState extends State<EventFormScreen> {
   bool _saving = false;
   String? _loadError;
   Map<String, String> _fieldErrors = const <String, String>{};
-  bool _submitAfterSave = false;
 
   bool get _isEditing => widget.eventId != null;
 
   @override
   void initState() {
     super.initState();
-    _repository = widget.repository ?? MockOrganizerEventRepository.shared();
-    _ownerId = widget.ownerId ?? OrganizerEventFixtures.demoOwnerId;
+    final user = AppConfig.mockMode ? null : context.read<AuthProvider>().user;
+    _organizerName = TextEditingController(
+      text: AppConfig.mockMode
+          ? OrganizerEventFixtures.demoOwnerName
+          : user?.name ?? '',
+    );
+    _contactInfo = TextEditingController(
+      text: AppConfig.mockMode
+          ? OrganizerEventFixtures.demoOwnerEmail
+          : user?.email ?? '',
+    );
+    _repository = widget.repository ?? createOrganizerEventRepository();
+    _ownerId =
+        widget.ownerId ??
+        (AppConfig.mockMode
+            ? OrganizerEventFixtures.demoOwnerId
+            : user?.id ?? '');
     if (_isEditing) _loadExisting();
   }
 
@@ -160,24 +171,24 @@ class _EventFormScreenState extends State<EventFormScreen> {
   }
 
   OrganizerEventDraft _buildDraft() => OrganizerEventDraft(
-        title: _title.text,
-        category: _category,
-        description: _description.text,
-        organizerName: _organizerName.text,
-        contactInfo: _contactInfo.text,
-        startDateTime: _startDateTime ?? DateTime.now(),
-        endDateTime: _endDateTime ?? DateTime.now(),
-        timeZone: _timeZone,
-        format: _format,
-        posterUrl: _posterUrl.text,
-        location: _location.text,
-        onlineUrl: _onlineUrl.text,
-        publicInfo: _publicInfo.text,
-        attendeeFields: _attendeeFields.toList(growable: false),
-      );
+    title: _title.text,
+    category: _category,
+    description: _description.text,
+    organizerName: _organizerName.text,
+    contactInfo: _contactInfo.text,
+    startDateTime: _startDateTime ?? DateTime.now(),
+    endDateTime: _endDateTime ?? DateTime.now(),
+    timeZone: _timeZone,
+    format: _format,
+    posterUrl: _posterUrl.text,
+    location: _location.text,
+    onlineUrl: _onlineUrl.text,
+    publicInfo: _publicInfo.text,
+    attendeeFields: _attendeeFields.toList(growable: false),
+  );
 
-  /// Menyimpan draft; [submitForReview] menentukan aksi setelah simpan.
-  Future<void> _save({required bool submitForReview}) async {
+  /// Menyimpan perubahan event sebagai draft.
+  Future<void> _save() async {
     final formValid = _formKey.currentState?.validate() ?? false;
     final draftErrors = OrganizerEventValidators.validateEventDraft(
       _buildDraft(),
@@ -198,7 +209,6 @@ class _EventFormScreenState extends State<EventFormScreen> {
     setState(() {
       _fieldErrors = const <String, String>{};
       _saving = true;
-      _submitAfterSave = submitForReview;
     });
 
     try {
@@ -214,20 +224,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
         saved = await _repository.createEvent(ownerId: _ownerId, draft: draft);
       }
 
-      if (submitForReview) {
-        saved = await _repository.submitForReview(
-          ownerId: _ownerId,
-          eventId: saved.id,
-        );
-      }
-
       if (!mounted) return;
-      _showMessage(
-        submitForReview
-            ? 'Event "${saved.title}" diajukan. Status: ${saved.statusLabel} '
-                '(simulasi).'
-            : 'Draft "${saved.title}" tersimpan.',
-      );
+      _showMessage('Draft "${saved.title}" tersimpan.');
       Navigator.of(context).pop(true);
     } on OrganizerEventValidationException catch (error) {
       if (!mounted) return;
@@ -242,9 +240,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _preview() async {
@@ -253,8 +250,10 @@ class _EventFormScreenState extends State<EventFormScreen> {
     );
     if (draftErrors.isNotEmpty) {
       setState(() => _fieldErrors = draftErrors);
-      _showMessage('Lengkapi data sebelum pratinjau: '
-          '${draftErrors.values.first}');
+      _showMessage(
+        'Lengkapi data sebelum pratinjau: '
+        '${draftErrors.values.first}',
+      );
       return;
     }
     final existing = _existing;
@@ -336,7 +335,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
           children: <Widget>[
             if (_existing != null)
               OrganizerInfoBanner(
-                message: 'Status event saat ini: ${_existing!.statusLabel}. '
+                message:
+                    'Status event saat ini: ${_existing!.statusLabel}. '
                     'Status moderasi hanya berubah melalui aksi pengajuan atau '
                     'keputusan moderator (simulasi).',
               ),
@@ -384,7 +384,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
               controller: _posterUrl,
               decoration: const InputDecoration(
                 labelText: 'URL poster (opsional, fixture demo)',
-                helperText: 'Gambar tidak diunduh; hanya disimpan sebagai teks.',
+                helperText:
+                    'Gambar tidak diunduh; hanya disimpan sebagai teks.',
               ),
             ),
             const SizedBox(height: 14),
@@ -564,12 +565,11 @@ class _EventFormScreenState extends State<EventFormScreen> {
             ),
             const SizedBox(height: 12),
             const OrganizerInfoBanner(
-              message: 'Batas waktu pembayaran mengikuti kebijakan platform '
+              message:
+                  'Batas waktu pembayaran mengikuti kebijakan platform '
                   'yang belum ditetapkan, sehingga tidak dapat diatur di sini.',
               icon: Icons.schedule,
             ),
-
-
           ],
         ),
       ),
@@ -578,51 +578,47 @@ class _EventFormScreenState extends State<EventFormScreen> {
   }
 
   Widget _sectionTitle(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Text(
-          text,
-          style: Theme.of(context)
-              .textTheme
-              .titleSmall
-              ?.copyWith(fontWeight: FontWeight.w700),
-        ),
-      );
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Text(
+      text,
+      style: Theme.of(context).textTheme.titleSmall
+          ?.copyWith(fontWeight: FontWeight.w700),
+    ),
+  );
 
   Widget _errorText(String message) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Text(
-          message,
-          style: const TextStyle(color: AppTheme.errorColor, fontSize: 12),
-        ),
-      );
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Text(
+      message,
+      style: const TextStyle(color: AppTheme.errorColor, fontSize: 12),
+    ),
+  );
 
   Widget _dateTile({
     required Key key,
     required String label,
     required DateTime? value,
     required Future<void> Function() onPick,
-  }) =>
-      Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Row(
-          children: <Widget>[
-            Expanded(
-              child: Text(
-                '$label: ${value == null ? 'belum diatur' : core.DateUtils.formatDateTime(value)}',
-                style: const TextStyle(fontSize: 13),
-              ),
-            ),
-            OutlinedButton(
-              key: key,
-              onPressed: onPick,
-              child: Text(value == null ? 'Pilih' : 'Ubah'),
-            ),
-          ],
+  }) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(
+      children: <Widget>[
+        Expanded(
+          child: Text(
+            '$label: ${value == null ? 'belum diatur' : core.DateUtils.formatDateTime(value)}',
+            style: const TextStyle(fontSize: 13),
+          ),
         ),
-      );
+        OutlinedButton(
+          key: key,
+          onPressed: onPick,
+          child: Text(value == null ? 'Pilih' : 'Ubah'),
+        ),
+      ],
+    ),
+  );
 
   Widget _buildActions() {
-    final canSubmit = _existing == null || _existing!.canSubmitForReview;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
@@ -631,8 +627,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
             Expanded(
               child: OutlinedButton(
                 key: const Key('event-save-draft-button'),
-                onPressed: _saving ? null : () => _save(submitForReview: false),
-                child: _saving && !_submitAfterSave
+                onPressed: _saving ? null : _save,
+                child: _saving
                     ? const SizedBox(
                         width: 18,
                         height: 18,
@@ -641,26 +637,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
                     : const Text('Simpan draft'),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: FilledButton(
-                key: const Key('event-submit-button'),
-                onPressed: (_saving || !canSubmit)
-                    ? null
-                    : () => _save(submitForReview: true),
-                child: _saving && _submitAfterSave
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Simpan & ajukan'),
-              ),
-            ),
           ],
         ),
       ),
     );
   }
-
 }

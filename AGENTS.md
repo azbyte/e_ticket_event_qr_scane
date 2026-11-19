@@ -1,6 +1,9 @@
 # Panduan AI dan developer — E-Ticket Event & QR Scanner
 
 Gunakan Bahasa Indonesia untuk komunikasi dan dokumentasi kecuali nama teknis.
+Jika melanjutkan checkpoint T03, mulai dengan [`task/HANDOVER_AI_T03.md`](task/HANDOVER_AI_T03.md),
+kemudian baca dokumen lain yang dirujuk hanya jika diperlukan. Jangan membaca
+seluruh `task/archive/` atau `archive/` secara default.
 Sebelum mengubah kode, baca `README.md`, `prd.md`, dan bagian arsitektur yang
 terdampak di `docs/ARCHITECTURE.md`. Untuk aturan khusus gunakan skills di
 `.agents/skills/` (lihat `SKILL.md` sebagai katalog). Jangan menganggap prototipe
@@ -17,8 +20,9 @@ atau dummy sebagai jaminan keamanan maupun perilaku backend.
 - Persistence/auth: Supabase/PostgreSQL, JWT dan role. SQL migration aktual
   berada di `backend/supabase/migrations/`. Ikuti implementasi dan migration,
   jangan mengandalkan schema lama di README backend.
-- Flutter menyediakan mode demo/dummy secara default; `MOCK_MODE=false`
-  mengaktifkan integrasi API. Backend membutuhkan environment variables.
+- Flutter memakai API backend secara default; mode demo harus diaktifkan secara
+  eksplisit dengan `MOCK_MODE=true`. Integrasi seluruh modul belum selesai dan
+  backend membutuhkan environment variables.
 - PRD mendeskripsikan beberapa fitur sebagai rencana/prototype; jangan mengklaim
   fitur yang belum diimplementasikan sebagai tersedia.
 
@@ -26,15 +30,25 @@ atau dummy sebagai jaminan keamanan maupun perilaku backend.
 
 Pilih skill berdasarkan pekerjaan, jangan jalankan semua prosedur untuk setiap
 perubahan. Baca katalog root [`SKILL.md`](SKILL.md) untuk memilih skill yang
-sesuai; file skill berada di `.agents/skills/<nama>/SKILL.md`.
+sesuai; file skill berada di `.agents/skills/<nama>/SKILL.md`. Skill berikut
+berlaku untuk pekerjaan backend sesuai cakupannya:
 
-- Requirement, role, acceptance criteria dan dampak API: skill `requirements`.
-- Perubahan struktur instruksi, skills, tooling atau editor: skill `workspace`.
-- UI Flutter dan design system: `flutter-ui`; endpoint/security/data backend:
-  `backend-api`.
-- Bug yang perlu direproduksi: `debug`; review diff: `review`; pemeriksaan
-  kualitas sebelum PR (termasuk mode targeted berdasarkan dampak perubahan):
-  `pr-quality-gate`.
+- Fitur backend atau perubahan API: gunakan `backend-api`; tambahkan
+  `requirements` jika menyentuh perilaku, role, acceptance criteria, atau
+  kontrak API.
+- Bug backend: gunakan `debug` untuk reproduksi dan diagnosis, serta
+  `backend-api` bila alur endpoint, akses, atau persistence terdampak.
+- Review perubahan backend: gunakan `review` untuk memeriksa regresi, validasi,
+  authorization/ownership, dan kontrak.
+- Pemeriksaan kualitas backend: gunakan `pr-quality-gate` dalam mode targeted
+  sesuai dampak atau mode penuh sebelum PR.
+- Perubahan instruksi, skill, konfigurasi, atau tooling backend: gunakan
+  `workspace`.
+- Gunakan `flutter-ui` hanya bila pekerjaan juga mengubah UI Flutter; skill ini
+  tidak menggantikan pemeriksaan backend.
+
+Skill tidak perlu dijalankan semuanya untuk setiap perubahan. Ikuti prasyarat
+dan pemeriksaan yang dinyatakan oleh skill terpilih.
 
 Requirement sumber adalah `prd.md` serta migration/source aktual; PRD UI prototype
 memiliki batas cakupan tersendiri. Jika permintaan menyentuh backend, cek konteks

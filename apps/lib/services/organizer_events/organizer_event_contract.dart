@@ -1,4 +1,4 @@
-/// Kontrak domain Event/TicketType milik Developer 1 (Tahap 0 — mock lokal).
+/// Kontrak domain Event/TicketType milik Developer 1 (Tahap 0 Î“Ã‡Ã¶ mock lokal).
 ///
 /// File ini adalah API publik domain Event yang dipakai Developer 1, 2 dan 3.
 /// Tidak ada request jaringan di sini; seluruh konstanta, payload, dan DTO
@@ -63,12 +63,12 @@ class OrganizerEventStatus {
   /// tidak boleh diubah. Event yang sudah tayang tetap bisa diubah, tetapi
   /// perubahan penting dapat memerlukan moderasi ulang (kebijakan belum final).
   static bool isEditable(String status) => const <String>[
-        draft,
-        revisionRequested,
-        rejected,
-        approved,
-        published,
-      ].contains(status);
+    draft,
+    revisionRequested,
+    rejected,
+    approved,
+    published,
+  ].contains(status);
 
   /// Status yang boleh diajukan untuk moderasi pertama kali.
   static bool canSubmit(String status) => status == draft;
@@ -206,7 +206,7 @@ enum OrganizerEventFilter {
   }
 }
 
-/// Payload form Buat/Edit Event (PRD 5.4 A–E).
+/// Payload form Buat/Edit Event (PRD 5.4 AÎ“Ã‡Ã´E).
 ///
 /// Dipakai repository sebagai satu-satunya signature mutasi event agar kontrak
 /// tidak berubah setiap ada field baru.
@@ -346,15 +346,15 @@ class OrganizerEventSummary {
   final int participants;
   final int checkedIn;
 
-  /// Penjualan kotor demo: `Σ (harga × tiket terjual)`.
+  /// Penjualan kotor demo: `â•¬Ãº (harga â”œÃ¹ tiket terjual)`.
   ///
   /// Bukan pendapatan platform, bukan fee, dan bukan komisi (PRD 7.3).
   final double grossSales;
 
   static OrganizerEventSummary empty(String eventId) => OrganizerEventSummary(
-        eventId: eventId,
-        status: OrganizerEventStatus.draft,
-      );
+    eventId: eventId,
+    status: OrganizerEventStatus.draft,
+  );
 }
 
 /// Metrik operasional per event yang disediakan fixture Developer 1.
@@ -461,7 +461,7 @@ class OrganizerActivityActions {
   static const String ticketTypeDeleted = 'ticket_type.deleted';
 }
 
-/// Helper turunan [EventModel] sesuai aturan PRD 5.3–5.5.
+/// Helper turunan [EventModel] sesuai aturan PRD 5.3Î“Ã‡Ã´5.5.
 ///
 /// Diletakkan di lapisan service (bukan di model) agar model tetap murni dan
 /// dapat dipakai alur publik/Participant yang tidak mengenal alur Organizer.
@@ -493,11 +493,7 @@ extension OrganizerEventModelExtension on EventModel {
   /// Memakai [publicUrl] bila event sudah dipublikasikan; jika belum, memakai
   /// tautan demo lokal dan [registrationUrlIsDemo] bernilai true supaya UI tidak
   /// mengklaim event sudah tayang di server.
-  String get registrationUrl =>
-      publicUrl ?? 'https://demo.eticket.local/e/$id';
+  String get registrationUrl => publicUrl ?? 'https://demo.eticket.local/e/$id';
 
   bool get registrationUrlIsDemo => publicUrl == null;
 }
-
-
-

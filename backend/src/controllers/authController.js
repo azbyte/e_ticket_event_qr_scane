@@ -1,6 +1,6 @@
 const asyncHandler = require('express-async-handler');
 const bcrypt = require('bcryptjs');
-const { supabaseAdmin } = require('../config/supabase');
+const { query, getOne } = require('../config/db');
 const authService = require('../services/authService');
 const { validateEmail, validatePassword } = require('../utils/validators');
 const { USER_ROLES } = require('../utils/constants');
@@ -30,57 +30,33 @@ const registerUser = asyncHandler(async (req, res) => {
 
   const normalizedEmail = email.trim().toLowerCase();
 
-  // Check if user exists via Supabase
-  const { data: existingUser, error: findError } = await supabaseAdmin
-    .from('profiles')
-    .select('id')
-    .eq('email', normalizedEmail)
-    .maybeSingle();
-
-  if (findError) throw findError;
-  if (existingUser) {
+  // Cek apakah email sudah terdaftar di tabel profiles
+  const existing = await getOne('SELECT id FROM profiles WHERE email = $1', [normalizedEmail]);
+  if (existing) {
     res.status(400);
     throw new Error('User already exists');
   }
 
-  // Create auth user in Supabase Auth
+  // Buat username unik
   const baseUsername = normalizedEmail.split('@')[0];
-  const { count: usernameCount, error: usernameError } = await supabaseAdmin
-    .from('profiles').select('id', { count: 'exact', head: true }).eq('username', baseUsername);
-  if (usernameError) throw usernameError;
-  const username = usernameCount ? `${baseUsername}_${Date.now().toString(36)}` : baseUsername;
-  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-    email: normalizedEmail,
-    password,
-    email_confirm: true,
-    user_metadata: { name, username, role: USER_ROLES.ORGANIZER },
-  });
+  const usernameRows = await query('SELECT id FROM profiles WHERE username = $1', [baseUsername]);
+  const username = usernameRows.length ? `${baseUsername}_${Date.now().toString(36)}` : baseUsername;
 
-  if (authError) throw authError;
-
-  // Create profile in public.profiles table
   const hashedPassword = await authService.hashPassword(password);
-  const { error: profileError } = await supabaseAdmin.from('profiles').insert([
-    {
-      id: authData.user.id,
-      name,
-      email: normalizedEmail,
-      password_hash: hashedPassword,
-      username,
-      role: USER_ROLES.ORGANIZER,
-      created_at: new Date().toISOString(),
-    },
-  ]);
-
-  if (profileError) throw profileError;
+  const created = await getOne(
+    `INSERT INTO profiles (id, name, email, password_hash, username, role, created_at)
+     VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6)
+     RETURNING id, name, email, username, role`,
+    [name, normalizedEmail, hashedPassword, username, USER_ROLES.ORGANIZER, new Date().toISOString()]
+  );
 
   // Generate JWT
-  const token = authService.generateToken({ id: authData.user.id, email: normalizedEmail, role: USER_ROLES.ORGANIZER });
+  const token = authService.generateToken({ id: created.id, email: created.email, role: created.role });
 
   res.status(201).json({
     success: true,
     token,
-    user: { id: authData.user.id, name, email: normalizedEmail, username, role: USER_ROLES.ORGANIZER },
+    user: { id: created.id, name: created.name, email: created.email, username: created.username, role: created.role },
   });
 });
 
@@ -97,22 +73,19 @@ const loginUser = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Email/username and password are required' });
   }
 
-  // Resolve email or username through profile data; never accept a role from the client.
-  let lookup = supabaseAdmin
-    .from('profiles')
-    .select('id, name, email, username, password_hash, role, avatar_url, created_at, disabled_at')
-    .eq('email', identity);
-  let { data: user, error } = await lookup.maybeSingle();
-
+  // Resolve email atau username melalui data profil; bukan menerima role dari klien.
+  let user = await getOne(
+    'SELECT id, name, email, username, password_hash, role, avatar_url, created_at, disabled_at FROM profiles WHERE email = $1',
+    [identity]
+  );
   if (!user && !identity.includes('@')) {
-    ({ data: user, error } = await supabaseAdmin
-      .from('profiles')
-      .select('id, name, email, username, password_hash, role, avatar_url, created_at, disabled_at')
-      .eq('username', identity)
-      .maybeSingle());
+    user = await getOne(
+      'SELECT id, name, email, username, password_hash, role, avatar_url, created_at, disabled_at FROM profiles WHERE username = $1',
+      [identity]
+    );
   }
 
-  if (error || !user) {
+  if (!user) {
     res.status(401);
     throw new Error('Invalid credentials');
   }
@@ -121,7 +94,7 @@ const loginUser = asyncHandler(async (req, res) => {
     throw new Error('This account is disabled');
   }
 
-  // Compare password
+  // Bandingkan password
   const isMatch = user.password_hash && await bcrypt.compare(password, user.password_hash);
   if (!isMatch) {
     res.status(401);
@@ -151,13 +124,12 @@ const loginUser = asyncHandler(async (req, res) => {
  * @access  Private
  */
 const getMe = asyncHandler(async (req, res) => {
-  const { data: user, error } = await supabaseAdmin
-    .from('profiles')
-    .select('id, name, email, username, role, avatar_url, created_at')
-    .eq('id', req.user.id)
-    .single();
+  const user = await getOne(
+    'SELECT id, name, email, username, role, avatar_url, created_at FROM profiles WHERE id = $1',
+    [req.user.id]
+  );
 
-  if (error || !user) {
+  if (!user) {
     res.status(404);
     throw new Error('User not found');
   }
@@ -167,19 +139,32 @@ const getMe = asyncHandler(async (req, res) => {
 
 const updateMe = asyncHandler(async (req, res) => {
   const updates = {};
-  if (typeof req.body.name === 'string' && req.body.name.trim()) updates.name = req.body.name.trim();
-  if (typeof req.body.avatar_url === 'string') updates.avatar_url = req.body.avatar_url.trim() || null;
-  if (Object.keys(updates).length === 0) {
+  const params = [];
+  const setParts = [];
+  let paramIndex = 1;
+
+  if (typeof req.body.name === 'string' && req.body.name.trim()) {
+    setParts.push(`name = $${paramIndex}`);
+    params.push(req.body.name.trim());
+    paramIndex += 1;
+  }
+  if (typeof req.body.avatar_url === 'string') {
+    setParts.push(`avatar_url = $${paramIndex}`);
+    params.push(req.body.avatar_url.trim() || null);
+    paramIndex += 1;
+  }
+  if (setParts.length === 0) {
     res.status(400);
     throw new Error('Please provide profile fields to update');
   }
-  const { data: user, error } = await supabaseAdmin
-    .from('profiles')
-    .update(updates)
-    .eq('id', req.user.id)
-    .select('id, name, email, username, role, avatar_url, created_at')
-    .single();
-  if (error) throw error;
+
+  params.push(req.user.id);
+  const user = await getOne(
+    `UPDATE profiles SET ${setParts.join(', ')} WHERE id = $${paramIndex}
+     RETURNING id, name, email, username, role, avatar_url, created_at`,
+    params
+  );
+
   res.json({ success: true, user });
 });
 
@@ -188,10 +173,11 @@ const logoutUser = asyncHandler(async (req, res) => {
   if (token) {
     const decoded = require('jsonwebtoken').decode(token);
     const expiresAt = new Date((decoded?.exp || Math.floor(Date.now() / 1000) + 3600) * 1000).toISOString();
-    const { error } = await supabaseAdmin.from('revoked_tokens').upsert({
-      token_hash: authService.hashToken(token), expires_at: expiresAt,
-    }, { onConflict: 'token_hash' });
-    if (error) throw error;
+    await query(
+      `INSERT INTO revoked_tokens (token_hash, expires_at) VALUES ($1, $2)
+       ON CONFLICT (token_hash) DO UPDATE SET expires_at = EXCLUDED.expires_at`,
+      [authService.hashToken(token), expiresAt]
+    );
   }
   res.json({ success: true, message: 'Logged out successfully' });
 });

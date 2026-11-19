@@ -6,17 +6,16 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../models/event/event_model.dart';
 import '../../../services/admin/admin_audit_log_service.dart';
 import '../../../services/organizer_events/organizer_event_contract.dart';
 import '../../../services/organizer_events/organizer_event_repository.dart';
+import '../../../services/organizer_events/organizer_event_repository_factory.dart';
 import '../../../services/organizer_events/mock_organizer_event_repository.dart';
 
 class EventModerationScreen extends StatefulWidget {
-  const EventModerationScreen({
-    super.key,
-    this.repository,
-  });
+  const EventModerationScreen({super.key, this.repository});
 
   final OrganizerEventRepository? repository;
 
@@ -34,14 +33,15 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
   List<EventModel> _events = const <EventModel>[];
   bool _isLoading = true;
   String? _loadError;
+  // Admin sebaiknya langsung melihat event yang membutuhkan tindak lanjut;
+  // publikasi tetap otomatis dan tidak menunggu persetujuan Admin.
   String _filter = OrganizerEventStatus.pendingReview;
   final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _repository =
-        widget.repository ?? MockOrganizerEventRepository.shared();
+    _repository = widget.repository ?? createOrganizerEventRepository();
     _loadEvents();
   }
 
@@ -66,33 +66,32 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
     }
   }
 
-  Future<void> _updateEventState(
-    EventModel event, {
-    required String status,
-    required String action,
-    required String successMessage,
-    String? note,
-  }) async {
+  Future<void> _suspendEvent(EventModel event, String note) async {
     try {
       await _repository.simulatePlatformModeration(
         eventId: event.id,
-        status: status,
+        status: OrganizerEventStatus.suspended,
         note: note,
       );
-      await AdminAuditLogService.instance.logAction(
-        actorId: 'admin@event.com',
-        actorName: 'Super Admin',
-        action: action,
-        entityType: 'EVENT',
-        entityId: event.id,
-        reason: note,
-        details: 'Keputusan simulasi untuk event "${event.title}".',
-        metadata: {'title': event.title, 'status': status},
-      );
+      if (AppConfig.mockMode) {
+        await AdminAuditLogService.instance.logAction(
+          actorId: 'admin@event.com',
+          actorName: 'Super Admin',
+          action: 'EVENT_SUSPENDED',
+          entityType: 'EVENT',
+          entityId: event.id,
+          reason: note,
+          details: 'Penangguhan simulasi untuk event "${event.title}".',
+          metadata: {
+            'title': event.title,
+            'status': OrganizerEventStatus.suspended,
+          },
+        );
+      }
       await _loadEvents();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(successMessage)),
+          SnackBar(content: Text('Event "${event.title}" telah ditangguhkan.')),
         );
       }
     } on Exception catch (error) {
@@ -102,172 +101,6 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
         );
       }
     }
-  }
-
-  void _showApproveDialog(EventModel event) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.check_circle_outline, color: Colors.green),
-            SizedBox(width: 8),
-            Text('Setujui Event?'),
-          ],
-        ),
-        content: Text(
-          'Apakah Anda menyetujui penayangan publik untuk event "${event.title}"?\n\n'
-          'Status akan diubah menjadi Disetujui/Dipublikasikan dan dapat dipesan peserta.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.green),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await _updateEventState(
-                event,
-                status: OrganizerEventStatus.approved,
-                action: 'EVENT_APPROVED',
-                successMessage:
-                    'Event "${event.title}" telah disetujui & tayang.',
-              );
-            },
-            child: const Text('Setujui & Publikasikan'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showRevisionDialog(EventModel event) {
-    final noteController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.edit_note, color: Colors.orange),
-            SizedBox(width: 8),
-            Text('Minta Revisi Event'),
-          ],
-        ),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Tuliskan catatan perbaikan yang wajib dipenuhi oleh penyelenggara event "${event.title}":',
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: noteController,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Catatan Revisi *',
-                  hintText: 'Cth: Mohon perjelas batas kuota tiket dan alamat gedung...',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) {
-                    return 'Catatan revisi wajib diisi.';
-                  }
-                  return null;
-                },
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.orange.shade800),
-            onPressed: () async {
-              if (!formKey.currentState!.validate()) return;
-              Navigator.pop(ctx);
-              await _updateEventState(
-                event,
-                status: OrganizerEventStatus.revisionRequested,
-                action: 'EVENT_REVISION_REQUESTED',
-                successMessage:
-                    'Permintaan revisi dikirim ke penyelenggara "${event.title}".',
-                note: noteController.text.trim(),
-              );
-            },
-            child: const Text('Kirim Catatan Revisi'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showRejectDialog(EventModel event) {
-    final reasonController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.cancel_outlined, color: Colors.red),
-            SizedBox(width: 8),
-            Text('Tolak Permohonan Event'),
-          ],
-        ),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Tuliskan alasan penolakan event "${event.title}":',
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: reasonController,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Alasan Penolakan *',
-                  hintText: 'Cth: Melanggar ketentuan konten platform / indikasi penipuan',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) {
-                    return 'Alasan penolakan wajib diisi.';
-                  }
-                  return null;
-                },
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () async {
-              if (!formKey.currentState!.validate()) return;
-              Navigator.pop(ctx);
-              await _updateEventState(
-                event,
-                status: OrganizerEventStatus.rejected,
-                action: 'EVENT_REJECTED',
-                successMessage: 'Event "${event.title}" telah ditolak.',
-                note: reasonController.text.trim(),
-              );
-            },
-            child: const Text('Tolak Permohonan'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showSuspendDialog(EventModel event) {
@@ -292,7 +125,11 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
             children: [
               Text(
                 'Sesuai FR-88, penangguhan event WAJIB mencatat alasan penangguhan ke AuditLog:',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                ),
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -314,58 +151,18 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
               if (!formKey.currentState!.validate()) return;
               Navigator.pop(ctx);
-              await _updateEventState(
-                event,
-                status: OrganizerEventStatus.suspended,
-                action: 'EVENT_SUSPENDED',
-                successMessage:
-                    'Event "${event.title}" telah ditangguhkan.',
-                note: reasonController.text.trim(),
-              );
+              await _suspendEvent(event, reasonController.text.trim());
             },
             child: const Text('Tangguhkan Event'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showReactivateDialog(EventModel event) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.restore, color: Colors.green),
-            SizedBox(width: 8),
-            Text('Buka Penangguhan?'),
-          ],
-        ),
-        content: Text(
-          'Pulihkan penayangan untuk event "${event.title}"?\n'
-          'Status akan dikembalikan ke Disetujui/Tayang.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.green),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await _updateEventState(
-                event,
-                status: OrganizerEventStatus.approved,
-                action: 'EVENT_REACTIVATED',
-                successMessage:
-                    'Penangguhan event "${event.title}" berhasil dibuka.',
-              );
-            },
-            child: const Text('Buka Penangguhan'),
           ),
         ],
       ),
@@ -395,7 +192,10 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
                   Expanded(
                     child: Text(
                       event.title,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
                     ),
                   ),
                   _buildBadge(event.status),
@@ -404,26 +204,43 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
               const SizedBox(height: 8),
               Text(
                 'Penyelenggara: ${event.organizerName ?? event.organizerId}',
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade700, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               Text(
                 'Kontak: ${event.contactInfo ?? "-"}',
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
               ),
               const Divider(height: 24),
-              const Text('Deskripsi Acara:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                'Deskripsi Acara:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 4),
               Text(event.description ?? 'Tidak ada deskripsi acara.'),
               const SizedBox(height: 16),
-              const Text('Jadwal & Lokasi:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                'Jadwal & Lokasi:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 4),
-              Text('Mulai: ${event.startDateTime.day}/${event.startDateTime.month}/${event.startDateTime.year} ${event.startDateTime.hour}:${event.startDateTime.minute.toString().padLeft(2, '0')}'),
-              Text('Selesai: ${event.endDateTime.day}/${event.endDateTime.month}/${event.endDateTime.year} ${event.endDateTime.hour}:${event.endDateTime.minute.toString().padLeft(2, '0')}'),
+              Text(
+                'Mulai: ${event.startDateTime.day}/${event.startDateTime.month}/${event.startDateTime.year} ${event.startDateTime.hour}:${event.startDateTime.minute.toString().padLeft(2, '0')}',
+              ),
+              Text(
+                'Selesai: ${event.endDateTime.day}/${event.endDateTime.month}/${event.endDateTime.year} ${event.endDateTime.hour}:${event.endDateTime.minute.toString().padLeft(2, '0')}',
+              ),
               Text('Format: ${event.eventType.toUpperCase()}'),
               Text('Lokasi: ${event.location ?? "Online"}'),
               if (event.publicUrl != null) ...[
                 const SizedBox(height: 8),
-                Text('URL Publik: ${event.publicUrl}', style: const TextStyle(color: Colors.blue, fontSize: 12)),
+                Text(
+                  'URL Publik: ${event.publicUrl}',
+                  style: const TextStyle(color: Colors.blue, fontSize: 12),
+                ),
               ],
               if (event.reviewNote != null && event.reviewNote!.isNotEmpty) ...[
                 const SizedBox(height: 16),
@@ -438,11 +255,17 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Catatan Review / Penangguhan Terakhir:',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                        'Alasan penangguhan terakhir:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
                       ),
                       const SizedBox(height: 4),
-                      Text(event.reviewNote!, style: const TextStyle(fontSize: 13)),
+                      Text(
+                        event.reviewNote!,
+                        style: const TextStyle(fontSize: 13),
+                      ),
                     ],
                   ),
                 ),
@@ -470,7 +293,9 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
       if (_filter == 'all') {
         matchStatus = true;
       } else if (_filter == OrganizerEventStatus.published) {
-        matchStatus = e.status == OrganizerEventStatus.published || e.status == OrganizerEventStatus.approved;
+        matchStatus =
+            e.status == OrganizerEventStatus.published ||
+            e.status == OrganizerEventStatus.approved;
       } else {
         matchStatus = e.status == _filter;
       }
@@ -518,7 +343,9 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
                         },
                       )
                     : null,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 14),
               ),
               onChanged: (_) => setState(() {}),
@@ -528,37 +355,48 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
           // Filter Chips (FR-86, FR-12)
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 6.0,
+            ),
             child: Row(
               children: [
                 ChoiceChip(
                   label: const Text('Menunggu Review'),
                   selected: _filter == OrganizerEventStatus.pendingReview,
-                  onSelected: (_) => setState(() => _filter = OrganizerEventStatus.pendingReview),
+                  onSelected: (_) => setState(
+                    () => _filter = OrganizerEventStatus.pendingReview,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 ChoiceChip(
                   label: const Text('Butuh Revisi'),
                   selected: _filter == OrganizerEventStatus.revisionRequested,
-                  onSelected: (_) => setState(() => _filter = OrganizerEventStatus.revisionRequested),
-                ),
-                const SizedBox(width: 8),
-                ChoiceChip(
-                  label: const Text('Disetujui/Tayang'),
-                  selected: _filter == OrganizerEventStatus.published,
-                  onSelected: (_) => setState(() => _filter = OrganizerEventStatus.published),
-                ),
-                const SizedBox(width: 8),
-                ChoiceChip(
-                  label: const Text('Ditangguhkan'),
-                  selected: _filter == OrganizerEventStatus.suspended,
-                  onSelected: (_) => setState(() => _filter = OrganizerEventStatus.suspended),
+                  onSelected: (_) => setState(
+                    () => _filter = OrganizerEventStatus.revisionRequested,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 ChoiceChip(
                   label: const Text('Ditolak'),
                   selected: _filter == OrganizerEventStatus.rejected,
-                  onSelected: (_) => setState(() => _filter = OrganizerEventStatus.rejected),
+                  onSelected: (_) => setState(
+                    () => _filter = OrganizerEventStatus.rejected,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('Disetujui/Tayang'),
+                  selected: _filter == OrganizerEventStatus.published,
+                  onSelected: (_) =>
+                      setState(() => _filter = OrganizerEventStatus.published),
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('Ditangguhkan'),
+                  selected: _filter == OrganizerEventStatus.suspended,
+                  onSelected: (_) =>
+                      setState(() => _filter = OrganizerEventStatus.suspended),
                 ),
                 const SizedBox(width: 8),
                 ChoiceChip(
@@ -577,27 +415,31 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _loadError != null
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text('Gagal memuat event.'),
-                            const SizedBox(height: 8),
-                            TextButton(
-                              onPressed: _loadEvents,
-                              child: const Text('Coba lagi'),
-                            ),
-                          ],
-                        ),
-                      )
-                    : events.isEmpty
                 ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.event_busy, size: 64, color: Colors.grey.shade400),
+                        const Text('Gagal memuat event.'),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: _loadEvents,
+                          child: const Text('Coba lagi'),
+                        ),
+                      ],
+                    ),
+                  )
+                : events.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.event_busy,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
                         const SizedBox(height: 12),
-                        const Text('Tidak ada permohonan event pada kategori ini.'),
+                        const Text('Tidak ada event pada filter ini.'),
                       ],
                     ),
                   )
@@ -617,9 +459,9 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
   }
 
   Widget _buildEventCard(EventModel item) {
-    final isPending = item.status == OrganizerEventStatus.pendingReview;
-    final isSuspended = item.status == OrganizerEventStatus.suspended;
-    final isPublished = item.status == OrganizerEventStatus.published || item.status == OrganizerEventStatus.approved;
+    final isPublished =
+        item.status == OrganizerEventStatus.published ||
+        item.status == OrganizerEventStatus.approved;
 
     return Card(
       elevation: 2,
@@ -635,7 +477,10 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
                 Expanded(
                   child: Text(
                     item.title,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
                 _buildBadge(item.status),
@@ -669,7 +514,7 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
               ],
             ),
 
-            // Review Note Box
+            // Penangguhan reason
             if (item.reviewNote != null && item.reviewNote!.isNotEmpty) ...[
               const SizedBox(height: 10),
               Container(
@@ -681,7 +526,7 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
                   border: Border.all(color: Colors.amber.shade200),
                 ),
                 child: Text(
-                  'Catatan Review/Alasan: "${item.reviewNote}"',
+                  'Alasan: "${item.reviewNote}"',
                   style: TextStyle(fontSize: 11, color: Colors.amber.shade900),
                 ),
               ),
@@ -701,29 +546,7 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
                 Wrap(
                   spacing: 8,
                   children: [
-                    if (isPending) ...[
-                      OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red,
-                          side: const BorderSide(color: Colors.red),
-                        ),
-                        onPressed: () => _showRejectDialog(item),
-                        child: const Text('Tolak'),
-                      ),
-                      OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.orange.shade900,
-                          side: BorderSide(color: Colors.orange.shade700),
-                        ),
-                        onPressed: () => _showRevisionDialog(item),
-                        child: const Text('Minta Revisi'),
-                      ),
-                      FilledButton(
-                        style: FilledButton.styleFrom(backgroundColor: Colors.green),
-                        onPressed: () => _showApproveDialog(item),
-                        child: const Text('Setujui'),
-                      ),
-                    ] else if (isPublished) ...[
+                    if (isPublished) ...[
                       OutlinedButton(
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.red,
@@ -731,25 +554,6 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
                         ),
                         onPressed: () => _showSuspendDialog(item),
                         child: const Text('Tangguhkan'),
-                      ),
-                    ] else if (isSuspended) ...[
-                      FilledButton.tonal(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.green.shade50,
-                          foregroundColor: Colors.green.shade800,
-                        ),
-                        onPressed: () => _showReactivateDialog(item),
-                        child: const Text('Buka Penangguhan'),
-                      ),
-                    ] else if (item.status == OrganizerEventStatus.revisionRequested) ...[
-                      OutlinedButton(
-                        onPressed: () => _showRevisionDialog(item),
-                        child: const Text('Ubah Catatan'),
-                      ),
-                      FilledButton(
-                        style: FilledButton.styleFrom(backgroundColor: Colors.green),
-                        onPressed: () => _showApproveDialog(item),
-                        child: const Text('Setujui'),
                       ),
                     ],
                   ],
@@ -773,15 +577,6 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
         bg = Colors.green.shade50;
         fg = Colors.green.shade800;
         break;
-      case OrganizerEventStatus.pendingReview:
-        bg = Colors.orange.shade50;
-        fg = Colors.orange.shade900;
-        break;
-      case OrganizerEventStatus.revisionRequested:
-        bg = Colors.amber.shade50;
-        fg = Colors.amber.shade900;
-        break;
-      case OrganizerEventStatus.rejected:
       case OrganizerEventStatus.suspended:
         bg = Colors.red.shade50;
         fg = Colors.red.shade800;
@@ -793,8 +588,14 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
-      child: Text(label, style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.bold)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.bold),
+      ),
     );
   }
 }
