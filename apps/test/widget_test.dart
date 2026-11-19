@@ -14,6 +14,8 @@ import 'package:e_ticket_event_qr_scane/models/user/user_role.dart';
 import 'package:e_ticket_event_qr_scane/providers/auth_provider.dart';
 import 'package:e_ticket_event_qr_scane/services/auth/auth_service.dart';
 
+import 'helpers/test_mock_server.dart';
+
 class _UnauthenticatedAuthService extends AuthService {
   @override
   Future<Map<String, dynamic>> me() async =>
@@ -31,7 +33,13 @@ class _ProfileAuthService extends _UnauthenticatedAuthService {
   };
 }
 
-void main() {
+void main() async {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  await TestMockServer.start();
+
+  setUp(() {
+    TestMockServer.attachHttpOverrides();
+  });
   testWidgets('launching without a session displays login', (tester) async {
     await tester.pumpWidget(
       ChangeNotifierProvider<AuthProvider>(
@@ -95,6 +103,7 @@ void main() {
 
       await tester.tap(find.byTooltip('Notifikasi'));
       await tester.pumpAndSettle();
+
       expect(find.textContaining('Notifikasi'), findsOneWidget);
       expect(find.text('Event Disetujui'), findsOneWidget);
       await tester.pageBack();
