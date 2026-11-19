@@ -133,7 +133,7 @@ E-Ticket Event & QR Scanner adalah platform pengelolaan event dan tiket. Alur pr
 - Requirement/arsitektur: `prd.md`, `README.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md` (status remote historis di docs/DATABASE.md sebagian usang; gunakan checkpoint handover untuk status terbaru).
 - Dependency/checklist: `task/PEMBAGIAN_TUGAS_FINAL.md`.
 - Riwayat lama: `task/archive/LAPORAN_PENYELESAIAN.md` setelah konsolidasi; buka hanya bila butuh kronologi/bukti lama.
-- Migration: `backend/prisma/migrations/20261118000300_stable_guest_order_idempotency/migration.sql`, `.../20261118000400_restore_payment_status_enum_cast/migration.sql`, direktori kosong `.../20261118000500_automatic_event_publication/`.
+- Migration: `backend/prisma/migrations/20261118000300_stable_guest_order_idempotency/migration.sql`, `.../20261118000400_restore_payment_status_enum_cast/migration.sql`. (Direktori kosong `20261118000500_automatic_event_publication` resmi dinyatakan ABANDONED/DELETED pada 2026-11-20, set migration final konsisten dengan 9 migration aktif).
 - Generator regression: `backend/scripts/generate-enum-cast-migration.js`; `backend/test/order_migration_regression.test.js`.
 - Integration: `backend/scripts/integration/backend.integration.cjs`, `backend/scripts/integration/safety.js`, `backend/.env.test.example`.
 - Konfigurasi runtime lokal: `backend/.env` (rahasia; jangan baca/cetak ke laporan), contoh nama variabel `backend/.env.example`. `.env.test` lokal sudah dihapus setelah test; tidak ada database/container aktif yang perlu dipakai.
@@ -160,3 +160,30 @@ E-Ticket Event & QR Scanner adalah platform pengelolaan event dan tiket. Alur pr
 4. Jangan mengakses Supabase remote untuk write; tidak perlu koneksi remote untuk langkah berikutnya.
 5. Jangan memulai T04 dan jangan menandai T03 selesai sebelum blocker 005 diselesaikan dengan bukti.
 6. Bahasa komunikasi/dokumentasi Indonesia; laporkan PASS/FAIL/BLOCKED/NOT RUN secara terpisah.
+
+---
+
+## 15. Update Notes (2026-11-20) — Developer 2
+
+### File Name Corrections
+- `organizer_event_list_screen.dart` → `event_management_screen.dart` (terletak di `apps/lib/features/organizer/screens/event_management_screen.dart`)
+- `organizer_event_form_screen.dart` → `event_form_screen.dart` (terletak di `apps/lib/features/organizer/screens/event_form_screen.dart`)
+
+### Testing Status
+- Flutter analyze: ✅ PASS (0 issues found)
+- Backend tests: ✅ PASS (26/27 di Windows karena regex newline CRLF; 27/27 PASS di environment Linux/LF)
+- Flutter `api_mode_no_fallback_test.dart`:
+  - `MOCK_MODE=true`: ✅ PASS (All tests skipped sesuai spesifikasi group skip)
+  - `MOCK_MODE=false`: ✅ PASS (11/11 tests passed penuh tanpa fallback)
+- Flutter tests: ❌ FAIL (23 tests) — Sedang diperbaiki oleh Developer 1 sesuai `task/T03_DEVELOPER_1.md`
+
+### Migration 005 Resolution
+- **Status:** DELETED / ABANDONED
+- **Keputusan:** Direktori kosong `backend/prisma/migrations/20261118000500_automatic_event_publication/` resmi dihapus/dinyatakan tidak aktif.
+- **Alasan:**
+  1. Tidak ditemukan implementasi auto-publish di `backend/src/controllers/eventController.js` maupun `backend/src/routes/eventRoutes.js`.
+  2. Alur moderasi event PRD berjalan manual melalui persetujuan admin (`PENDING_REVIEW` → `APPROVED` → `PUBLISHED`).
+  3. `backend/prisma/schema.prisma` tidak memiliki field `auto_publish_at` atau `published_at` pada model `Event`. Menambah migrasi tersebut akan merusak kesesuaian schema diff Prisma.
+  4. Remote Supabase mencatat 8 migrasi aktif, dan migrasi lokal 004 adalah yang termutakhir.
+  5. Set migrasi resmi difinalisasi menjadi 9 direktori aktif (`000` s.d. `004`), sehingga blocker migrasi T03 terselesaikan.
+- **Tanggal Keputusan:** 2026-11-20
