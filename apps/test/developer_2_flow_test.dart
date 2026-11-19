@@ -16,8 +16,13 @@ import 'package:e_ticket_event_qr_scane/services/ticket/ticket_service.dart';
 import 'package:e_ticket_event_qr_scane/services/ticket/ticket_type_service.dart';
 import 'package:flutter/services.dart';
 
+import 'helpers/test_mock_server.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    await TestMockServer.start();
+  });
   const secureStorageChannel = MethodChannel(
     'plugins.it_nomads.com/flutter_secure_storage',
   );
