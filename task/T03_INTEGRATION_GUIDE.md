@@ -95,10 +95,11 @@ Afternoon:
 - [ ] Report created
 
 ### Developer 2
-- [ ] Migration 005 decided
-- [ ] Documentation updated
-- [ ] File names corrected
-- [ ] Report created
+- [x] Migration 005 decided (Resolved: ABANDONED/DELETED, 9 active migrations confirmed)
+- [x] Documentation updated (HANDOVER_AI_T03.md updated with 2026-11-20 notes)
+- [x] File names corrected (organizer_event_list_screen -> event_management_screen, organizer_event_form_screen -> event_form_screen)
+- [x] EventProvider verified (api_mode_no_fallback_test passes 11/11 in MOCK_MODE=false)
+- [x] Report created (task/T03_REPORT_DEVELOPER_2.md)
 
 ## Post-Integration Tests
 
