@@ -77,7 +77,10 @@ class ApiClient {
           data['message']?.toString() ??
           data['errors']?.toString() ??
           'Request failed (${response.statusCode})';
-      if (response.statusCode == 401) await _session.clear();
+      if (response.statusCode == 401) {
+        await _session.clear();
+        _session.notifySessionInvalidated();
+      }
       if (response.statusCode == 401 || response.statusCode == 403) {
         throw AuthException(message, statusCode: response.statusCode);
       }

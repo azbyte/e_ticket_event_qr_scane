@@ -6,6 +6,8 @@ import 'package:e_ticket_event_qr_scane/features/admin/tabs/admin_tab_controller
 import 'package:e_ticket_event_qr_scane/providers/auth_provider.dart';
 import 'package:e_ticket_event_qr_scane/services/auth/auth_service.dart';
 
+import '../../../helpers/test_mock_server.dart';
+
 class FakeAdminAuthService extends AuthService {
   @override
   Future<Map<String, dynamic>> me() async => {
@@ -18,6 +20,9 @@ class FakeAdminAuthService extends AuthService {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    await TestMockServer.start();
+  });
 
   Widget createAdminTabWidget(AuthProvider auth, {int initialIndex = 0}) {
     return MaterialApp(

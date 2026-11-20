@@ -3,18 +3,37 @@
 /// Requires package `provider` added to pubspec.yaml (PRD section 8.1).
 library;
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import '../core/errors/app_exception.dart';
+import '../core/services/session_service.dart';
 import '../models/user/user_model.dart';
 import '../services/auth/auth_service.dart';
 
 class AuthProvider extends ChangeNotifier {
-  AuthProvider(this._authService);
+  AuthProvider(this._authService) {
+    _sessionInvalidation = SessionService.instance.onSessionInvalidated.listen(
+      (_) => _onSessionInvalidated(),
+    );
+  }
 
   final AuthService _authService;
+
+  StreamSubscription<void>? _sessionInvalidation;
+  bool _disposed = false;
 
   UserModel? _user;
   bool _isLoading = false;
   String? _error;
+
+  /// Pesan yang ditampilkan ketika server menolak token tersimpan (HTTP 401)
+  /// sehingga sesi berakhir di tengah pemakaian.
+  static const String sessionExpiredMessage =
+      'Sesi Anda telah berakhir. Silakan masuk kembali.';
+
+  static const String _genericErrorMessage =
+      'Terjadi kesalahan. Silakan coba lagi.';
 
   UserModel? get user => _user;
   bool get isLoading => _isLoading;
@@ -45,7 +64,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = _messageForError(e);
       return false;
     } finally {
       _setLoading(false);
@@ -69,7 +88,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = _messageForError(e);
       return false;
     } finally {
       _setLoading(false);
@@ -85,7 +104,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = _messageForError(e);
       return false;
     } finally {
       _setLoading(false);
@@ -97,6 +116,9 @@ class AuthProvider extends ChangeNotifier {
       await _authService.logout();
     } finally {
       _user = null;
+      // Logout adalah tindakan sadar pengguna, bukan kegagalan: jangan sisakan
+      // pesan error (termasuk yang mungkin diisi oleh invalidasi sesi).
+      _error = null;
       notifyListeners();
     }
   }
@@ -110,8 +132,40 @@ class AuthProvider extends ChangeNotifier {
     _error = null;
   }
 
+  /// Menangani sesi yang dinyatakan tidak berlaku oleh server (HTTP 401).
+  ///
+  /// Tanpa penanganan ini, API client sudah menghapus token tetapi state
+  /// Provider tetap terautentikasi sampai aplikasi dibuka ulang (GAP-2).
+  void _onSessionInvalidated() {
+    if (_disposed || _user == null) return;
+    _user = null;
+    _error = sessionExpiredMessage;
+    notifyListeners();
+  }
+
+  /// Mengubah exception menjadi pesan yang layak ditampilkan ke pengguna.
+  ///
+  /// `Exception.toString()` menyertakan nama kelas internal (mis.
+  /// `AuthException: Invalid credentials`) sehingga pesannya tidak eksplisit
+  /// bagi pengguna (GAP-1).
+  String _messageForError(Object error) {
+    if (error is AppException) return error.message;
+    if (error is FormatException && error.message.isNotEmpty) {
+      return error.message;
+    }
+    return _genericErrorMessage;
+  }
+
   void _setLoading(bool value) {
     _isLoading = value;
-    notifyListeners();
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _sessionInvalidation?.cancel();
+    _sessionInvalidation = null;
+    super.dispose();
   }
 }

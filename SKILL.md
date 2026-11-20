@@ -34,3 +34,13 @@ perlu menjalankan semua skill untuk setiap perubahan.
 
 Skill yang tercantum adalah panduan yang dipilih sesuai cakupan, bukan prosedur
 yang harus seluruhnya dijalankan pada setiap tugas.
+
+## Eksekusi tugas developer
+
+Untuk perintah berbentuk “Kerjakan Developer N Tahap M”, “Lanjutkan tugas
+Developer N”, atau “Perbaiki bug tahap sebelumnya”, ikuti *Autonomous Execution
+Protocol* pada [`task/PEMBAGIAN_TUGAS_FINAL.md`](task/PEMBAGIAN_TUGAS_FINAL.md):
+perintah pemilik proyek adalah otorisasi implementasi, keputusan teknis diambil
+mandiri tanpa approval tambahan, dan skill di atas dipilih sesuai cakupan
+pekerjaan. Mode read-only hanya bila diminta eksplisit. Pengecualian: Developer 1
+Tahap 1 berstatus FROZEN dan tidak dikerjakan ulang.

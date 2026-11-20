@@ -3,7 +3,13 @@ import 'package:e_ticket_event_qr_scane/services/organizer_plans/organizer_plans
 import 'package:e_ticket_event_qr_scane/services/organizer_support/organizer_support_service.dart';
 import 'package:e_ticket_event_qr_scane/services/report/report_service.dart';
 
+import '../../../helpers/test_mock_server.dart';
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    await TestMockServer.start();
+  });
   group('OrganizerPlansService Tests (FR-76–79)', () {
     late OrganizerPlansService service;
 
@@ -52,6 +58,7 @@ void main() {
     setUp(() {
       supportService = OrganizerSupportService.instance;
       ReportService.resetMockData();
+      TestMockServer.resetReports();
     });
 
     test('Creates complaint in the shared Admin report store', () async {
