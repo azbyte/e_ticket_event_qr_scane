@@ -1,0 +1,17 @@
+# Kepemilikan file — Tahap 2
+
+Tabel path eksklusif; conditional on Tahap 1 integration GO baseline dan keputusan/technical gate yang relevan untuk acceptance task. Developer tidak boleh mengubah di luar assigned globs.
+
+| Pemilik | Path boleh diubah |
+|---|---|
+| Developer 1 — staff invitation/membership | `backend/src/controllers/eventInvitationController.js`; `backend/src/controllers/organizerProfileController.js`; Flutter `apps/lib/features/organizer/membership/**`; `apps/lib/features/staff/**`; `apps/lib/features/organizer/screens/staff_management_screen.dart`; tests scoped to invitations/membership in `apps/test/features/organizer/shell/organizer_membership_test.dart` and `backend/test/invitation_*.test.js` |
+| Developer 2 — scanner/check-in and event summary consumer | `backend/src/controllers/checkInController.js`; `backend/src/services/ticketTokenService.js` only if no other owner modifies it in this stage; `apps/lib/features/scanner/**`; `apps/lib/features/check_in/**`; `apps/lib/features/organizer/operations/organizer_scanner_screen.dart`; tests `apps/test/features/organizer/operations/attendee_access_widget_test.dart`; `backend/test/checkin_*.test.js` |
+| Developer 3 — attendee list/export and admin/reporting | `backend/src/controllers/adminController.js`; `backend/src/controllers/eventMetricsController.js` (exclusive owner in Tahap 2: Admin moderation + event metrics); `backend/src/controllers/reportController.js`; `backend/src/controllers/notificationController.js`; `apps/lib/features/organizer/screens/attendee_list_screen.dart`; `apps/lib/features/admin/**`; `apps/lib/features/reports/**`; `apps/lib/features/notifications/**`; `backend/test/admin_*.test.js`, `backend/test/report_*.test.js` |
+| Developer 4 post-merge | `task/TAHAP_2/LAPORAN_DEVELOPER_4.md`; `backend/test/stage2_integration.test.js`; `apps/test/stage2_integration_test.dart` only |
+
+## Locked / prohibited
+`apps/lib/app_router.dart`, `app.dart`, `main.dart`, `routes/**`, global providers/services/models/core, API client; `backend/src/app.js`, `server.js`, all `src/routes/**`, global middleware/config, Prisma/migrations, package/pubspec/lock, shared response/serializers; all D1/D2/D3-owned file globs assigned to others; PRD and architecture docs. D1–D3 dilarang mengubah atau menjalankan perubahan DB/schema/migration/SQL/seed/config. Kebutuhan database hanya dilaporkan untuk FINISHING sesuai `../FINISHING_AUTHORITY.md`; Developer 4 tidak otomatis berwenang. `ticketTokenService.js` assignment is D2 exclusive despite being a shared security surface; no other developer may touch it. If source test path already owned/shared, request a new D4-specific test path instead of editing.
+
+`backend/src/controllers/eventMetricsController.js` adalah ownership tunggal Developer 3 pada Tahap 2 karena file ini memuat Admin moderation dan event metrics; D2 hanya memakai endpoint summary/sales baseline secara read-only. Developer 2 tidak boleh mengubah controller tersebut. Bila endpoint perlu diubah, laporkan interface request dan blokir acceptance terdampak sampai amendment ownership tertulis; jangan buat shared ownership.
+
+No other duplicate allow-globs between the three developers. Semantic dependencies (membership event scope → scan permission → attendee reporting) are handled by frozen API contract, not by waiting on implementation. If a current endpoint is insufficient, block/report rather than change a locked route.

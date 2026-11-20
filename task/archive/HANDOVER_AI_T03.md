@@ -1,5 +1,7 @@
 # Handover AI — Checkpoint T03 E-Ticket Event & QR Scanner
 
+> **ARSIP HISTORIS — BUKAN INSTRUKSI AKTIF.** Snapshot ini berasal dari 2026-11-19/20 dan sebagian keputusan/claim-nya telah digantikan. Jangan ikuti instruksi task/migration di bawah sebagai mandat saat ini. Entry point aktif adalah [`../PEMBAGIAN_TUGAS_FINAL.md`](../PEMBAGIAN_TUGAS_FINAL.md), requirement aktif [`../../PRD.md`](../../PRD.md), dan database authority [`../FINISHING_AUTHORITY.md`](../FINISHING_AUTHORITY.md).
+>
 > **Entry point untuk AI penerus.** Baca dokumen ini lebih dahulu. Ini ringkasan kerja aktif, bukan pengganti requirement. Jangan mulai T04 dan jangan menganggap T03 selesai sebelum blocker migration 005 mendapat keputusan/sumber yang dapat diverifikasi.
 >
 > **Snapshot:** 2026-11-19. Working tree memiliki banyak perubahan tracked/untracked yang sudah ada sebelum pekerjaan handover; jangan reset, menghapus, atau mengatribusikan perubahan itu tanpa pemeriksaan pemilik.

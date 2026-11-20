@@ -1,10 +1,14 @@
 # Panduan AI dan developer — E-Ticket Event & QR Scanner
 
 Gunakan Bahasa Indonesia untuk komunikasi dan dokumentasi kecuali nama teknis.
-Jika melanjutkan checkpoint T03, mulai dengan [`task/HANDOVER_AI_T03.md`](task/HANDOVER_AI_T03.md),
-kemudian baca dokumen lain yang dirujuk hanya jika diperlukan. Jangan membaca
-seluruh `task/archive/` atau `archive/` secara default.
-Sebelum mengubah kode, baca `README.md`, `prd.md`, dan bagian arsitektur yang
+Entry point workflow developer adalah [`task/PEMBAGIAN_TUGAS_FINAL.md`](task/PEMBAGIAN_TUGAS_FINAL.md).
+Untuk permintaan berbentuk “Saya Developer N, kerjakan Tahap M”, ikuti controller
+tersebut: identifikasi task, periksa status/diff dan gate, lalu baca hanya task,
+ownership, integration contract, laporan sebelumnya dan source relevan. Jangan
+membaca seluruh repository atau `task/archive/` / `archive/` secara default.
+Handover T03 lama dipindahkan ke `task/archive/HANDOVER_AI_T03.md` dan hanya
+untuk sejarah, bukan entry point.
+Sebelum mengubah kode, baca `README.md`, `PRD.md`, dan bagian arsitektur yang
 terdampak di `docs/ARCHITECTURE.md`. Untuk aturan khusus gunakan skills di
 `.agents/skills/` (lihat `SKILL.md` sebagai katalog). Jangan menganggap prototipe
 atau dummy sebagai jaminan keamanan maupun perilaku backend.
@@ -17,9 +21,12 @@ atau dummy sebagai jaminan keamanan maupun perilaku backend.
   `models`, `providers`, `services`.
 - Backend: JavaScript CommonJS, Node.js, Express 4 di `backend/`; controller,
   routes, middleware, services, models dan validators di `backend/src/`.
-- Persistence/auth: Supabase/PostgreSQL, JWT dan role. SQL migration aktual
-  berada di `backend/supabase/migrations/`. Ikuti implementasi dan migration,
-  jangan mengandalkan schema lama di README backend.
+- Persistence/auth: PostgreSQL/Supabase, JWT dan role. Sumber schema dan riwayat
+  migration aktif yang ditetapkan adalah `backend/prisma/schema.prisma` dan
+  `backend/prisma/migrations/`. `backend/supabase/migrations/` berisi SQL legacy
+  yang masih dipertahankan untuk fungsi/riwayat tertentu; jangan menjalankannya
+  atau menghapusnya sebagai baseline Prisma tanpa rekonsiliasi dan persetujuan
+  penanggung jawab FINISHING. Backend runtime memakai `pg`, bukan Prisma Client.
 - Flutter memakai API backend secara default; mode demo harus diaktifkan secara
   eksplisit dengan `MOCK_MODE=true`. Integrasi seluruh modul belum selesai dan
   backend membutuhkan environment variables.
@@ -50,14 +57,20 @@ berlaku untuk pekerjaan backend sesuai cakupannya:
 Skill tidak perlu dijalankan semuanya untuk setiap perubahan. Ikuti prasyarat
 dan pemeriksaan yang dinyatakan oleh skill terpilih.
 
-Requirement sumber adalah `prd.md` serta migration/source aktual; PRD UI prototype
-memiliki batas cakupan tersendiri. Jika permintaan menyentuh backend, cek konteks
-dan mandat terkini—jangan menganggap roadmap PRD sebagai approval otomatis.
+Requirement produk aktif adalah `PRD.md`; implementation/source dan schema
+menunjukkan kondisi teknis, bukan pengganti keputusan produk. PRD mencatat
+keputusan yang perlu konfirmasi dan gap; jangan menganggap roadmap sebagai
+approval otomatis.
 
 ## Batas perubahan
 
 - Jangan mengubah flow bisnis, skema/database, API, role, atau dependensi runtime
   sebagai bagian pekerjaan tooling tanpa alasan/mandat eksplisit.
+- Developer 1–3 dilarang mengubah schema, migration, struktur/relasi tabel,
+  konfigurasi/seed database, atau SQL langsung. Kebutuhan perubahan dilaporkan
+  sebagai proposal untuk FINISHING. Hanya penanggung jawab FINISHING yang telah
+  ditetapkan dan setelah gate FINISHING dibuka boleh mengimplementasikan DB;
+  Developer 4 tidak otomatis berwenang. Rincian di `task/FINISHING_AUTHORITY.md`.
 - Jangan pernah menaruh secret, `.env`, service role key, atau token ke kode,
   fixture, log, dokumentasi, maupun aplikasi Flutter.
 - Validasi authorization di backend; menyembunyikan kontrol UI bukan keamanan.

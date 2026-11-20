@@ -1,123 +1,199 @@
-# Pembagian Tugas Final — E-Ticket Event & QR Scanner
+# Peta Kerja Final — E-Ticket Event & QR Scanner
 
-> **Dokumen kerja Fase 1.** Dasar audit: PRD `prd.md` (FR-01–FR-101), `README.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, source Flutter/Express, schema Prisma/migration yang ada, tes, dan status Git pada 2026-11-18. Perubahan working tree yang sudah ada sebelum audit ini tidak dianggap dibuat atau diverifikasi oleh audit ini.
+Dokumen ini adalah **controller proyek** untuk tugas Developer 1–3. PRD aktif
+adalah [`../PRD.md`](../PRD.md); task rinci, allow-list ownership, integrasi,
+laporan, dan gate tahap berada di folder `TAHAP_1/`, `TAHAP_2/`, dan
+`TAHAP_3/`. Dokumen lama di `archive/` bersifat historis, bukan instruksi kerja.
 
-## A. Ringkasan Hasil Audit
+## Cara memulai (prompt singkat — instruksi operasional)
 
-### Kondisi repository dan stack
+Perintah yang didukung, tanpa prompt tambahan:
 
-- Frontend Flutter/Dart (Android/Web), Provider, `http`, `flutter_secure_storage`; source di `apps/lib/`, tes di `apps/test/`.
-- Backend Node.js/CommonJS, Express 4, PostgreSQL via `pg` (`backend/src/config/db.js`), JWT, migration Prisma dan satu migration Supabase SQL lama. `backend/src/config/supabase.js` adalah alias kompatibilitas; Prisma schema/migration lokal **tidak membuktikan** status database deployment. Tidak menjalankan migration atau akses database pada audit ini.
-- Ada implementasi route/controller/service untuk auth, event, order, payment simulasi, ticket, check-in, invitation, notification, plans, subscriptions, revenue, support reports dan admin. UI Flutter memiliki area public, participant, organizer/staff dan admin.
-- Working tree telah berubah luas di semua area dan memiliki file untracked, termasuk `backend/prisma/`, controller/route baru, sejumlah tes, serta perubahan CI. Audit mengamati workspace saat ini dan tidak mengatribusikan perubahan tersebut ke sesi audit.
+`Developer 1 — Tahap 1` · `Developer 2 — Tahap 1` · `Developer 3 — Tahap 1`
+`Developer 1 — Tahap 2` · `Developer 2 — Tahap 2` · `Developer 3 — Tahap 2`
+`Developer 1 — Tahap 3` · `Developer 2 — Tahap 3` · `Developer 3 — Tahap 3`
 
-### Sudah tersedia di source (belum seluruhnya diverifikasi end-to-end)
+Perintah tersebut cukup untuk memilih dan melaksanakan task. AI wajib membaca
+controller ini, task bernomor sama, allow-list `FILE_OWNERSHIP.md`,
+`INTEGRATION_CONTRACT.md`, ledger Fase 1E, matriks PRD, authorization register,
+laporan developer dan laporan integrasi/gate sebelumnya yang relevan, lalu source
+terbatas yang dirujuk task. AI tidak meminta developer mengulang scope, analisis,
+file, atau acceptance yang sudah ditetapkan dokumen. Perintah **bukan** approval:
+status izin dinilai per task dan acceptance berdasarkan bukti approval/gate yang
+berlaku, bukan blanket status fase.
 
-- API terstruktur, koneksi PostgreSQL langsung, middleware auth/error/rate-limit/logging, validasi dan test unit/backend.
-- Alur order dan pembayaran simulasi, ticket issuance, email delivery service berbasis konfigurasi, undangan/membership event, event/ticket-type, check-in dan token QR mempunyai implementasi source.
-- Mode MOCK tersedia sebagai pilihan eksplisit di Flutter; bukan pengganti integrasi backend produksi.
-- Prisma schema valid secara sintaksis; tersedia migration lokal berlapis dan dokumentasi rekonsiliasi DB.
+AI harus menyatakan task/AC yang siap dan terblokir serta bukti/approval yang
+kurang. Jika seluruh prasyarat task GO, langsung kerjakan seluruh scope yang
+diizinkan, jalankan tes yang ditetapkan, isi laporan tahap milik developer, lalu
+siapkan handoff untuk integrator. Jika BLOCKED, jangan implementasikan bagian
+terdampak; sebutkan blocker spesifik, owner/approver dan bukti yang diperlukan,
+serta kerjakan hanya sub-scope independen yang eksplisit diizinkan. Jangan beralih
+ke tahap berikutnya otomatis. Untuk FINISHING, gunakan jalur otorisasi terpisah;
+perintah singkat D1–D3 tidak memberi wewenang database kepada Developer 4.
 
-### Gap dan masalah yang terbukti
+## Authorization status saat snapshot
 
-1. **Flutter gagal dianalisis/dikompilasi:** `apps/lib/features/organizer/events/screens/organizer_event_detail_screen.dart` menghasilkan 69 analyzer issues, termasuk State tanpa `build` dan banyak identifier (`_provider`, `widget`, `context`) di scope yang salah. `flutter test` juga gagal kompilasi modul ini.
-2. **Flutter tests gagal:** selain compile failure, ada `MissingPluginException` untuk secure storage, kegagalan widget test dan `pumpAndSettle` timeout. Perlu isolasi plugin dengan test doubles dan regression tests.
-3. **Backend checks lokal lulus:** `npm test` 26/26; `npm run check` memeriksa 61 file JS; `npm run format:check`; `npm run validate:skills` 7 skills/8 Markdown; `npm run prisma:validate` valid. Ini tidak membuktikan integrasi DB/provider.
-4. **Status DB/deployment belum disahkan:** klaim historis docs mengenai introspeksi, fungsi DB, RLS/grants dan migration history tidak dapat dibuktikan dari file. Tidak menjalankan audit/mutasi remote tanpa environment uji eksplisit.
-5. **QR/check-in belum production-ready menurut `docs/DATABASE.md`:** QR/scanner menggunakan bearer ticket code, bukan verifikasi hash token; expiry/replay/race/authorization perlu review dan tes sebelum klaim aman.
-6. **Email bergantung SMTP:** tanpa host SMTP, service mencatat status pending/non-delivery, bukan bukti email terkirim. Perlu pengujian status delivery dan sandbox E2E.
-7. **Kesesuaian fitur PRD belum terbukti menyeluruh:** keberadaan screen/API bukan bukti alur berfungsi. Coverage acceptance custom ticket design/template/QR placement, public links, order/payment/email, Staff permissions, Admin/business/support/audit, plan/subscription, serta state loading/error/empty perlu ditelusuri per kontrak dan test.
+- `task/FASE_1C_AUTHORIZATION_REGISTER.md` dan
+  `task/FASE_1D_AUTHORIZATION_AND_UNBLOCKING.md` adalah catatan rekomendasi/
+  blocker sampai kolom keputusan/approver/evidence benar-benar diisi pihak
+  berwenang. Teks AI atau status dokumen saja tidak mengotorisasi implementasi.
+- Untuk gate/ownership pending, baca
+  [`FASE_1E_OWNERSHIP_AND_EXECUTION_LEDGER.md`](FASE_1E_OWNERSHIP_AND_EXECUTION_LEDGER.md).
+- Snapshot saat ini tidak mempunyai approval tertulis/baseline sign-off: D1 T1
+  auth adalah kandidat independent scope, tetapi tetap **BLOCKED** sampai
+  maintainer mengesahkan baseline, technical gate dan test path; D2 T1 lifecycle
+  dan D3 T1 order/payment tetap **BLOCKED** sesuai contract/OPEN decisions.
 
-### Batasan audit
+1. Identifikasi developer (1/2/3 atau FINISHING) dan tahap (1/2/3/FINISHING).
+   Jika identitas/tahap tidak jelas, berhenti dan minta klarifikasi.
+2. Periksa `git status --short --branch` dan diff. Jangan menimpa, membuang,
+   atau mengatribusikan perubahan yang sudah ada. Jangan membaca `.env`.
+3. Baca `PRD.md` hanya bagian yang dirujuk task terpilih; baca task developer
+   tersebut, `FILE_OWNERSHIP.md`, `INTEGRATION_CONTRACT.md`,
+   [`FASE_1E_OWNERSHIP_AND_EXECUTION_LEDGER.md`](FASE_1E_OWNERSHIP_AND_EXECUTION_LEDGER.md),
+   [`FASE_1E_TASK_SYSTEM_FINALIZATION.md`](FASE_1E_TASK_SYSTEM_FINALIZATION.md),
+   laporan gate tahap sebelumnya, dan hanya source/tests yang disebut task bila
+   gate mengizinkan.
+4. Verifikasi gate sebelumnya dari laporan integrasi **dan** bukti baseline/CI
+   yang dirujuk. Template kosong, klaim tanpa evidence, status NOT RUN, atau
+   baseline tidak diketahui berarti **BLOCKED**. Periksa OPEN DECISION PRD per
+   acceptance/task: hanya pekerjaan yang bergantung pada keputusan tersebut
+   diblokir; jangan memperluas atau mengabaikan blocker secara sepihak.
+5. Pastikan task belum selesai pada baseline aktif melalui laporan, PR/diff dan
+   bukti terkait. Jangan mengulang task; bila status tidak terbukti, berhenti dan
+   laporkan blocker.
+6. Periksa semua file yang akan disentuh terhadap allow-list task. Jangan edit
+   kontrak bersama, file developer lain, atau file di luar allow-list. Jika
+   perlu perubahan interface/file milik orang lain, buat laporan kebutuhan:
+   file/interface, alasan, dampak, dependency, acceptance/test, dan owner yang
+   perlu menyetujui; hentikan bagian terdampak.
+7. Kerjakan **hanya** task yang dipilih, tanpa fitur tambahan. Jalankan test
+   relevan yang diizinkan; jangan mengakses database/provider sungguhan.
+8. Periksa ulang status dan diff. Isi `LAPORAN_DEVELOPER_N.md` pada folder tahap
+   aktif dengan fakta aktual dan status PASS/FAIL/BLOCKED/NOT RUN. Jangan tandai
+   tahap GO; integrator menilai tahapnya, dan penanggung jawab FINISHING terpilih
+   hanya berwenang pada gate FINISHING yang ditetapkan.
+9. Untuk requirement-driven task, konsultasikan [`PRD_TRACEABILITY_MATRIX.md`](PRD_TRACEABILITY_MATRIX.md)
+   dan [`TECHNICAL_GATE_CLOSURE.md`](TECHNICAL_GATE_CLOSURE.md); update status/evidence
+   hanya berdasarkan hasil aktual, dan gunakan [`DB_CHANGE_PROPOSAL.md`](DB_CHANGE_PROPOSAL.md)
+   bila kebutuhan DB perlu dieskalasikan.
 
-- Tidak mengakses service DB, SMTP, payment provider atau akun sungguhan; tidak membaca/menyalin nilai `.env`.
-- E2E, build Android/Web, validasi perangkat/responsivitas, migration live dan policy/grants memerlukan environment uji khusus.
-- Schema aktif ditentukan oleh runtime dan migration yang diterapkan, bukan sekadar keberadaan Prisma. `backend/prisma/` untracked pada saat audit.
+10. Periksa authorization state pada `FASE_1C_AUTHORIZATION_REGISTER.md`,
+    `FASE_1D_AUTHORIZATION_AND_UNBLOCKING.md` dan Fase 1E ledger. Approval hanya
+    valid bila pihak berwenang, keputusan/scope, tanggal dan evidence tercatat;
+    catatan rekomendasi AI bukan approval.
 
-## B. Daftar Pekerjaan
+11. Tentukan izin **per task/acceptance**, bukan satu status blanket seluruh
+    developer atau tahap. Laporkan GO/CONDITIONAL GO/BLOCKED, file allow/deny,
+    dependency, approval dan evidence yang mendasarinya. CONDITIONAL GO baru
+    mengizinkan mulai setelah kondisi tertulis benar-benar dipenuhi. Jika BLOCKED,
+    jangan implementasi scope terdampak; sub-scope independen hanya boleh dikerjakan
+    bila task/gate secara eksplisit menyatakannya. Jangan lanjut otomatis.
 
-| ID | Pekerjaan / tujuan | File atau bagian proyek | Ketergantungan | Kriteria keberhasilan |
+## Routing task
+
+| Instruksi | Dokumen yang wajib dibaca |
+|---|---|
+| Developer 1, Tahap 1 | `TAHAP_1/DEVELOPER_1_TASK.md`, `TAHAP_1/FILE_OWNERSHIP.md`, `TAHAP_1/INTEGRATION_CONTRACT.md` |
+| Developer 2, Tahap 1 | `TAHAP_1/DEVELOPER_2_TASK.md`, `TAHAP_1/FILE_OWNERSHIP.md`, `TAHAP_1/INTEGRATION_CONTRACT.md` |
+| Developer 3, Tahap 1 | `TAHAP_1/DEVELOPER_3_TASK.md`, `TAHAP_1/FILE_OWNERSHIP.md`, `TAHAP_1/INTEGRATION_CONTRACT.md` |
+| Developer 1/2/3, Tahap 2 | Task bernomor sama di `TAHAP_2/`, `TAHAP_2/FILE_OWNERSHIP.md`, `TAHAP_2/INTEGRATION_CONTRACT.md`, serta Tahap 1 gate |
+| Developer 1/2/3, Tahap 3 | Task bernomor sama di `TAHAP_3/`, `TAHAP_3/FILE_OWNERSHIP.md`, `TAHAP_3/INTEGRATION_CONTRACT.md`, serta Tahap 2 gate |
+| FINISHING | `FINISHING_AUTHORITY.md`, seluruh laporan tahap terkait, kontrak/ownership, diff PR dan checklist integrasi yang relevan |
+
+Untuk semua task, ikuti batas database di `FINISHING_AUTHORITY.md`. Tidak ada
+Developer 4 otomatis berwenang mengubah database. FINISHING hanya aktif ketika
+penanggung jawabnya ditetapkan secara eksplisit dan gate FINISHING dibuka.
+
+## Pemetaan PRD → Developer → Tahap → output → acceptance
+
+Matriks di bawah merangkum seluruh requirement produk aktif §§1–16; traceability
+rinci (API/DB/test/evidence per baris) ada di
+[`PRD_TRACEABILITY_MATRIX.md`](PRD_TRACEABILITY_MATRIX.md). Setiap baris harus
+ditutup dengan bukti aktual pada laporan task dan penerimaan integrator; `BLOCKED`
+atau `NOT RUN` bukan pemenuhan requirement. Keputusan OPEN hanya memblokir
+acceptance yang bergantung padanya. Kebutuhan lintas-domain berakhir pada integrasi
+Tahap 3, FINISHING berotorisasi, dan demonstrasi; tugas yang secara eksplisit
+dimiliki D4 ditandai demikian.
+
+| Fitur PRD | Developer | Tahap | Output | Acceptance Criteria | Status |
+|---|---|---:|---|---|---|
+| Auth/session, role server-authoritative; no Participant account | D1 | 1 | Auth Flutter/backend milik D1; laporan + test evidence | Login valid/invalid, `/me`, logout/session, tidak ada role escalation atau mock fallback; AC-02/10 | BLOCKED sampai baseline/technical gate dan test path disetujui |
+| Organizer event CRUD/ownership, validasi, auto-publish/private-invalid, suspend pascapublikasi | D2; D3 konsumen order gate; D4 integrasi | 1–2 | Event/category domain; moderation/report D3 T2; laporan + API/UI/DB evidence | Owner isolation, validasi lifecycle/status, publikasi sesuai PRD, alasan/audit suspend, suspended event tidak dapat dipesan; AC-02/05 | BLOCKED pada G-02/shared contract dan DB disposition terkait |
+| Kategori tiket, kuota/periode jual, satu event satu kelas harga gratis/berbayar | D2; D3 validasi order | 1 | CRUD kategori + kontrak yang dikonsumsi checkout; laporan/test | Inactive/out-of-window/sold-out/mixed-price ditolak server; AC-04/06 | BLOCKED pada G-01/G-02 bagian yang membutuhkan shared/DB |
+| Form pendaftaran dinamis, validasi jawaban, brosur opsional | D1 konfigurasi; D2 renderer; technical owner untuk shared API/storage; D4 validasi | 3 / FINISHING jika disetujui | UI dan public journey; kontrak/storage yang disetujui; laporan/evidence | Persist round-trip, validasi field/answer, renderer satu peserta, unggah hanya bila storage disahkan; AC-03/04 | BLOCKED G-07; shared interface/storage owner belum ditetapkan |
+| Desain/template tiket dan tampilan tiket/QR | D1 presentation; D3 T1 issuance; D2 T3 journey; D4 validasi | 1, 3 | Issued ticket/QR sesuai record; UI dan test | Tiket gratis setelah validasi, berbayar setelah PAID; QR unik; template hanya jika persisted contract tersedia; AC-07 | BLOCKED pada kontrak/API/DB terkait; status bukan bukti QR aman |
+| Link pendaftaran publik; guest tanpa akun; no manual/assisted; satu order/item/tiket/attendee dan repeat order | D3 domain; D2 journey; D4 integrasi | 1, 3 | Order API/domain dan UI guest; laporan + test/E2E | Tidak perlu akun, satu item dan quantity 1, harga snapshot, repeat selama terbuka, reject assisted/multi-item; AC-03/04/06 | BLOCKED pada G-01 dan DB compatibility yang relevan |
+| Simulasi VA, fee Rp5.000 + 5%, payment status, guest payment authority, expiry/cancel/refund | D3; keputusan produk untuk C-01/C-02/expiry/cancel; D2 status UI | 1, 3 | Order/payment/ticket flow dan status UI; evidence server/test | Paid ticket hanya sesudah PAID; simulasi bukan gateway riil; nominal terjaga; formula/authority/status hanya sesudah keputusan; AC-06/07 | Sebagian OPEN/BLOCKED: C-01, C-02 dan policy terkait; scope independen tetap dinilai terpisah |
+| Invitation Staff, membership event-scoped, permission dan accept link | D1 invitation/membership; D2 konsumen permission/scanner; maintainer owner router bila diperlukan; D4 integrasi | 2 | Invitation/membership; handoff interface; laporan + positive/negative test | Invite/revoke/expiry/email mismatch, authenticated accept, permission/event scope; tidak ada akses global; AC-08 | BLOCKED sampai Tahap 1 GO; G-04 router owner belum disahkan |
+| Scanner dan check-in online/QR eligibility | D2; D1 membership upstream; D4 integrasi | 2 | Check-in/token service/UI; laporan + API/widget evidence | Authorized event permission, reject invalid/duplicate/ineligible, online only; no token leak; AC-08 | BLOCKED sampai Tahap 1 GO dan kontrak/DB/security evidence |
+| Daftar peserta PAID-first, nomor/order stabil, export | D2 owns attendee source; D3 owns UI/export; D4 integrasi | 2 | Endpoint (D2), UI/export (D3), laporan + parity/CSV tests | Akses owner/permission, urutan paid-first dan stabil, export set/sort sama, CSV/privacy safe; AC-09 | BLOCKED G-06; endpoint/response belum memenuhi bukti lengkap |
+| Admin monitoring akun/event/transaksi, suspend, audit/reports/notification | D3 eksklusif `eventMetricsController.js` T2; D2 event domain terkait; D4 validasi | 1–2 | Admin screens/report/metrics + API; laporan + authorization/persistence evidence | Admin-only backend, suspend beralasan/audit, monitoring/report sesuai scope approved; AC-02/09 | BLOCKED G-02; C-03 hanya untuk plan/entitlement |
+| Plan/subscription, entitlement, email delivery/retry | Pemilik produk/technical owner untuk keputusan; D3 hanya scope T2 yang disetujui; D4 verifikasi | 2 / setelah keputusan | Keputusan tertulis, kontrak dan implementasi hanya setelah owner/gate; evidence | Tidak menciptakan paywall/entitlement atau mengklaim email terkirim tanpa keputusan dan evidence sandbox; AC terkait §13/15 | OPEN C-03/G-09; bukan blanket blocker untuk task lain |
+| Responsive Android/Web, loading/error/empty/retry/accessibility states | D1–D3 sesuai file owned; D4 integrasi/build/smoke | 1–3 / FINISHING | UI state tests, builds, device/browser evidence | Narrow/wide journey tanpa mock fallback; test/build dan keterbatasan perangkat dicatat; AC-10 | BLOCKED sampai gate dan bukti per environment tersedia |
+| Integrasi seluruh sistem, regression, build/smoke, demonstrasi & penutupan AC-01–10 | D4 integrator untuk Tahap 1–3; penanggung jawab FINISHING yang ditunjuk untuk scope FINISHING; D1–D3 handback domain | 1–FINISHING | Laporan integrasi tiap tahap, test/build/smoke evidence, checklist/runbook demonstrasi pada allow-list | Semua AC PRD terpetakan PASS dengan bukti backend/API/DB/UI yang sesuai; known gap ditutup/diterima pemilik; siap demonstrasi tanpa klaim mock-only | BLOCKED; tidak ada laporan GO/evidence integrasi final atau penunjukan FINISHING |
+
+Tidak ada baris yang berstatus PASS hanya karena source atau task dokumennya ada.
+Matriks traceability rinci tetap authoritative untuk evidence/test per requirement.
+
+## Pemilik, keluaran, dan acceptance per tahap
+
+| Tahap | Developer 1 | Developer 2 | Developer 3 | Output/gate integrasi |
 |---|---|---|---|---|
-| T01 | Pulihkan baseline Flutter: diagnosis scope/class detail event dan perbaiki sekecil mungkin tanpa menghilangkan fitur/kerja lokal. | `apps/lib/features/organizer/events/screens/organizer_event_detail_screen.dart`, provider/widget terkait | — | `flutter analyze` tanpa error; test/build compile; loading/error/empty dan callback detail event tetap teruji. |
-| T02 | Stabilkan fondasi tes Flutter: isolasi secure storage/HTTP dan benahi widget tests gagal/timeout. | `apps/test/**`, test setup session/storage/service, widget organizer/admin/report | T01 | `flutter test` lulus berulang; fixtures/test doubles tanpa jaringan atau plugin nyata. |
-| T03 | Konfirmasi baseline database secara read-only: rekonsiliasi koneksi PostgreSQL, schema/migration source of truth dan klaim docs. | `backend/src/config/db.js`, `backend/prisma/**`, `backend/supabase/migrations/**`, `docs/DATABASE.md`, scripts audit | — | Schema-diff read-only terhadap DB test eksplisit atau status BLOCKED; tanpa migration/reset/remote write tanpa izin/keputusan deployment. |
-| T04 | Rekonsiliasi dan amankan DB bila diperlukan berdasarkan bukti T03. | migration Prisma/Supabase, `backend/scripts/**`, dokumentasi DB | T03; keputusan pemilik DB | Migration kompatibel direview dan diuji pada DB disposable; grants/RLS minimum dan constraint transaksi sesuai; schema diff bersih. Jika tak perlu, dokumentasikan bukti. |
-| T05 | Audit/tegakkan auth, role, membership, ownership pada endpoint privat: Participant, Organizer Owner, Staff permission event, Admin dan Guest token. | `backend/src/routes/**`, middleware/controller/service, `backend/test/**`, policy | T03 | Tes positive/negative auth, role, owner lain, membership/permission revoked dan guest token; request tak sah ditolak, response konsisten. |
-| T06 | Lengkapi event/ticket category sesuai PRD: DRAFT, auto-validation/publish, OPEN/CLOSED, suspend Admin + alasan/audit, free/paid rule dan quota. | event/ticket-type API, SQL/migration bila perlu, Flutter organizer/admin | T04, T05, T01 | Transisi valid/invalid dan quota/concurrency diuji; hanya aktor berhak mengubah; suspension beralasan/audit; kontrak klien konsisten. |
-| T07 | Tuntaskan publikasi dan desain tiket: public registration link/QR terpisah dari QR tiket, template PDF/PNG, validasi upload/area QR, versioning. | event API, storage/template service, organizer form/detail, public registration/ticket UI | T06, T05 | Format/ukuran/area QR tervalidasi; desain invalid tidak membuka registrasi; tiket mengacu versi desain; link publik tidak memberi akses staff. |
-| T08 | Tuntaskan registrasi/order/pembayaran simulasi: satu order satu item/tiket/peserta, self/assisted, guest access/idempotency, hold/expiry/fee, status server-side. | order/payment API, SQL functions/migrations, Flutter registration/order/payment | T04, T05, T06 | Free/paid, success/fail/expired, duplicate/retry, oversell/concurrency, guest access dan spoof status diuji; tiket hanya terbit sekali sesuai state sah. |
-| T09 | Tuntaskan ticket issuance/email: QR token terkait ticket/event, desain tiket, status email/retry tanpa duplikasi. | ticket/email/token service, schema, Flutter ticket/order | T08, T07 | Ticket state dan email pending/sent/failed/retry teruji; SMTP mati tidak diklaim sukses; token tidak terekspos pada log/response yang tidak perlu. |
-| T10 | Amankan scanner/check-in online & sync: token/hash atau signed sesuai desain, expiry, event auth, replay/race, offline marking. | ticket token service, check-in controller/routes, migration bila perlu, Flutter scanner | T09, T05, T04 | Token tak dapat ditebak/dipakai lintas event; transaksi atomik mencegah check-in ganda; scan kedua ditolak/log; permission Staff ditegakkan; offline belum verified sampai sync server. |
-| T11 | Tuntaskan Staff/invitation dan assisted registration: undangan panitia terpisah dari public link, acceptance/auth, event permission/revoke. | invitation/organizer API, auth/membership services, Flutter staff/organizer | T05, T06 | Invitation aman/expire/revoke/single-use; email penerima berhak; permission diuji tiap aksi dan revocation langsung berlaku. |
-| T12 | Selesaikan dashboard Participant/Organizer dan operasi event: metrics, peserta/order, scan history, reports, profile, notification dan semua states. | Flutter `features/organizer`, `features/home`, `features/orders`; API metrics/report/notification | T06, T08, T10, T11, T01 | Data API sesuai role/event; gross/net/fee benar; filter/error/empty/loading/retry teruji; tidak memakai mock pada backend default. |
-| T13 | Selesaikan paket, langganan dan transaksi platform: feature limits, subscription lifecycle, payment dan revenue/commission. | plan/subscription/revenue API, DB constraints, Flutter organizer/admin | T04, T05, T08 | Batas fitur allow/deny, lifecycle, konsistensi commission/transaksi dan sumber transaksi order vs subscription diuji; tidak mengklaim gateway riil. |
-| T14 | Selesaikan Admin dan support/audit: dashboard, akun, moderation, plans, subscriptions, transactions/revenue, reports, settings/audit. | admin/report/revenue/plan/subscription APIs; `apps/lib/features/admin/**` | T05, T06, T13 | Endpoint admin-only; tindakan sensitif beralasan/tercatat; support data hanya terungkap sesuai izin; UI API-connected dengan states lengkap. |
-| T15 | Integrasikan kontrak Flutter-backend: route/payload/error/pagination/status/guest token/base URL/mock mode. | Flutter network/services/providers/features; backend routes/serializers | T02, T05–T14 | Contract/service tests cocokkan JSON; backend default dan MOCK_MODE eksplisit; auth/network/timeout/error/retry tanpa data palsu. |
-| T16 | Sempurnakan UX, accessibility dan layout narrow/wide Android/Web pada seluruh alur. | screens/widgets/theme/navigation | T01, T02, T07–T15 | Widget/layout tests state utama dan viewport sempit/lebar; semantics/keyboard/focus relevan; tanpa overflow alur kritis. Perangkat fisik dicatat terpisah. |
-| T17 | Audit akhir, regression dan release readiness; trace FR dan catat gap. | seluruh workspace, CI, laporan akhir | T01–T16 | Backend+Flutter checks lulus; role/transaksi/QR/contract tests lulus; build target tersedia; schema aman; setiap FR punya bukti atau blocker. |
+| 1 — fondasi | Auth/session: backend + Flutter auth; test sesuai allow-list | Event/category CRUD, ownership, validasi | Order/payment/ticket/QR domain dan client | Tiga laporan developer, diff/PR terpisah, targeted tests, dependency/interface request dan integrator report. Acceptance & gate rinci di task/kontrak; integrator memverifikasi auth → event/category → order/payment. Tahap 1 GO hanya dengan acceptance wajib dan evidence. |
+| 2 — operasi MVP | Invitation/membership; router hanya oleh owner yang disahkan | Scanner/check-in online dan attendee source endpoint | Attendee UI/export, Admin/report/metrics (eventMetricsController eksklusif D3) | Tiga laporan, tests, frozen contract/API, handoff membership → permission/scanner → attendee/Admin, laporan integrasi. Mulai hanya setelah Tahap 1 GO; fitur yang bergantung G-04/G-06/G-09 tetap scoped BLOCKED. |
+| 3 — demo readiness | Form config/ticket presentation hanya bila kontrak persist tersedia | Public guest purchase journey/responsive UI | Demo runbook/checklist/smoke sesuai task/allow-list | Tiga laporan + test/runbook/harness evidence yang sungguh tersedia; integrator report/build/smoke. Mulai hanya setelah Tahap 2 GO; artifacts yang belum dibuat bukan bukti dan tidak boleh dipakai sebelum task diizinkan. |
 
-## C. Urutan Prioritas Pengerjaan
+Setiap developer mengisi laporan milik sendiri dengan tujuan/tugas, file aktual,
+dependency, acceptance per kriteria, perintah test dan hasil, batas/NOT RUN,
+blocker/interface request, serta status. Laporan tidak boleh mengklaim fitur,
+integrasi, atau tahap selesai tanpa bukti.
 
-1. T01 → T02: pulihkan analisis/kompilasi dan tes Flutter.
-2. T03 → T04: pastikan source-of-truth schema dan DB; ubah DB hanya jika bukti/otorisasi mengharuskan.
-3. T05: tutup authorization/ownership sebelum mengandalkan endpoint bisnis.
-4. T06 → T07: event/ticket foundation lalu publikasi/desain/link.
-5. T08 → T09 → T10: order/payment, ticket/email, lalu QR/check-in aman.
-6. T11: invitation/Staff setelah akses dan event foundation.
-7. T12 → T13 → T14: operasi dashboard, paket/transaksi platform, Admin/support.
-8. T15 → T16 → T17: integrasi, UX, audit akhir.
+## Urutan proyek dan gate
 
-Pekerjaan yang ternyata telah benar dengan bukti test boleh ditutup tanpa perubahan. Jika urutan berubah karena ketergantungan baru, alasan wajib dicatat.
+`Tahap 1 → Integrasi Tahap 1 → Tahap 2 → Integrasi Tahap 2 → Tahap 3 →
+Integrasi Tahap 3 → FINISHING → Demonstrasi`.
 
-## D. Pembagian Menjadi Tahapan
+Integrasi tahap 1/2 adalah gate/baseline GO sebelum maju. Integrasi tahap 3
+memvalidasi feature PRs; FINISHING setelahnya menyelesaikan item lintas-domain
+dan—hanya oleh penanggung jawab yang ditunjuk—database bila diperlukan. Demo
+final ditutup setelah acceptance/evidence FINISHING lulus.
 
-| Tahap | Cakupan | Hasil yang dapat diuji |
-|---|---|---|
-| 1. Stabilkan workspace | T01–T02 | Flutter analyzer/test berjalan dan baseline regresi terukur. |
-| 2. Data dan akses aman | T03–T05 | Schema target jelas, migration strategy aman, akses server tervalidasi. |
-| 3. Event siap registrasi | T06–T07 | Owner dapat validasi/publish event, desain/link sesuai PRD. |
-| 4. Transaksi hingga tiket | T08–T10 | Checkout idempotent, ticket/email status jujur, scanner/check-in aman. |
-| 5. Tim dan operasi role | T11–T14 | Staff, Participant, Organizer dan Admin menyelesaikan alur lewat API. |
-| 6. Integrasi dan release gate | T15–T17 | Kontrak, UX, checks/build dan traceability selesai atau blocker tercatat. |
+- D1–D3 tahap berjalan dari baseline yang sama, pada branch/PR terpisah dan
+  allow-list masing-masing. Tidak menggabungkan branch satu sama lain saat
+  implementasi. Pemeriksaan path **dan** semantik API/data/import wajib.
+- Integrasi tahap dilakukan sesudah ketiga laporan/PR tersedia. Bug domain
+  dikembalikan kepada developer pemilik; integrator tidak menggantikan task.
+- Tahap berikutnya hanya mulai setelah laporan integrasi menyatakan GO dengan
+  baseline/CI/test evidence yang dapat diverifikasi. GO tanpa evidence tidak sah.
+- Tahap 1 task dapat dimulai hanya jika entry gate pada
+  `FASE_1E_OWNERSHIP_AND_EXECUTION_LEDGER.md` dan approval maintainer mencatat GO
+  atau conditional GO yang spesifik. Pada snapshot, tidak ada baseline/technical
+  approval tertulis; semua task coding **BLOCKED**. D1 auth independen dari
+  C-01–C-03 tetapi bukan otomatis GO. D2 lifecycle dan D3 acceptance yang
+  bergantung kontrak/DB/OPEN DECISION tetap BLOCKED.
+  Lihat `OPEN DECISION` di PRD; AI tidak boleh mengisi keputusan produk sendiri.
+- FINISHING bukan tempat menutupi task tertunda. Setiap item harus memiliki
+  laporan, owner, alasan, acceptance, dan bukti; pekerjaan developer yang dapat
+  dilakukan tanpa database tetap milik developer.
 
-## E. Checklist Penyelesaian
+## FINISHING dan demonstrasi
 
-- [x] T01 — Pulihkan baseline Flutter yang dapat dianalisis/dibangun. Memindahkan kurung penutup class State yang terlalu awal pada detail event; `flutter analyze` lulus.
-- [x] T02 — Stabilkan fondasi tes Flutter. Dua run full `flutter test --no-pub --dart-define=MOCK_MODE=true` lulus (`139` passed, `11` skipped yang sudah ada). Penyebab kegagalan Organizer: fixture screen tidak menyediakan `AuthProvider`; penyebab kegagalan Admin: test mengharapkan approval/revisi manual yang dilarang PRD §1.1/§6.3. Fixture diperbaiki dan assertion diselaraskan dengan PRD; test Organizer/Admin/API-mode terarah serta `flutter analyze` lulus. 11 skipped tetap dicatat, tidak diubah.
-- [!] T03 — DB baseline & migration validation (Supabase read-only/no-write). Prisma Client diregenerasi dari schema; migration 004 diregenerasi dari function 003, hanya menambahkan cast `PaymentStatus` dan menjaga guest replay/no token rotation. Regression dan SQL function scenarios lulus. Docker PostgreSQL 16 disposable lokal loopback/tmpfs digunakan; 9 migration SQL deployed via temporary directory, checksum 9/9, official Prisma schema diff empty. API integration harness **11/11 PASS**; fixture cleanup diverifikasi 0. Seluruh 105 index names ditelusuri ke migration SQL; 44 tidak dimodelkan eksplisit Prisma. **Tetap `[!]`**: folder migration 005 kosong/tidak terlacak dan intent belum dapat dipastikan; status history terhadap seluruh 10 direktori repository masih belum resolvable. T04 belum dimulai. Tidak ada operasi tulis ke Supabase. Penyelesaian T03 menunggu keputusan owner/source tentang 005 dan statusnya didokumentasikan/direkonsiliasi sesuai bukti, lalu migrate status pada set final diverifikasi. Detail pada checkpoint laporan 2026-11-19.
-- [ ] T04 — Rekonsiliasi/keamanan DB bila dibutuhkan berdasarkan bukti.
-- [ ] T05 — Audit/tegakkan auth, role, membership, ownership.
-- [ ] T06 — Event dan kategori tiket sesuai PRD.
-- [ ] T07 — Publikasi, template/desain tiket, public links.
-- [ ] T08 — Registrasi/order/pembayaran simulasi.
-- [ ] T09 — Ticket issuance dan email delivery.
-- [ ] T10 — Scanner/check-in aman dan sinkronisasi.
-- [ ] T11 — Staff/invitation/assisted registration.
-- [ ] T12 — Dashboard/operasi Participant dan Organizer.
-- [ ] T13 — Plan/subscription/platform transactions.
-- [ ] T14 — Admin, support, audit.
-- [ ] T15 — Integrasi Flutter-backend dan API contracts.
-- [ ] T16 — UX, accessibility, layout.
-- [ ] T17 — Audit akhir, regression dan release readiness.
+FINISHING mengintegrasikan pekerjaan lintas-domain, menjalankan regression/build
+dan skenario demo, memeriksa keamanan/setup test, serta menyelesaikan hanya item
+yang secara eksplisit diterima pada scope FINISHING. **Perubahan database hanya
+boleh dilakukan oleh penanggung jawab FINISHING yang sudah ditetapkan, setelah
+gate FINISHING dibuka.** Kebutuhan database dari Developer 1–3 adalah laporan
+proposal, bukan izin edit. Prosedur lengkap di `FINISHING_AUTHORITY.md`.
 
-Checklist hanya diubah menjadi `[x]` jika implementasi dan tes terkait berhasil. Gunakan `[!]` untuk blocker/keputusan eksternal dan tulis alasannya.
+Demo hanya dinyatakan siap jika acceptance wajib PRD memiliki bukti; API/DB
+terisolasi dan bukan mock-only; skenario role/ownership negatif, event, guest
+order/payment/ticket, Staff/check-in, attendee/export/Admin, error states dan
+Android/Web diuji sesuai lingkungan; build/test dicatat. Provider eksternal,
+device, keamanan atau E2E yang tidak diuji harus tetap ditandai NOT RUN/BLOCKED.
 
-## F. Kriteria Proyek Selesai
+## Riwayat
 
-1. FR-01–FR-101 yang termasuk MVP dipetakan ke implementasi dan bukti test; prototype/deferred ditandai jujur.
-2. Flutter analyze dan suite yang dijalankan lulus (catat skipped-existing), build target masih harus diverifikasi; backend test, syntax, format, skill/sync-config checks lulus.
-3. Kontrak API dan role/ownership/permission (Guest, Staff scoped-event, Admin) diuji positive/negative di server.
-4. Alur event → registrasi → order/payment → ticket/email → QR/check-in diuji dengan data sintetis/test DB terisolasi; idempotency, expiry, oversell, retry dan scan ulang terbukti.
-5. Schema/migration konsisten, akses DB minimum, tanpa destructive/production action untuk validasi.
-6. Alur memiliki loading/error/empty/unauthorized/retry states relevan dan diuji pada viewport/target build.
-7. Provider eksternal, SMTP, DB live, deployment dan perangkat fisik hanya diklaim diuji jika hasil benar-benar ada.
-8. `task/archive/LAPORAN_PENYELESAIAN.md` mencatat pekerjaan, hasil, perubahan, kegagalan/keterbatasan. Tidak mengklaim 100% bila requirement wajib belum diimplementasi atau diverifikasi.
-
-## Validasi Fase 1
-
-- PRD diperiksa pada kebutuhan FR-01–FR-101, role, event, registration, payment, ticket, scanner, plan, admin dan support; traceability rinci dilaksanakan melalui T05–T17.
-- Tidak ada duplikasi: implementasi fitur, integrasi lintas-stack dan audit tes dibedakan.
-- Urutan dependency diperhitungkan: data→authorization→event→order/payment→ticket→check-in→integrasi/release.
-- Backend unit tests 26/26 **PASS**; syntax 61 file **PASS**; format **PASS**; skill validation **PASS**; Prisma validate **PASS**.
-- Awal audit: Flutter analyze **FAIL** (69 issues). Setelah perbaikan minimal T01: Flutter analyze **PASS** (No issues found). Saat T02 ditemukan fixture organizer tanpa Provider dan test Admin meminta approval manual yang bertentangan PRD; sesudah perbaikan, full Flutter suite 2 kali **PASS** (139 passed, 11 skipped-existing), Organizer/Admin/API targeted **PASS**, analyze **PASS**. Test targeted yang dicoba pada nama file yang tidak ada tidak dihitung sebagai test lulus.
-- Pada validasi Fase 1, DB live, external services, build/device E2E **NOT RUN**. Pembaruan T03 2026-11-19 di atas mencatat audit DB live read-only; migration/write/E2E tetap tidak dijalankan. T03 masih blocker dan T04 belum dituntaskan. Perubahan lokal sudah ada sebelum audit; hindari menghapus/menimpa kerja tersebut.
+Dokumen dan laporan T03 lama dipertahankan di `task/archive/` untuk sejarah;
+isinya bukan handover atau instruksi aktif. Dokumen ini menggantikan kumpulan
+versi pembagian tugas terdahulu sebagai peta workflow aktif.

@@ -2,16 +2,33 @@
 
 ## Panduan developer dan AI
 
-- Titik masuk terbaru untuk AI yang melanjutkan checkpoint database T03:
-  [`task/HANDOVER_AI_T03.md`](task/HANDOVER_AI_T03.md). Baca handover dahulu;
-  jangan membaca archive historis kecuali perlu bukti asal keputusan.
+- Titik masuk AI dan pembagian tugas aktif:
+  [`task/PEMBAGIAN_TUGAS_FINAL.md`](task/PEMBAGIAN_TUGAS_FINAL.md). Instruksi singkat
+  yang didukung: “Saya Developer 1/2/3, kerjakan Tahap 1/2/3.” Workflow memeriksa
+  status Git dan gate tahap sebelum memilih task; archive T03 bersifat historis.
+- Satu-satunya PRD aktif: [`PRD.md`](PRD.md). Keputusan produk yang ditandai
+  OPEN DECISION tetap memblokir hanya acceptance/implementasi yang bergantung
+  padanya; lihat status setiap task dan gate.
+- Database authority dan proses FINISHING:
+  [`task/FINISHING_AUTHORITY.md`](task/FINISHING_AUTHORITY.md).
+- Matriks PRD, status technical gate, dan proposal database (tidak memberi izin
+  perubahan DB): [`task/PRD_TRACEABILITY_MATRIX.md`](task/PRD_TRACEABILITY_MATRIX.md),
+  [`task/TECHNICAL_GATE_CLOSURE.md`](task/TECHNICAL_GATE_CLOSURE.md),
+  [`task/DB_CHANGE_PROPOSAL.md`](task/DB_CHANGE_PROPOSAL.md).
+- Product decision register, usulan kontrak teknis dan status entry gate Fase 1C:
+  [`task/FASE_1C_AUTHORIZATION_REGISTER.md`](task/FASE_1C_AUTHORIZATION_REGISTER.md).
+- Authorization, status izin scope dan daftar approval Fase 1D:
+  [`task/FASE_1D_AUTHORIZATION_AND_UNBLOCKING.md`](task/FASE_1D_AUTHORIZATION_AND_UNBLOCKING.md).
+- Ownership lintas tahap dan finalisasi task system Fase 1E:
+  [`task/FASE_1E_OWNERSHIP_AND_EXECUTION_LEDGER.md`](task/FASE_1E_OWNERSHIP_AND_EXECUTION_LEDGER.md),
+  [`task/FASE_1E_TASK_SYSTEM_FINALIZATION.md`](task/FASE_1E_TASK_SYSTEM_FINALIZATION.md).
 - Instruksi utama: [`AGENTS.md`](AGENTS.md); katalog skill: [`SKILL.md`](SKILL.md).
 - Arsitektur dan workflow lokal: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 - Kontribusi dan pemeriksaan sebelum PR: [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - Status kerja dan dependency: [`task/PEMBAGIAN_TUGAS_FINAL.md`](task/PEMBAGIAN_TUGAS_FINAL.md);
   riwayat pengerjaan: [`task/archive/LAPORAN_PENYELESAIAN.md`](task/archive/LAPORAN_PENYELESAIAN.md).
-- Laporan terdahulu dan dokumen prototype lama berada di `task/archive/` atau
-  `archive/`; bukan referensi aktif kecuali handover meminta penelusuran sejarah.
+- Laporan terdahulu dan dokumen prototype lama berada di `task/archive/`;
+  bukan referensi aktif kecuali penelusuran sejarah memang diperlukan.
 - GitHub Actions menjalankan pemeriksaan backend dan Flutter pada setiap push
   dan pull request, lalu menerbitkan status `PR Quality Gate` sebagai satu
   pemeriksaan yang dapat diwajibkan sebelum merge.

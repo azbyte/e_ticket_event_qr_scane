@@ -10,8 +10,13 @@ menggunakan JavaScript CommonJS, Express 4, JWT, koneksi PostgreSQL langsung
 berada di `backend/src/{config,controllers,middleware,models,routes,services,utils,validators}`.
 
 Alur umum API adalah routes → middleware (auth/role/validation) → controllers →
-services/models → PostgreSQL (`src/config/db.js`). Schema dan migration aktual
-berada di `backend/prisma/`; verifikasi struktur dengan `node
+services/models → PostgreSQL (`src/config/db.js`). Sumber schema yang ditetapkan
+adalah `backend/prisma/schema.prisma`, dan migration Prisma berada di
+`backend/prisma/migrations/`. `backend/supabase/migrations/` memuat SQL legacy
+yang dipertahankan untuk fungsi/riwayat tertentu; ini bukan baseline schema
+pengganti dan tidak boleh dijalankan/dihapus tanpa rekonsiliasi serta otorisasi
+FINISHING. Saat diperlukan, dokumentasikan fungsi/status migration legacy
+berdasarkan pemeriksaan yang aman. Verifikasi schema lokal dengan `node
 backend/scripts/audit-db.js` dan `npx prisma migrate status`. README backend
 memuat ringkasan endpoint; kode dan migration tetap menjadi sumber kebenaran.
 
@@ -25,6 +30,8 @@ sebagai fallback.
 
 1. Baca `AGENTS.md`, PRD, README dan modul terdampak. Periksa status/diff Git.
 2. Hindari perubahan bisnis, database dan dependency saat tugas hanya tooling.
+   Developer 1–3 tidak mengubah atau menjalankan perubahan DB; proposal kebutuhan
+   database diserahkan kepada FINISHING sesuai `task/FINISHING_AUTHORITY.md`.
 3. Gunakan fixtures sintetis; jalankan test demo dengan
    `flutter test --dart-define=MOCK_MODE=true`. Tes API tanpa fallback dijalankan
    dengan `flutter test test/services/api_mode_no_fallback_test.dart
