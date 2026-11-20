@@ -1,9 +1,13 @@
 # Kepemilikan file — Tahap 3
 
-**Satu-satunya allow-list aktif Tahap 3.** Developer mulai hanya setelah gate
-Tahap 2 GO dan dari baseline bersama yang dicatat maintainer. Hanya path dalam
-baris pemilik yang boleh diubah. Tabel ini memeriksa path; konflik API/data/
-semantic tetap wajib ditinjau dalam integration contract.
+**Allow-list preferensi Tahap 3** (bukan gate izin). Developer dapat langsung mulai
+bila pemilik proyek memerintahkannya; tidak diperlukan GO Tahap 2 atau baseline
+yang dicatat maintainer. Kerjakan path pada baris pemilik lebih dulu; perubahan di
+luarnya diperbolehkan bila benar-benar diperlukan dengan perubahan minimum dan
+didokumentasikan pada laporan. Tabel ini memeriksa path; konflik API/data/semantik
+tetap wajib ditinjau dalam integration contract. Yang terkunci absolut:
+schema/migration/SQL/seed/config DB, secret/`.env`, dependency lockfile tanpa
+kebutuhan sah, dan operasi Git destruktif.
 
 | Pemilik | Tanggung jawab | Path yang boleh diubah |
 |---|---|---|
@@ -17,10 +21,12 @@ semantic tetap wajib ditinjau dalam integration contract.
 - Semua file lain terkunci: termasuk router/bootstrap/provider global, shared
   services/models, backend production source/routes/config, schema/migration,
   seed, dependency/lockfile, CI, environment/secret dan file developer lain.
-- D1 tidak mengubah registration screen yang dimiliki D2 dan tidak membuat
-  komponen yang hanya tersedia pada branch D1 untuk dipakai D2. Jika form/config
-  atau storage API yang dipersist belum tersedia, laporkan blocker; jangan
-  membuat local-only success atau mengklaim data tersimpan.
+- D1 mengutamakan path miliknya dan tidak membuat komponen yang hanya tersedia
+  pada branch D1 untuk dipakai D2. Jika form/config atau storage API yang
+  dipersist belum tersedia, rekonstruksi kontraknya dari kode/API aktual, kerjakan
+  lapisan yang dapat diselesaikan, buat adapter minimum, dan catat kebutuhan
+  interface pada laporan; jangan membuat local-only success atau mengklaim data
+  tersimpan.
 - D2 hanya memakai interface pada baseline; tidak mengarang API/payload atau
   mengimpor branch belum merge. Guest/payment behavior mengikuti keputusan PRD
   yang telah disahkan.
@@ -28,9 +34,10 @@ semantic tetap wajib ditinjau dalam integration contract.
   path tersembunyi; test bersifat sintetis/non-destructive dan dilarang memakai
   `.env`/database pengguna. Runbook/checklist baru pada allow-list ini menjadi
   output D3; belum ada berarti task belum selesai.
-- Tidak ada overlap path antar D1–D3. Bila memerlukan shared file, developer
-  mengajukan amendment ownership tertulis (path, owner tunggal, interface,
-  dampak, acceptance/test) sebelum perubahan; default tetap locked.
+- Tidak ada overlap path antar D1–D3 pada kondisi normal. Bila shared file
+  benar-benar diperlukan untuk menyelesaikan task, lakukan perubahan minimum yang
+  konsisten, lalu catat path, alasan, interface, dampak, dan acceptance/test pada
+  laporan developer. Jangan berhenti menunggu amendment ownership.
 - Developer 1–3 dilarang menyentuh semua database/schema/migration/seed/SQL.
   Proposal kebutuhan database dilaporkan sesuai `../FINISHING_AUTHORITY.md`.
 - Integrator tidak otomatis menjadi otoritas database. Perubahan integrasi kecil

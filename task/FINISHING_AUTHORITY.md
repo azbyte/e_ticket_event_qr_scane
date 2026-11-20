@@ -1,5 +1,15 @@
 # Otoritas database dan tahap FINISHING
 
+> **Catatan workflow autonomous:** dokumen ini mengatur **wewenang database** —
+> batas nyata yang tetap berlaku, bukan approval gate teknis untuk pekerjaan
+> sehari-hari. Developer 1–3 menyelesaikan seluruh scope task yang tidak
+> memerlukan perubahan DB tanpa menunggu izin apa pun (lihat *Autonomous Execution
+> Protocol* pada [`PEMBAGIAN_TUGAS_FINAL.md`](PEMBAGIAN_TUGAS_FINAL.md)); kebutuhan
+> DB dicatat sebagai proposal di [`DB_CHANGE_PROPOSAL.md`](DB_CHANGE_PROPOSAL.md)
+> dan butir yang benar-benar bergantung DB ditandai NOT RUN dengan alasan spesifik.
+> Ketentuan Developer 1 Tahap 1 yang sudah disetujui tetap berlaku apa adanya.
+
+
 ## Aturan mutlak
 
 Selama Tahap 1–3 dan integrasi masing-masing, Developer 1, 2, dan 3 **dilarang**

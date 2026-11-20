@@ -2,12 +2,15 @@
 
 > Ini tugas integrator pasca-merge. Bukan tahap FINISHING berotoritas database.
 
-## Gate dan bahan
+## Bahan dan cara memulai (non-blocking)
 
-Mulai setelah seluruh PR Tahap 3 tersedia dari baseline Tahap 2 GO, laporan
-D1–D3 diisi, dan ownership dapat diverifikasi. Baca kontrak/ownership, task dan
-laporan D1–D3, diff/CI, PRD §§10–16, serta checklist yang dibuat D3. Gate tidak
-lulus jika blocker wajib terbuka atau evidence tidak ada.
+Mulai dari kondisi repository aktual saat perintah diberikan; tidak perlu menunggu
+seluruh PR Tahap 3 merged atau baseline Tahap 2 GO. Baca kontrak/ownership, task
+dan laporan D1–D3, diff/CI, PRD §§10–16, serta checklist yang dibuat D3. Bila
+laporan atau evidence belum ada, kerjakan audit atas apa yang tersedia dan catat
+bagian yang tidak dapat dibuktikan sebagai NOT RUN dengan alasan spesifik. Gate
+dinyatakan tidak lulus hanya untuk hambatan eksternal nyata; kekurangan
+dokumentasi bukan alasan berhenti.
 
 ## Urutan dan scope
 
@@ -28,8 +31,10 @@ lulus jika blocker wajib terbuka atau evidence tidak ada.
 Hanya `LAPORAN_DEVELOPER_4.md`, `backend/test/stage3_integration.test.js`, dan
 `apps/test/stage3_integration_test.dart` sesuai `FILE_OWNERSHIP.md`. Tidak boleh
 mengubah file domain, schema/migration/SQL/seed/config DB, global route/config,
-dependency atau melakukan external mutation. Tidak ada “tiny fix” source tanpa
-amendment ownership tertulis sebelum edit.
+dependency atau melakukan external mutation. Bila perbaikan kecil di file domain
+benar-benar dibutuhkan agar integrasi dapat diuji, lakukan perubahan minimum,
+jaga kontrak, dan dokumentasikan file/alasan/dampak pada laporan — tanpa menunggu
+amendment ownership tertulis.
 
 Integrator/Developer 4 **bukan** penanggung jawab FINISHING secara otomatis dan
 tidak punya otoritas database dari task ini. Jika ingin ditunjuk untuk FINISHING,

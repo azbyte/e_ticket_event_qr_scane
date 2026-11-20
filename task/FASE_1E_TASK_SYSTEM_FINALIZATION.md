@@ -1,5 +1,18 @@
 # Fase 1E — Task System Finalization & Execution Readiness
 
+> **STATUS: REFERENSI TEKNIS / HISTORIS — NON-BLOCKING.** Sejak perbaikan workflow
+> autonomous, dokumen ini **bukan lagi syarat izin** untuk mulai bekerja. Seluruh
+> status `BLOCKED`, "menunggu approval/persetujuan tertulis", "gate", "baseline
+> sign-off", dan "authorization" di dalamnya digantikan oleh *Autonomous Execution
+> Protocol* pada [`PEMBAGIAN_TUGAS_FINAL.md`](PEMBAGIAN_TUGAS_FINAL.md): perintah
+> pemilik proyek adalah otorisasi implementasi, keputusan teknis diambil mandiri,
+> OPEN DECISION dan gate teknis dikerjakan dengan interpretasi paling aman lalu
+> dicatat sebagai asumsi, dan BLOCKED hanya untuk hambatan eksternal nyata. Isi
+> dokumen dipertahankan sebagai referensi analisis dan kontrak. **Pengecualian:**
+> catatan Developer 1 Tahap 1 (baris "GO (limited)" dan Amendment A-1) tetap berlaku
+> apa adanya, tidak diubah, dan tidak dikerjakan ulang.
+
+
 - **Tanggal:** 2026-11-20
 - **Snapshot Git:** `update/featur`, HEAD `24d18e248b6550483e162f7484e1eab8e43bec17`.
 - **Fase status:** **BLOCKED untuk membuka implementasi**; task system tersusun dan ownership audited, tetapi tidak ada approval pemilik/technical owner untuk gate yang masih dibutuhkan.

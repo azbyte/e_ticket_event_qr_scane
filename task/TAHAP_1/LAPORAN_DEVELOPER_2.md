@@ -1,8 +1,9 @@
 # Laporan Developer 2 — Tahap 1 (isi setelah selesai)
 
-- **Status:** NOT STARTED / CONDITIONAL GO / BLOCKED / DONE (DONE hanya pekerjaan scope; bukan gate integrasi)
+- **Status:** NOT STARTED / IN PROGRESS / DONE / DONE (sebagian + blocker) / BLOCKED (hanya untuk hambatan eksternal nyata sesuai "Aturan BLOCKED" di `../PEMBAGIAN_TUGAS_FINAL.md`)
 - **Baseline commit / branch / PR:**
-- **Authorization/gate evidence:** approver/decision/baseline reference; jika belum ada → BLOCKED
+- **Otorisasi:** perintah pemilik proyek ("Kerjakan Developer N Tahap M") = otorisasi implementasi; tidak diperlukan approval teknis tambahan
+- **Keputusan teknis & asumsi (mandiri):** lokasi test yang dipilih, kontrak hasil rekonstruksi, interpretasi OPEN DECISION PRD, alasan dan dampaknya:
 - **PRD requirement/AC yang dikerjakan:** ID/section:
 - **Ringkasan:**
 - **Fitur berhasil diselesaikan:**

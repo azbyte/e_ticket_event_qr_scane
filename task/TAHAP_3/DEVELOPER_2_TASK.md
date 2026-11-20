@@ -13,7 +13,7 @@ Selesaikan guest journey Android/Web melalui API: public event → category → 
 5. Regression tests single order, API errors, order ownership, ticket view; no provider delivery claims.
 
 ## Ownership/dependensi
-Hanya D2 paths di `FILE_OWNERSHIP.md`; D1/D3 paths, routes/global client/services/backend/schema/dependencies locked. Gunakan contract yang ada pada baseline; tidak menunggu branch D1. Jika dynamic form API/interface tidak ada, dokumentasikan blocker dan jangan import kode branch lain.
+Hanya D2 paths di `FILE_OWNERSHIP.md`; D1/D3 paths, routes/global client/services/backend/schema/dependencies locked. Gunakan contract yang ada pada baseline; tidak menunggu branch D1. Jika dynamic form API/interface tidak ada, rekonstruksi kontraknya dari kode/PRD, buat adapter minimum pada path D2, catat kebutuhan interface pada laporan, dan jangan import kode branch lain.
 
 ## Kriteria/laporan
 Guest menyelesaikan flow approved melalui existing API; one attendee/ticket; tanpa login/dashboard Participant; error state jelas; tests/analyze pass. Build/API/DB E2E dilaporkan terpisah dari mock tests; sertakan actual files, contract, output dan blocker.

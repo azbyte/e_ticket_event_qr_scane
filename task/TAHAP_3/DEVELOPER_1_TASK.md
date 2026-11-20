@@ -1,6 +1,6 @@
 # Tahap 3 — Developer 1: Organizer form config dan ticket presentation
 
-> Mulai setelah Tahap 2 GO. Audit UI/read-only boleh dilakukan dari baseline, tetapi konfigurasi persist/ticket template acceptance **BLOCKED** sampai storage/template contract dan owner shared interface disetujui. UI-only task; no API/database change.
+> **Eksekusi autonomous.** Perintah pemilik proyek ("Kerjakan Developer 1 Tahap 3") sudah merupakan otorisasi implementasi; tidak perlu menunggu Tahap 2 GO. Audit UI, konfigurasi persist, dan ticket template dikerjakan dalam satu alur: rekonstruksi storage/template contract dari model/repository/API aktual lalu implementasikan. Bila backend belum menyimpan field konfigurasi, kerjakan seluruh lapisan UI/service yang dapat diselesaikan, buat adapter sesuai kontrak hasil rekonstruksi, dan catat kebutuhan interface (payload/endpoint) pada laporan serta `../DB_CHANGE_PROPOSAL.md` bila menyangkut schema — jangan berhenti, dan jangan membuat persisted-success palsu. UI-only task; tanpa perubahan API/database.
 
 ## Tujuan/kondisi awal
 Lengkapi konfigurasi field yang didukung form Organizer dan presentasi desain ticket default/template pada UI. Baca PRD §§4–5, 7, 10–16; ownership/contract tahap; `event_form_screen.dart`, model/repository event, registration screen, QR widget dan tests (read-only); keputusan final. Jangan buka `.env`.

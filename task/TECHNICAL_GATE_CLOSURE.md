@@ -1,5 +1,18 @@
 # Penutupan Technical Gate — Fase 1B
 
+> **STATUS: REFERENSI TEKNIS / HISTORIS — NON-BLOCKING.** Sejak perbaikan workflow
+> autonomous, dokumen ini **bukan lagi syarat izin** untuk mulai bekerja. Seluruh
+> status `BLOCKED`, "menunggu approval/persetujuan tertulis", "gate", "baseline
+> sign-off", dan "authorization" di dalamnya digantikan oleh *Autonomous Execution
+> Protocol* pada [`PEMBAGIAN_TUGAS_FINAL.md`](PEMBAGIAN_TUGAS_FINAL.md): perintah
+> pemilik proyek adalah otorisasi implementasi, keputusan teknis diambil mandiri,
+> OPEN DECISION dan gate teknis dikerjakan dengan interpretasi paling aman lalu
+> dicatat sebagai asumsi, dan BLOCKED hanya untuk hambatan eksternal nyata. Isi
+> dokumen dipertahankan sebagai referensi analisis dan kontrak. **Pengecualian:**
+> catatan Developer 1 Tahap 1 (baris "GO (limited)" dan Amendment A-1) tetap berlaku
+> apa adanya, tidak diubah, dan tidak dikerjakan ulang.
+
+
 - **Tanggal pemeriksaan:** 2026-11-20
 - **PRD aktif:** [`../PRD.md`](../PRD.md) v2.2
 - **Status:** dokumentasi/evidence review selesai; tidak ada implementation gate yang dinyatakan GO oleh dokumen ini.

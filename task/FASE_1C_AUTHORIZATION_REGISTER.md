@@ -1,5 +1,18 @@
 # Fase 1C — Readiness Authorization Register
 
+> **STATUS: REFERENSI TEKNIS / HISTORIS — NON-BLOCKING.** Sejak perbaikan workflow
+> autonomous, dokumen ini **bukan lagi syarat izin** untuk mulai bekerja. Seluruh
+> status `BLOCKED`, "menunggu approval/persetujuan tertulis", "gate", "baseline
+> sign-off", dan "authorization" di dalamnya digantikan oleh *Autonomous Execution
+> Protocol* pada [`PEMBAGIAN_TUGAS_FINAL.md`](PEMBAGIAN_TUGAS_FINAL.md): perintah
+> pemilik proyek adalah otorisasi implementasi, keputusan teknis diambil mandiri,
+> OPEN DECISION dan gate teknis dikerjakan dengan interpretasi paling aman lalu
+> dicatat sebagai asumsi, dan BLOCKED hanya untuk hambatan eksternal nyata. Isi
+> dokumen dipertahankan sebagai referensi analisis dan kontrak. **Pengecualian:**
+> catatan Developer 1 Tahap 1 (baris "GO (limited)" dan Amendment A-1) tetap berlaku
+> apa adanya, tidak diubah, dan tidak dikerjakan ulang.
+
+
 - **PRD:** `../PRD.md` v2.2 (source of product requirements)
 - **Snapshot repository yang diperiksa:** branch `update/featur`, HEAD `24d18e248b6550483e162f7484e1eab8e43bec17`
 - **Status fase:** **BLOCKED untuk otorisasi implementasi Tahap 1**; kontrak, rekomendasi dan daftar approval siap ditinjau.
@@ -100,9 +113,24 @@ Shared form-schema/API/storage and ticket-template persistence: **no owner assig
 
 | Scope | Status now | READY criteria / limitation |
 |---|---|---|
-| D1 T1 auth/session | **BLOCKED → candidate READY WITH LIMITATIONS** | Product C-01–C-03 are irrelevant to auth. Can become READY only after maintainer signs baseline + technical gate; test ownership/path must be clarified (auth test directory absent). Cannot alter shared router/API or DB and cannot open T2. Until signed, do not start implementation. |
+| D1 T1 auth/session | **GO (limited) — approved 2026-11-20** (sebelumnya: BLOCKED → candidate READY WITH LIMITATIONS) | Product C-01–C-03 are irrelevant to auth. Baseline + technical gate ditandatangani maintainer; test ownership/path disahkan. Cannot alter shared router/API or DB and cannot open T2. |
 | D2 T1 event/category | **BLOCKED** | CRUD validation can be separately scoped, but event lifecycle acceptance cannot GO until G-02 status/public/order contract, shared route owner/amendment and DB disposition are signed. Existing routes source contradicts PRD. |
 | D3 T1 order/payment/ticket | **BLOCKED** | Single-item API logic is a possible app-only path, but current SQL/schema allow wider data; DP-01 conditional review needed. Payment steps blocked by C-01/C-02 and guest authorization. Free-ticket AC and same-event category homogeneity need an approved atomic contract (DP-03). |
+
+**Keputusan maintainer 2026-11-20 (baris D1 T1).** Owner/approver: maintainer
+proyek (keputusan disampaikan sebagai instruksi langsung pada sesi kerja
+"Developer 1 — Tahap 1"). Scope yang disetujui: baseline branch `update/featur`
+commit `5413de1`; technical contract Tahap 1 untuk scope auth; pengesahan lokasi
+test `apps/test/features/auth/**` dan `backend/test/auth_*.test.js`; amendment
+`authMiddleware.js` (non-breaking); owner tunggal OR-1…OR-4 untuk menutup
+GAP-1…GAP-4. Evidence: hasil check lokal pada baseline tersebut
+(`npm run check`, `npm run format:check`, `npm test` 27/27, `flutter analyze`,
+`flutter test` 150/150) sebagaimana dicatat di
+[`TAHAP_1/LAPORAN_DEVELOPER_1.md`](TAHAP_1/LAPORAN_DEVELOPER_1.md). Rincian
+mengikat ada di `TAHAP_1/FILE_OWNERSHIP.md` → "Amendment A-1". Baris D2/D3 **tidak**
+berubah dan tetap BLOCKED; keputusan ini bukan approval C-01/C-02/C-03, bukan
+approval database/FINISHING, dan tidak membuka Tahap 2.
+
 
 AI cannot turn these into GO by recommendation. Required signatures/entries:
 

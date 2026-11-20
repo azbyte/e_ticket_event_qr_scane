@@ -1,6 +1,6 @@
 # Tahap 2 — Developer 1: staff invitation dan membership
 
-> Mulai hanya setelah Tahap 1 GO dengan baseline/evidence yang bisa diverifikasi. API invitation audit dapat dikerjakan pada allow-list; deep-link/redirect tetap BLOCKED sampai owner tunggal untuk app router/global navigation ditetapkan melalui amendment. Jangan edit shared router/schema.
+> **Eksekusi autonomous.** Perintah pemilik proyek ("Kerjakan Developer 1 Tahap 2") sudah merupakan otorisasi implementasi; tidak perlu menunggu Tahap 1 GO atau baseline yang diverifikasi maintainer. Kerjakan audit, API invitation, dan deep-link/redirect dalam satu alur. Bila acceptance memerlukan perubahan app router/global navigation di luar allow-list, lakukan perubahan **minimum** yang diperlukan, jaga perilaku navigasi lainnya, dan dokumentasikan file/alasan/dampak pada laporan — jangan menandai acceptance BLOCKED hanya karena owner router belum ditunjuk. Jangan mengubah schema/migration; kebutuhan DB ditulis sebagai proposal di `../DB_CHANGE_PROPOSAL.md`.
 
 ## Tujuan
 Menyelesaikan onboarding Staff berbasis invitation event-scoped dan UI permission sesuai PRD.

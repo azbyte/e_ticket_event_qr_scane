@@ -1,12 +1,17 @@
 # Tahap 3 — Developer 3: runbook, checklist, smoke evidence
 
-## Tujuan dan gate
+## Tujuan dan cara memulai (non-blocking)
 
 Siapkan instruksi demo yang dapat diulang dan bukti smoke untuk fitur yang
-benar-benar tersedia pada baseline. Mulai hanya setelah Tahap 2 GO terverifikasi
-dan kontrak teknis/environment demo yang relevan disahkan. C-03 hanya memblokir
-butir billing/entitlement yang bergantung padanya, bukan seluruh runbook. Task ini dokumentasi/harness; tidak
-menggantikan implementasi MVP dan tidak membenarkan mock/dummy sebagai integrasi.
+benar-benar tersedia pada baseline. Perintah pemilik proyek ("Kerjakan Developer 3
+Tahap 3") sudah merupakan otorisasi implementasi: tidak perlu menunggu Tahap 2 GO
+terverifikasi atau pengesahan kontrak/environment demo. Bila environment demo
+(device, database uji, email sandbox) tidak tersedia, tulis runbook/harness secara
+lengkap, jalankan bagian yang dapat dijalankan, dan tandai sisanya NOT RUN dengan
+alasan spesifik. C-03 hanya mempengaruhi butir billing/entitlement: kerjakan dengan
+interpretasi paling aman dan konsisten PRD, lalu catat sebagai asumsi. Task ini
+dokumentasi/harness; tidak menggantikan implementasi MVP dan tidak membenarkan
+mock/dummy diklaim sebagai integrasi.
 
 ## Baca efisien
 

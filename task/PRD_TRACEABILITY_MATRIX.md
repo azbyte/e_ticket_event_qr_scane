@@ -1,5 +1,17 @@
 # PRD Traceability Matrix — E-Ticket Event
 
+> **STATUS: REFERENSI TEKNIS / HISTORIS — NON-BLOCKING.** Sejak perbaikan workflow
+> autonomous, dokumen ini **bukan lagi syarat izin** untuk mulai bekerja. Kolom
+> status/gate di dalamnya adalah catatan analisis, bukan izin: seluruh status
+> `BLOCKED` dan "menunggu approval/persetujuan tertulis" digantikan oleh *Autonomous
+> Execution Protocol* pada [`PEMBAGIAN_TUGAS_FINAL.md`](PEMBAGIAN_TUGAS_FINAL.md).
+> Perintah pemilik proyek adalah otorisasi implementasi, keputusan teknis diambil
+> mandiri, OPEN DECISION dan gate teknis dikerjakan dengan interpretasi paling aman
+> lalu dicatat sebagai asumsi, dan BLOCKED hanya untuk hambatan eksternal nyata.
+> **Pengecualian:** catatan Developer 1 Tahap 1 (baris "GO (limited)" dan Amendment
+> A-1) tetap berlaku apa adanya, tidak diubah, dan tidak dikerjakan ulang.
+
+
 - **Sumber:** [`../PRD.md`](../PRD.md) v2.2; acceptance ID AC-01–AC-10 dari §14.
 - **Makna status:** status readiness/evidence saat Fase 1B, bukan klaim source selesai.
 - **Owner:** owner utama task; dependencies shared tidak menjadi shared file ownership. Status ini tidak membuka coding gate.

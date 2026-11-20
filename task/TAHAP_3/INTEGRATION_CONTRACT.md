@@ -1,12 +1,14 @@
 # Kontrak integrasi — Tahap 3 (demo readiness)
 
-## Gate dan baseline
+## Baseline dan cara memulai (non-blocking)
 
-Mulai hanya setelah Tahap 2 memiliki laporan integrasi **GO** dengan baseline,
-CI dan bukti yang bisa diperiksa. Keputusan PRD yang mempengaruhi task, kontrak
-API/data, environment demo, serta proposal yang menyentuh database harus sudah
-diselesaikan sebelum pekerjaan terkait. Jika laporan gate kosong/tidak memiliki
-bukti, keputusan masih terbuka, atau baseline tidak dapat diverifikasi: **BLOCKED**.
+Dokumen ini referensi teknis, **bukan gate izin**. Perintah pemilik proyek
+(“Kerjakan Developer N Tahap 3”) sudah merupakan otorisasi implementasi. Laporan
+integrasi Tahap 2 yang belum GO, keputusan PRD yang masih terbuka, atau baseline
+yang tidak dapat diverifikasi **bukan** alasan berhenti: periksa kondisi kode
+aktual, kerjakan scope yang dapat diselesaikan, dan catat asumsi, bukti yang
+tersedia, serta bagian yang benar-benar memerlukan environment demo (mis. device/
+build) sebagai NOT RUN bila tidak dapat dijalankan di lingkungan kerja.
 
 ## Kontrak bersama
 
@@ -18,15 +20,20 @@ bukti, keputusan masih terbuka, atau baseline tidak dapat diverifikasi: **BLOCKE
   storage baseline tidak menyimpan datanya. Missing capability adalah blocker.
 - Guest journey mengikuti aturan yang sudah CONFIRMED di PRD: guest tanpa akun,
   satu ticket per order, harga order terkunci, gratis langsung issue dan berbayar
-  setelah PAID, kategori event homogen free/paid. Bagian yang memerlukan formula
-  C-01, guest payment authority C-02 atau subscription gate C-03 tetap BLOCKED
-  sampai keputusan disahkan. API failure tetap error, tidak fallback ke mock.
+  setelah PAID, kategori event homogen free/paid. Bagian yang bersinggungan dengan
+  formula C-01, guest payment authority C-02 atau subscription gate C-03
+  **dikerjakan dengan interpretasi paling aman dan konsisten PRD** (utamakan angka
+  yang sudah CONFIRMED, mis. fee Rp5.000 + 5%), lalu dicatat sebagai asumsi pada
+  laporan — bukan dihentikan. API failure tetap error, tidak fallback ke mock.
 - Ticket/check-in menggunakan tiket dan otorisasi server. Email/provider hanya
-  diklaim berhasil jika dibuktikan oleh sandbox yang diizinkan.
+  diklaim berhasil jika dibuktikan oleh sandbox yang diizinkan; bila tidak
+  tersedia, tandai NOT RUN dan lanjutkan bagian lain.
 - UI wajib mempertahankan loading, empty, error, unauthorized, retry, success
   serta responsive states sesuai acceptance PRD.
 - Tidak mengubah response/error envelope, JWT/role, route, konfigurasi global,
-  atau kontrak shared tanpa persetujuan tertulis dan owner tunggal sebelum coding.
+  atau kontrak shared secara sepihak tanpa pencatatan. Bila perubahan semacam itu
+  benar-benar diperlukan untuk menyelesaikan task: lakukan perubahan minimum, jaga
+  kompatibilitas, dan dokumentasikan file/alasan/dampak pada laporan.
 - Database source schema yang ditetapkan ialah `backend/prisma/schema.prisma`;
   migration aktifnya di `backend/prisma/migrations/`. SQL `backend/supabase/
   migrations/` adalah legacy yang dipertahankan dan status/fungsinya harus

@@ -1,6 +1,6 @@
 # Kepemilikan file — Tahap 2
 
-Tabel path eksklusif; conditional on Tahap 1 integration GO baseline dan keputusan/technical gate yang relevan untuk acceptance task. Developer tidak boleh mengubah di luar assigned globs.
+Tabel **path preferensi ownership**, bukan gate izin dan bukan alasan berhenti. Kerjakan lebih dulu path milik sendiri; perubahan di luar assigned globs diperbolehkan bila benar-benar diperlukan untuk menyelesaikan task — lakukan perubahan minimum, jaga kontrak/perilaku yang ada, jangan merusak pekerjaan developer lain, dan dokumentasikan file/alasan/dampak pada laporan. Yang tetap terkunci absolut: schema/migration/SQL/seed/config database (wewenang FINISHING), secret/`.env`, dependency lockfile tanpa kebutuhan sah, dan operasi Git destruktif.
 
 | Pemilik | Path boleh diubah |
 |---|---|
@@ -12,6 +12,6 @@ Tabel path eksklusif; conditional on Tahap 1 integration GO baseline dan keputus
 ## Locked / prohibited
 `apps/lib/app_router.dart`, `app.dart`, `main.dart`, `routes/**`, global providers/services/models/core, API client; `backend/src/app.js`, `server.js`, all `src/routes/**`, global middleware/config, Prisma/migrations, package/pubspec/lock, shared response/serializers; all D1/D2/D3-owned file globs assigned to others; PRD and architecture docs. D1–D3 dilarang mengubah atau menjalankan perubahan DB/schema/migration/SQL/seed/config. Kebutuhan database hanya dilaporkan untuk FINISHING sesuai `../FINISHING_AUTHORITY.md`; Developer 4 tidak otomatis berwenang. `ticketTokenService.js` assignment is D2 exclusive despite being a shared security surface; no other developer may touch it. If source test path already owned/shared, request a new D4-specific test path instead of editing.
 
-`backend/src/controllers/eventMetricsController.js` adalah ownership tunggal Developer 3 pada Tahap 2 karena file ini memuat Admin moderation dan event metrics; D2 hanya memakai endpoint summary/sales baseline secara read-only. Developer 2 tidak boleh mengubah controller tersebut. Bila endpoint perlu diubah, laporkan interface request dan blokir acceptance terdampak sampai amendment ownership tertulis; jangan buat shared ownership.
+`backend/src/controllers/eventMetricsController.js` adalah ownership tunggal Developer 3 pada Tahap 2 karena file ini memuat Admin moderation dan event metrics; D2 hanya memakai endpoint summary/sales baseline secara read-only. Developer 2 tidak boleh mengubah controller tersebut. Bila endpoint perlu diubah, lakukan perubahan minimum yang diperlukan (utamakan adapter pada path D3), jaga kompatibilitas kontrak, dan dokumentasikan file/alasan/dampak pada laporan; jangan membuat dua owner yang saling menimpa tanpa pencatatan.
 
 No other duplicate allow-globs between the three developers. Semantic dependencies (membership event scope → scan permission → attendee reporting) are handled by frozen API contract, not by waiting on implementation. If a current endpoint is insufficient, block/report rather than change a locked route.

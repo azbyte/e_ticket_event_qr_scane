@@ -21,6 +21,10 @@ enum UserRole {
   static UserRole? fromString(String? value) {
     switch (value) {
       case 'attendee':
+      // Alias legacy backend (`USER_ROLES.CUSTOMER`). PRD §2.4: Participant
+      // tidak memiliki akun/dashboard, sehingga nilai lama ini dipetakan
+      // eksplisit ke role tanpa hak istimewa alih-alih mengandalkan fallback.
+      case 'customer':
         return UserRole.attendee;
       case 'organizer':
         return UserRole.organizer;

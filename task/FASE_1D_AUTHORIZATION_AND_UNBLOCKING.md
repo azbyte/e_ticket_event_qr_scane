@@ -1,5 +1,18 @@
 # Fase 1D — Authorization Resolution & Scope Unblocking
 
+> **STATUS: REFERENSI TEKNIS / HISTORIS — NON-BLOCKING.** Sejak perbaikan workflow
+> autonomous, dokumen ini **bukan lagi syarat izin** untuk mulai bekerja. Seluruh
+> status `BLOCKED`, "menunggu approval/persetujuan tertulis", "gate", "baseline
+> sign-off", dan "authorization" di dalamnya digantikan oleh *Autonomous Execution
+> Protocol* pada [`PEMBAGIAN_TUGAS_FINAL.md`](PEMBAGIAN_TUGAS_FINAL.md): perintah
+> pemilik proyek adalah otorisasi implementasi, keputusan teknis diambil mandiri,
+> OPEN DECISION dan gate teknis dikerjakan dengan interpretasi paling aman lalu
+> dicatat sebagai asumsi, dan BLOCKED hanya untuk hambatan eksternal nyata. Isi
+> dokumen dipertahankan sebagai referensi analisis dan kontrak. **Pengecualian:**
+> catatan Developer 1 Tahap 1 (baris "GO (limited)" dan Amendment A-1) tetap berlaku
+> apa adanya, tidak diubah, dan tidak dikerjakan ulang.
+
+
 - **PRD aktif:** [`../PRD.md`](../PRD.md) v2.2.
 - **Snapshot kerja:** branch `update/featur`, HEAD `24d18e248b6550483e162f7484e1eab8e43bec17`.
 - **Status:** **BLOCKED — tidak ada persetujuan produk/technical-owner/baseline baru yang tercatat sejak Fase 1C.** Dokumen ini memetakan status izin, bukan pengganti tanda tangan.
@@ -103,11 +116,19 @@ Semua proposal masih **proposal saja**; pemilik FINISHING/gate/approval/environm
 
 ## 5. Ownership dan entry gate per task
 
-“READY WITH LIMITATIONS” pun mensyaratkan baseline dan technical contract ditandatangani oleh maintainer. Saat ini tidak ada bukti penandatanganan baseline/technical gate, sehingga tidak ada task yang resmi READY untuk coding.
+“READY WITH LIMITATIONS” pun mensyaratkan baseline dan technical contract ditandatangani oleh maintainer. Saat dokumen ini pertama disusun tidak ada bukti penandatanganan baseline/technical gate, sehingga tidak ada task yang resmi READY untuk coding.
+
+> **Update 2026-11-20:** maintainer telah memberi approval tertulis untuk **D1 T1
+> saja** (baseline `update/featur`@`5413de1`, technical contract auth, lokasi test
+> auth, amendment `authMiddleware.js` non-breaking, owner tunggal OR-1…OR-4).
+> Instrumen mengikat: `TAHAP_1/FILE_OWNERSHIP.md` → "Amendment A-1" dan
+> `FASE_1C_AUTHORIZATION_REGISTER.md` §5. Seluruh baris lain pada tabel di bawah
+> **tetap BLOCKED**; approval ini bukan approval C-01/C-02/C-03, bukan approval
+> database/FINISHING, dan tidak membuka Tahap 2/3.
 
 | Task | Status saat ini | Scope/owner/allow-list dan batas utama | Dependency & test/evidence untuk membuka |
 |---|---|---|---|
-| **D1 T1 — Auth/session** | **BLOCKED — kandidat READY WITH LIMITATIONS setelah approval baseline** | Tujuan auth/login/logout/me; hanya D1 allow-list T1. Tidak C-01–C-03 dependency; tidak mengubah shared API/router/DB. Test auth paths yang diallow belum ada. | Maintainer mencatat baseline + technical contract GO; tetapkan/konfirmasi lokasi test yang allowed; auth tests valid/invalid/unauthorized/role/logout/no mock; report evidence. Ini belum memberi izin mulai saat ini. |
+| **D1 T1 — Auth/session** | **GO (limited) — disetujui maintainer 2026-11-20** (sebelumnya: BLOCKED — kandidat READY WITH LIMITATIONS) | Tujuan auth/login/logout/me; hanya D1 allow-list T1 + Amendment A-1 (`TAHAP_1/FILE_OWNERSHIP.md`). Tidak C-01–C-03 dependency; tidak mengubah shared API/router/DB. | Baseline `update/featur`@`5413de1` + technical contract GO sudah dicatat; lokasi test disahkan (`apps/test/features/auth/**`, `backend/test/auth_*.test.js`); auth tests valid/invalid/unauthorized/role/logout/no-mock wajib lolos dan dicatat di laporan D1. |
 | **D2 T1 — Event/category** | **BLOCKED** | D2 allow-list T1 untuk event controller/serializer/screens. Lifecycle auto-publish/suspend tidak boleh dikerjakan sampai G-02 contract/API/shared owner/disposition disetujui. Routes/DB locked. | Signed G-02 state/response/order gate contract; technical disposition DP-02; cross-owner/category validation/negative tests. |
 | **D3 T1 — Order/payment/ticket** | **BLOCKED** | D3 allow-list T1 order/payment/ticket modules only. No DB/schema/migration/SQL. Fee formula, guest payment authority, DB compatibility, atomic free issuance are not authorized. | C-01/C-02 where affected; DP-01/DP-03 disposition and shared API contract; quantity/no-assisted, idempotency, price snapshot, guest ownership, free/paid issue tests; safe DB integration only FINISHING. |
 | **D1 T2 — Invitation/membership** | **BLOCKED** | Backend invitation and membership UI allowed files. Router/deep-link is explicitly locked; cannot implement redirect. | Tahap 1 integration GO; maintainer appoints single router owner/amendment; invitation contract/test matrix. |
@@ -161,10 +182,10 @@ These are approval requests, not assumed decisions:
 
 ## 8. Conclusion
 
-- **Developer 1:** belum resmi boleh mulai. Ia adalah satu-satunya kandidat scope independen C-01–C-03 (auth), tetapi baseline/technical gate dan test allow-list belum disahkan. Setelah maintainer memberi approval tertulis, bisa dibatasi ke auth files + tests yang disetujui tanpa membuka Tahap 2.
+- **Developer 1:** **GO (limited) sejak 2026-11-20.** Maintainer telah memberi approval tertulis: baseline `update/featur`@`5413de1`, technical contract auth Tahap 1, pengesahan lokasi test (`apps/test/features/auth/**`, `backend/test/auth_*.test.js`), amendment `authMiddleware.js` (non-breaking) dan owner tunggal OR-1…OR-4 untuk GAP-1…GAP-4. Scope tetap terbatas pada auth files + tests yang disetujui, tanpa membuka Tahap 2. Instrumen: `TAHAP_1/FILE_OWNERSHIP.md` → "Amendment A-1".
 - **Developer 2:** belum boleh mulai lifecycle event/category. Hanya audit read-only yang diizinkan dapat dilakukan setelah baseline task sah; auto-publish/suspend masih memerlukan G-02 contract dan shared/DB disposition.
 - **Developer 3:** belum boleh mulai order/payment acceptance. C-01/C-02 terbuka; G-01 dan free-ticket/category atomic behavior memiliki dependency DB/shared API yang belum disahkan.
-- **Tahap 1 keseluruhan:** **BLOCKED**, belum dapat dibuka. Scope auth independen dapat dibuka secara terpisah hanya setelah maintainer menyetujui baseline/technical gate; tidak ada approval tersebut pada snapshot.
+- **Tahap 1 keseluruhan:** **BLOCKED**, kecuali scope auth D1 yang telah dibuka terpisah oleh approval maintainer 2026-11-20 (baseline `5413de1` + Amendment A-1). Scope D2 (event/category) dan D3 (order/payment) tetap BLOCKED sampai baseline/technical gate masing-masing disetujui; integrasi Tahap 1 tetap menunggu ketiga PR sesuai `TAHAP_1/INTEGRATION_CONTRACT.md`.
 - **GitHub:** baseline **belum disetujui**; file selection, archive pairing, dan secret scan staging masih memerlukan owner review.
 
 Fase 1D tetap **BLOCKED**, bukan PASS. Tidak ada persetujuan pemilik atau technical owner baru yang ditemukan/dibuat dalam pemeriksaan ini.
