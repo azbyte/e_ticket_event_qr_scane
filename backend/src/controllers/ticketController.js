@@ -1,7 +1,7 @@
 ﻿const asyncHandler = require('express-async-handler');
 const { query, getOne, pool } = require('../config/db');
 const { getAuthorizedOrder } = require('./orderController');
-const { assertScanPermission } = require('./checkInController');
+const { assertScanPermission, normalizeTicketStatus } = require('./checkInController');
 const tokens = require('../services/ticketTokenService');
 const emailService = require('../services/emailService');
 const logger = require('../utils/logger');
@@ -29,6 +29,19 @@ const mapTicket = (row) => ({
     category_id: row.events_category_id, created_at: row.events_created_at,
     updated_at: row.events_updated_at,
   },
+});
+
+/**
+ * Bentuk tiket untuk response klien Flutter.
+ *
+ * Kontrak `TicketModel` memakai status `valid`/`checked_in` dan field
+ * `attendee_name`/`attendee_email`/`order_id`, sedangkan kolom legacy menyimpan
+ * `active`/`used` dan tidak memiliki `order_id`. Normalisasi dilakukan di layer
+ * presentasi tanpa mengubah nilai di database.
+ */
+const presentTicketForClient = async (row, { includeToken = false } = {}) => ({
+  ...(await tokens.presentTicket(mapTicket(row), { includeToken })),
+  status: normalizeTicketStatus(row.status),
 });
 
 const belongsToOrder = async (ticket, order) => {
@@ -59,30 +72,44 @@ const getMyTickets = asyncHandler(async (req, res) => {
     const order = await getAuthorizedOrder(orderId, null, req.get('X-Order-Access-Token'));
     if (!order) { res.status(404); throw new Error('Order not found'); }
     rows = await query(
-      `SELECT ${EVENT_SELECT} FROM tickets t JOIN events e ON e.id=t.event_id
+      `SELECT ${EVENT_SELECT},
+              a.name AS attendee_name, a.email AS attendee_email, a.phone AS attendee_phone,
+              oi.order_id AS order_id
+       FROM tickets t JOIN events e ON e.id=t.event_id
        JOIN attendees a ON a.id=t.attendee_id JOIN order_items oi ON oi.id=a.order_item_id
        WHERE oi.order_id=$1 ORDER BY t.purchased_at DESC`, [orderId]
     );
   } else {
     rows = await query(
-      `SELECT ${EVENT_SELECT} FROM tickets t JOIN events e ON e.id=t.event_id
+      `SELECT ${EVENT_SELECT},
+              a.name AS attendee_name, a.email AS attendee_email, a.phone AS attendee_phone,
+              oi.order_id AS order_id
+       FROM tickets t JOIN events e ON e.id=t.event_id
+       LEFT JOIN attendees a ON a.id=t.attendee_id
+       LEFT JOIN order_items oi ON oi.id=a.order_item_id
        WHERE t.user_id=$1 ORDER BY t.purchased_at DESC`, [req.user.id]
     );
   }
   const tickets = [];
-  for (const row of rows) tickets.push(await tokens.presentTicket(mapTicket(row), { includeToken: true }));
+  for (const row of rows) tickets.push(await presentTicketForClient(row, { includeToken: true }));
   res.json({ success: true, count: tickets.length, tickets });
 });
 
 const getTicketById = asyncHandler(async (req, res) => {
   const ticket = await getOne(
-    `SELECT ${EVENT_SELECT} FROM tickets t JOIN events e ON e.id=t.event_id WHERE t.id=$1`,
+    `SELECT ${EVENT_SELECT},
+            a.name AS attendee_name, a.email AS attendee_email, a.phone AS attendee_phone,
+            oi.order_id AS order_id
+     FROM tickets t JOIN events e ON e.id=t.event_id
+     LEFT JOIN attendees a ON a.id=t.attendee_id
+     LEFT JOIN order_items oi ON oi.id=a.order_item_id
+     WHERE t.id=$1`,
     [req.params.id]
   );
   if (!ticket) { res.status(404); throw new Error('Ticket not found'); }
   const access = await resolveAccess(req, ticket);
   if (!access.allowed) { res.status(404); throw new Error('Ticket not found'); }
-  const presented = await tokens.presentTicket(mapTicket(ticket), { includeToken: access.owner });
+  const presented = await presentTicketForClient(ticket, { includeToken: access.owner });
   res.json({ success: true, ticket: presented, data: presented });
 });
 

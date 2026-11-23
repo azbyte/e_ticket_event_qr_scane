@@ -1,24 +1,43 @@
-# Tahap 2 — Developer 1: staff invitation dan membership
+# Tahap 2 — Developer 1: Publishable Event & Public Registration
 
-> **Eksekusi autonomous.** Perintah pemilik proyek ("Kerjakan Developer 1 Tahap 2") sudah merupakan otorisasi implementasi; tidak perlu menunggu Tahap 1 GO atau baseline yang diverifikasi maintainer. Kerjakan audit, API invitation, dan deep-link/redirect dalam satu alur. Bila acceptance memerlukan perubahan app router/global navigation di luar allow-list, lakukan perubahan **minimum** yang diperlukan, jaga perilaku navigasi lainnya, dan dokumentasikan file/alasan/dampak pada laporan — jangan menandai acceptance BLOCKED hanya karena owner router belum ditunjuk. Jangan mengubah schema/migration; kebutuhan DB ditulis sebagai proposal di `../DB_CHANGE_PROPOSAL.md`.
+> **Ringkasan.** Dokumen ini adalah lembar kerja ringkas. Sumber lengkap: [`RENCANA_KERJA.md`](RENCANA_KERJA.md) §C, [`INTEGRATION_CONTRACT.md`](INTEGRATION_CONTRACT.md), [`FILE_OWNERSHIP.md`](FILE_OWNERSHIP.md).
 
-## Tujuan
-Menyelesaikan onboarding Staff berbasis invitation event-scoped dan UI permission sesuai PRD.
+## Peran
 
-## Kondisi awal
-Baca PRD §§2, 6.2, 10, 12, 13, 15–16; Tahap 2 contract/ownership; Tahap 1 baseline dan laporan; source controller invitation, Flutter membership, API client, router (read-only).
+Developer 1 memiliki alur: **event Organizer → validasi → publish otomatis → dua tautan → guest mendaftar → order → pembayaran**, serta kepemilikan tunggal `apps/lib/app.dart`, `app_router.dart`, `routes/app_routes.dart`.
 
-## Pekerjaan
-Trace create/list/revoke, acceptance email/token validation, membership creation and scoped permission. Perbaiki UI/API handling hanya di owned paths; invitation expired/revoked/email mismatch, revoked membership and missing permission must deny. Acceptance authenticated; display event and outcome. Deep-link acceptance/redirect must use approved link contract; if central router change needed, request designated integration owner. Tests positive and negative synthetic.
+## Kondisi awal yang harus dipahami
 
-## Files / dependencies
-Allowed exclusively D1 paths in `FILE_OWNERSHIP.md`; prohibited all shared/locked paths and D2/D3 paths. D1 works in parallel using existing membership endpoints/contract; no dependency on D2 scanner implementation.
+- Router Flutter memaksa login pada hampir semua route (`app_router.dart:217-220`); route publik belum ada.
+- Event masih berstatus `DRAFT`/`PENDING_REVIEW` dan menunggu approval Admin (`eventController.js:210, 347`).
+- `events.public_url` tidak pernah diisi; UI menampilkan tautan demo (`organizer_event_contract.dart:493-498`).
+- Order & pembayaran guest sudah nyata dan wajib 1 tiket (`orderController.js:91-99`).
 
-## Acceptance/tests
-- Invite is for one event/email and permissions; revoke/expiry means acceptance denied.
-- User must be logged in, matching invited email; acceptance creates only event-scoped membership.
-- Organizer cannot manage other Organizer's event; role/user cannot elevate permissions outside approved model.
-- No global Staff route/data access; test list and denial states.
-- Target tests pass; document deep-link/runtime test limits.
+## Daftar task
 
-Do not add database fields, routes or role. Fill report from diff and request shared interface changes through issue, not edit.
+| ID | Judul | Depends |
+|---|---|---|
+| D1-A | Stub `public_event/`, `services/public_event/`, dan route publik (blocking Hari 1) | — |
+| D1-1 | Fondasi routing publik & kepemilikan route | — |
+| D1-2 | Auto-publish event (validasi → `PUBLISHED`) | — |
+| D1-3 | Dua tautan: `public_url` + staff invitation URL | D1-2 |
+| D1-4 | Landing publik + registrasi guest + checkout | D1-1, D1-2 |
+| D1-5 | Perbaikan order/payment/tiket guest + dynamic attendee data | D1-4 |
+
+> **D1-A wajib di-merge lebih dulu.** Stub route publik harus ada agar D2 (invite)
+> dan D1 (fitur publik) tidak berebut `app_router.dart`. Detail di
+> [`RENCANA_KERJA.md`](RENCANA_KERJA.md) §C dan §B.1.
+
+## Batas
+
+- **Boleh:** hanya file D1 pada `INTEGRATION_CONTRACT.md` Bagian 2.
+- **Dilarang:** schema/migration/seed, file D2/D3, menghapus fitur, mengubah kontrak order/payment yang sudah dipakai.
+- Permintaan perubahan route ke D1 datang dari D2; D1 yang mengedit `app_router.dart`.
+
+## Definisi selesai
+
+Seluruh kriteria K pada setiap task terpenuhi, `npm test` + `flutter analyze` + `flutter test` PASS, laporan diperbarui dengan bukti PASS/FAIL/NOT RUN.
+
+## Laporan
+
+Isi [`LAPORAN_DEVELOPER_1.md`](LAPORAN_DEVELOPER_1.md) dengan: baseline, task selesai, file disentuh, endpoint baru, bukti test, status platform, risiko.

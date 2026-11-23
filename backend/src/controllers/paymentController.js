@@ -9,10 +9,11 @@ const config = require('../config/env');
 const logger = require('../utils/logger');
 
 const getPayment = asyncHandler(async (req, res) => {
+  const accessToken = req.get('X-Order-Access-Token') || req.body?.order_access_token;
   const order = await getAuthorizedOrder(
     req.params.orderId,
     req.user,
-    req.get('X-Order-Access-Token'),
+    accessToken,
   );
   if (!order) {
     res.status(404);
@@ -43,11 +44,25 @@ const simulatePayment = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('Order ID and a boolean simulation result are required');
   }
-  const accessToken = req.get('X-Order-Access-Token');
+  const accessToken = req.get('X-Order-Access-Token') || req.body.order_access_token;
   const order = await getAuthorizedOrder(orderId, req.user, accessToken);
   if (!order) {
     res.status(404);
     throw new Error('Order not found');
+  }
+
+  const currentStatus = String(order.status).toUpperCase();
+  if (currentStatus === 'PAID') {
+    res.status(400);
+    throw new Error('Order has already been paid');
+  }
+  if (currentStatus === 'CANCELLED') {
+    res.status(400);
+    throw new Error('Order has been cancelled');
+  }
+  if (order.expires_at && new Date(order.expires_at) < new Date()) {
+    res.status(400);
+    throw new Error('Order has expired');
   }
 
   const rpc = await query(

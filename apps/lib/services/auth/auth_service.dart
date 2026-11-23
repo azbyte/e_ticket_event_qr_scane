@@ -8,14 +8,12 @@ class _DemoAccount {
     required this.username,
     required this.email,
     required this.name,
-    required this.password,
     required this.role,
   });
 
   final String username;
   final String email;
   final String name;
-  final String password;
   final UserRole role;
 }
 
@@ -24,19 +22,20 @@ class AuthService {
   final ApiClient _api = ApiClient();
   final SessionService _session = SessionService.instance;
 
+  // Persona demo hanya untuk mode mock eksplisit (`MOCK_MODE=true`). Tidak ada
+  // password yang disimpan di source code: akun Admin yang sebenarnya dibuat di
+  // tabel `profiles` lewat `npm run admin:provision` dan login memakai API.
   static const List<_DemoAccount> _demoAccounts = [
     _DemoAccount(
       username: 'admin',
       email: 'admin@event.com',
       name: 'Super Admin',
-      password: 'Admin123!',
       role: UserRole.admin,
     ),
     _DemoAccount(
       username: 'organizer',
       email: 'organizer@event.com',
       name: 'Event Organizer',
-      password: 'Organizer123!',
       role: UserRole.organizer,
     ),
   ];
@@ -46,16 +45,18 @@ class AuthService {
     required String password,
   }) async {
     if (AppConfig.mockMode) {
+      // Mode demo bukan batas keamanan: persona dipilih dari identitas dan tidak
+      // ada password tersimpan di source code karena tidak ada akun database.
+      // Login Admin yang sebenarnya selalu memakai backend (MOCK_MODE=false).
       final identity = email.trim().toLowerCase();
       for (final account in _demoAccounts) {
-        if ((identity == account.email || identity == account.username) &&
-            password == account.password) {
+        if (identity == account.email || identity == account.username) {
           final user = _demoUser(account);
           await _session.saveToken('demo:${account.role.name}');
           return user;
         }
       }
-      throw const FormatException('Email/username atau kata sandi salah.');
+      throw const FormatException('Persona demo tidak dikenal. Gunakan admin atau organizer.');
     }
     final response = await _api.post(
       '/auth/login',

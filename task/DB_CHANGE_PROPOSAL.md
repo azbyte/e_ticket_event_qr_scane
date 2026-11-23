@@ -4,9 +4,9 @@
 > Batas wewenang schema/migration/SQL/seed di dokumen ini adalah batas nyata (bukan
 > approval gate teknis) dan tetap dipatuhi: Developer 1–3 tidak mengubah database,
 > kebutuhan DB dicatat sebagai proposal di sini. Namun batas ini **tidak
-> menghentikan task**: sesuai *Autonomous Execution Protocol* pada
-> [`PEMBAGIAN_TUGAS_FINAL.md`](PEMBAGIAN_TUGAS_FINAL.md), seluruh bagian yang tidak
-> memerlukan perubahan DB wajib diselesaikan, diuji, dan dilaporkan; hanya butir
+> menghentikan task**: sesuai prosedur eksekusi pada
+> [`PEMBAGIAN_TUGAS_FINAL.md`](PEMBAGIAN_TUGAS_FINAL.md) §1.1, seluruh bagian yang
+> tidak memerlukan perubahan DB wajib diselesaikan, diuji, dan dilaporkan; hanya butir
 > yang benar-benar bergantung perubahan DB yang ditandai NOT RUN disertai proposal
 > dan alasan spesifik. Jangan memakai status "PROPOSAL ONLY / BLOCKED" sebagai
 > alasan menghentikan acceptance lain.

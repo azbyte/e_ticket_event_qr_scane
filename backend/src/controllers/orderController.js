@@ -1,6 +1,7 @@
-const { createHash, randomBytes, randomUUID } = require('node:crypto');
+const { createHash, randomBytes, randomUUID, timingSafeEqual } = require('node:crypto');
 const asyncHandler = require('express-async-handler');
 const { query, getOne } = require('../config/db');
+const { serializeOrder } = require('../utils/orderResponse');
 
 const ORDER_BASE_SELECT = `
   eo.id, eo.order_number, eo.event_id, eo.purchaser_id, eo.assisted_by_member_id,
@@ -11,6 +12,14 @@ const ORDER_BASE_SELECT = `
   e.title AS event_title
 `;
 const hashAccessToken = (token) => createHash('sha256').update(token).digest('hex');
+
+const safeHashEqual = (a, b) => {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufA = Buffer.from(a, 'utf8');
+  const bufB = Buffer.from(b, 'utf8');
+  if (bufA.length !== bufB.length || bufA.length === 0) return false;
+  return timingSafeEqual(bufA, bufB);
+};
 
 /** Muat order lengkap tanpa memeriksa otorisasi (dipakai setelah otorisasi). */
 const loadOrderById = async (orderId) => {
@@ -54,7 +63,7 @@ const getAuthorizedOrder = async (orderId, user, accessToken) => {
       return null;
     }
   } else if (typeof accessToken !== 'string' || !order.guest_access_token_hash
-      || hashAccessToken(accessToken) !== order.guest_access_token_hash) {
+      || !safeHashEqual(hashAccessToken(accessToken), order.guest_access_token_hash)) {
     return null;
   }
   return loadOrderById(orderId);
@@ -64,17 +73,32 @@ module.exports.getAuthorizedOrder = getAuthorizedOrder;
 module.exports.hashAccessToken = hashAccessToken;
 module.exports.loadOrderById = loadOrderById;
 const createOrder = asyncHandler(async (req, res) => {
+  if (req.body.assisted_by_member_id || req.body.assisted) {
+    res.status(400);
+    throw new Error('Assisted registration is not supported in public order checkout');
+  }
+
   const { event_id: eventId, items } = req.body;
   const isUuid = (value) =>
     typeof value === 'string' &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
   if (!isUuid(eventId) || !items || typeof items !== 'object' ||
-      Array.isArray(items) || Object.keys(items).length === 0 ||
-      Object.entries(items).some(([id, quantity]) =>
-        !isUuid(id) || !Number.isInteger(quantity) || quantity <= 0 || quantity > 20) ||
-      Object.values(items).reduce((sum, quantity) => sum + quantity, 0) > 20 ||
-      !Array.isArray(req.body.attendees) ||
-      req.body.attendees.length !== Object.values(items).reduce((sum, quantity) => sum + quantity, 0)) {
+      Array.isArray(items) || Object.keys(items).length === 0) {
+    res.status(400);
+    throw new Error('Provide valid ticket selections and attendee contact details');
+  }
+
+  const totalQuantity = Object.values(items).reduce(
+    (sum, quantity) => sum + (Number.isInteger(quantity) ? quantity : 0),
+    0
+  );
+  if (totalQuantity !== 1 || Object.keys(items).length !== 1 ||
+      !Array.isArray(req.body.attendees) || req.body.attendees.length !== 1) {
+    res.status(400);
+    throw new Error('Orders in Tahap 1 must contain exactly one ticket and one attendee');
+  }
+
+  if (Object.entries(items).some(([id, quantity]) => !isUuid(id) || quantity !== 1)) {
     res.status(400);
     throw new Error('Provide valid ticket selections and attendee contact details');
   }
@@ -147,7 +171,7 @@ const createOrder = asyncHandler(async (req, res) => {
       success: true,
       idempotent_replay: true,
       message: 'Checkout ini sudah diproses sebelumnya. Gunakan token akses dari respons pertama.',
-      order: replay,
+      order: serializeOrder(replay),
       order_access_token: null,
     });
   }
@@ -183,7 +207,7 @@ const createOrder = asyncHandler(async (req, res) => {
 
   res.status(201).json({
     success: true,
-    order,
+    order: serializeOrder(order),
     order_access_token: tokenMatches ? accessToken : null,
     ...(tokenMatches ? {} : { idempotent_replay: true }),
   });
@@ -198,7 +222,8 @@ const getOrder = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Order not found');
   }
-  res.json({ success: true, order, data: order });
+  const serialized = serializeOrder(order);
+  res.json({ success: true, order: serialized, data: serialized });
 });
 
 const listMyOrders = asyncHandler(async (req, res) => {
@@ -238,7 +263,7 @@ const listMyOrders = asyncHandler(async (req, res) => {
     paymentsByOrder[p.order_id].push(p);
   }
 
-  const orders = orderRows.map((order) => ({
+  const orders = orderRows.map((order) => serializeOrder({
     ...order,
     events: { title: order.event_title },
     order_items: itemsByOrder[order.id] || [],

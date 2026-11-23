@@ -13,7 +13,7 @@ import '../../../models/admin/admin_transaction_revenue_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../routes/app_routes.dart';
 import '../../../services/admin/admin_revenue_service.dart';
-import '../../../services/organizer_events/mock_organizer_event_repository.dart';
+import '../../../services/organizer_events/organizer_event_repository_factory.dart';
 
 /// DTO Ringkasan Keuangan Platform sesuai Kontrak Integrasi Developer 3.
 class PlatformRevenueSummary {
@@ -78,8 +78,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (widget.eventsLoader != null) {
       return widget.eventsLoader!();
     }
-    final events = await MockOrganizerEventRepository.shared()
-        .listPlatformEvents();
+    // API mode adalah default: event platform dibaca dari GET /api/events
+    // (admin-only) melalui repository yang sama dengan layar moderasi. Mock
+    // hanya dipakai bila MOCK_MODE=true diminta eksplisit sebagai demo.
+    final events = await createOrganizerEventRepository().listPlatformEvents();
     return events.map((event) => event.toJson()).toList(growable: false);
   }
 

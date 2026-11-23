@@ -1,24 +1,46 @@
-# Tahap 2 — Developer 2: scanner dan online check-in
+# Tahap 2 — Developer 2: Ticketing, Staff Workspace, Check-in
 
-> **Eksekusi autonomous.** Perintah pemilik proyek ("Kerjakan Developer 2 Tahap 2") sudah merupakan otorisasi implementasi; tidak perlu menunggu baseline Tahap 1 GO. Scan behavior yang telah ditetapkan dapat diuji pada source/contract yang ada, perubahan token storage/architecture diputuskan sendiri mengikuti pola keamanan yang ada (hash server-side, bearer token tidak ditulis ke log) dan dicatat sebagai keputusan teknis; bila DB terdampak, tulis proposal FINISHING dan lanjutkan bagian lain. Jangan mengubah schema/migration.
+> **Ringkasan.** Sumber lengkap: [`RENCANA_KERJA.md`](RENCANA_KERJA.md) §D, [`INTEGRATION_CONTRACT.md`](INTEGRATION_CONTRACT.md), [`FILE_OWNERSHIP.md`](FILE_OWNERSHIP.md).
 
-## Tujuan
-Membuktikan QR scanner online memvalidasi tiket eligible sekali, pada event yang tepat dan hanya untuk actor berizin.
+## Peran
 
-## Kondisi awal
-Baca PRD §§2, 9–10, 12–16; Tahap 2 ownership/contract; docs/DATABASE; source ticket/check-in controllers and scanners; tests. Treat sync endpoint as outside MVP; do not extend offline behavior.
+Developer 2 memiliki alur: **tiket terbit → QR nyata → invitation staff → workspace staff → scanner kamera → validasi → check-in → riwayat**, serta kepemilikan `checkInController.js`, `ticketController.js`, `eventInvitationController.js`, dan `apps/pubspec.yaml`.
 
-## Pekerjaan
-Trace camera/scan input → validation endpoint → result/history. Pastikan server checks authenticated Staff/Organizer permissions, event membership/event scope, ticket issued and eligible/paid, duplicate scan, atomic writes and safe error. Implement UI permission/camera/error/loading/success states only in owned paths. Validate QR payload handling without logging bearer token. Add tests for valid, duplicate, wrong event, unpaid/invalid, no permission and concurrency-safe backend where test harness supports it. If token hashing/storage or a route/shared API change is needed, implement the minimum safe version consistent with the PRD and existing patterns, document the decision and its impact in the report, and continue; only schema/migration needs are escalated to FINISHING as a proposal.
+## Kondisi awal yang harus dipahami
 
-## Files / dependencies
-Only D2 paths in `FILE_OWNERSHIP.md`; `ticketTokenService.js` is exclusively D2. Do not edit D1 invitation or D3 admin/list, routes/schema/router/global API/dependencies.
+- `QrTicketDisplay` menggambar pseudo-QR (`qr_ticket_display.dart:41-73`); tidak ada dependency QR/kamera.
+- `ScannerScreen` tanpa kamera dan masih menawarkan **mode offline** (non-MVP) (`scanner_screen.dart:96-108, 213-226`).
+- `POST /api/tickets/verify` menandai tiket `used` tanpa membuat `check_ins` (`ticketController.js:129-153`).
+- Flutter memanggil path riwayat yang salah (`check_in_service.dart:116`).
+- UI membership masih in-memory (`organizer_membership_service.dart:79-171`).
+- Tiket gratis belum tentu memiliki `token_hash`.
 
-## Acceptance/tests
-- Valid eligible paid ticket scans once and shows confirmation.
-- repeat, wrong-event, unpaid, revoked/unpermitted/unauthorized fail; no success offline.
-- No token leakage in logs/UI beyond required scan payload.
-- Permission/camera/API denial has retryable accessible state.
-- Run focused tests and report NOT RUN live camera/DB if not available.
+## Daftar task
 
-Do not trust client-supplied event/payment status. Fill report from actual tests; hand back wider defects.
+| ID | Judul | Depends |
+|---|---|---|
+| D2-0 | Dependency `qr_flutter` + `mobile_scanner` (blocking Hari 1, PR terpisah) | — |
+| D2-1 | QR e-ticket nyata + data tiket pribadi | — |
+| D2-2 | Invitation staff E2E + `GET /api/me/memberships` + routing workspace | D1-1, D1-3 |
+| D2-3 | Scanner kamera + validasi (online, MVP) | D2-1, D2-2 |
+| D2-4 | Check-in tunggal, riwayat, konsolidasi verifikasi | D2-3 |
+| D2-5 | Test regresi tiket–scan + dokumentasi endpoint | D2-1..D2-4 |
+
+> **D2-0 wajib di-merge lebih dulu.** Tanpa dependency QR/kamera di `apps/pubspec.yaml`,
+> branch D1 dan D3 tidak dapat menjalankan `flutter pub get`/`test` yang sama.
+> Detail ada di [`RENCANA_KERJA.md`](RENCANA_KERJA.md) §D (D2-0).
+
+## Batas
+
+- **Boleh:** hanya file D2 pada `INTEGRATION_CONTRACT.md` Bagian 2.
+- **Dilarang:** schema/migration/seed, file D1/D3, menghapus fitur, menambah alur offline.
+- Perubahan route (`app_router.dart`) **diajukan ke D1**, bukan diedit sendiri.
+- Perubahan `checkInController.js` oleh D3 (attendee) memerlukan persetujuan tertulis D2.
+
+## Definisi selesai
+
+Kriteria K per task terpenuhi, `npm test` + `flutter analyze` + `flutter test` PASS, uji kamera Android/Web dicatat (PASS/NOT RUN), laporan diperbarui.
+
+## Laporan
+
+Isi [`LAPORAN_DEVELOPER_2.md`](LAPORAN_DEVELOPER_2.md) dengan baseline, task, file, dependency baru (`qr_flutter`, `mobile_scanner`), bukti test, status device/browser, risiko.

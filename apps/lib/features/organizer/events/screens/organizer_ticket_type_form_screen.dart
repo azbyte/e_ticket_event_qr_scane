@@ -21,6 +21,7 @@ class OrganizerTicketTypeFormScreen extends StatefulWidget {
     required this.provider,
     required this.eventId,
     this.initial,
+    this.existingTypes = const <TicketTypeModel>[],
   });
 
   final EventProvider provider;
@@ -28,6 +29,9 @@ class OrganizerTicketTypeFormScreen extends StatefulWidget {
 
   /// Null berarti membuat kategori baru.
   final TicketTypeModel? initial;
+
+  /// Kategori tiket existing untuk validasi konsistensi free vs paid.
+  final List<TicketTypeModel> existingTypes;
 
   @override
   State<OrganizerTicketTypeFormScreen> createState() =>
@@ -182,6 +186,21 @@ class _OrganizerTicketTypeFormScreenState
     final parsed = double.tryParse(text);
     if (parsed == null) return 'Harga harus berupa angka.';
     if (parsed < 0) return 'Harga tidak boleh negatif.';
+    if (!_isEditing) {
+      final existingTypes = widget.existingTypes.isNotEmpty
+          ? widget.existingTypes
+          : widget.provider.ticketTypes;
+      if (existingTypes.isNotEmpty) {
+        final hasFree = existingTypes.any((t) => t.price == 0);
+        final hasPaid = existingTypes.any((t) => t.price > 0);
+        if (hasFree && parsed > 0) {
+          return 'Event gratis tidak boleh memiliki kategori tiket berbayar.';
+        }
+        if (hasPaid && parsed == 0) {
+          return 'Event berbayar tidak boleh memiliki kategori tiket gratis.';
+        }
+      }
+    }
     return null;
   }
 

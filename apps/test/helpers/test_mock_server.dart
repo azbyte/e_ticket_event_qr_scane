@@ -296,7 +296,13 @@ class TestMockServer {
     final orgRepo = MockOrganizerEventRepository.shared();
 
     // Routing
-    if (path == '/api/events/mine') {
+    if (path == '/api/events') {
+      final events = await orgRepo.listPlatformEvents();
+      return {
+        'success': true,
+        'events': events.map((e) => e.toJson()).toList(),
+      };
+    } else if (path == '/api/events/mine') {
       final events = await orgRepo.listEvents(ownerId: 'org-001');
       return {
         'success': true,

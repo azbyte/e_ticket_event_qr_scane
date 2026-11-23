@@ -1,17 +1,45 @@
-# Kepemilikan file — Tahap 2
+# TAHAP 2 — FILE OWNERSHIP
 
-Tabel **path preferensi ownership**, bukan gate izin dan bukan alasan berhenti. Kerjakan lebih dulu path milik sendiri; perubahan di luar assigned globs diperbolehkan bila benar-benar diperlukan untuk menyelesaikan task — lakukan perubahan minimum, jaga kontrak/perilaku yang ada, jangan merusak pekerjaan developer lain, dan dokumentasikan file/alasan/dampak pada laporan. Yang tetap terkunci absolut: schema/migration/SQL/seed/config database (wewenang FINISHING), secret/`.env`, dependency lockfile tanpa kebutuhan sah, dan operasi Git destruktif.
+Dokumen ini adalah ringkasan cepat. **Allow-list lengkap dan matriks koordinasi berada di [`INTEGRATION_CONTRACT.md`](INTEGRATION_CONTRACT.md) Bagian 2.** Bila terdapat perbedaan, `INTEGRATION_CONTRACT.md` yang berlaku.
 
-| Pemilik | Path boleh diubah |
+## Prinsip
+
+1. Satu file = satu owner per tahap.
+2. File shared diberi owner tunggal; developer lain mengirim **permintaan tertulis** (spesifikasi route/query/field) dan pemiliknya yang mengedit.
+3. Konflik tidak diselesaikan dengan merge manual paksa; selesaikan pada level kepemilikan.
+
+## Ringkasan owner
+
+| Area | Owner | Catatan |
+|---|---|---|
+| `apps/lib/app.dart`, `app_router.dart`, `routes/app_routes.dart` | **D1** | Semua route baru diajukan ke D1 |
+| `backend/src/app.js` | **D3** | Mount route baru sesuai daftar endpoint di kontrak |
+| Event domain (`eventController`, `eventRoutes`, `eventResponse`, `eventValidation`) | **D1** | Termasuk publish & `public_url` |
+| Order/payment guest (`orderController`, `paymentController`, `emailService`) | **D1** | Termasuk dynamic fields |
+| Ticketing & check-in (`ticketController`, `checkInController`, `ticketTokenService`, `ticketRoutes`, `checkInRoutes`) | **D2** | D3 meminta perubahan bagian attendee |
+| Invitation/membership (`eventInvitationController`, `invitationsRoutes`) | **D2** | URL undangan dipakai D1 |
+| Admin & platform (`adminController`, `planController`, `subscriptionController`, `revenueController`, `reportController`, `notificationController`, `eventMetricsController`, `utils/auditLog`) | **D3** | Termasuk audit & settings |
+| Flutter services admin & organizer operations | **D3** | |
+| Flutter services ticket/scanner/check-in/membership | **D2** | |
+| Flutter services order/payment/event/public_event | **D1** | |
+| `apps/pubspec.yaml` | **D2** | Dependency QR & kamera; permintaan lain diajukan ke D2 |
+| `backend/prisma/**`, `backend/supabase/**`, `PRD.md`, `task/TAHAP_1/**`, `task/archive/**` | **—** | Tidak boleh diubah siapa pun pada Tahap 2 |
+
+## Cek cepat konflik
+
+Sebelum mulai task, jalankan:
+
+```powershell
+git --no-pager diff --name-only origin/main...HEAD
+```
+
+Pastikan setiap file yang muncul ada pada allow-list developer tersebut.
+
+## Aturan eskalasi
+
+| Situasi | Tindakan |
 |---|---|
-| Developer 1 — staff invitation/membership | `backend/src/controllers/eventInvitationController.js`; `backend/src/controllers/organizerProfileController.js`; Flutter `apps/lib/features/organizer/membership/**`; `apps/lib/features/staff/**`; `apps/lib/features/organizer/screens/staff_management_screen.dart`; tests scoped to invitations/membership in `apps/test/features/organizer/shell/organizer_membership_test.dart` and `backend/test/invitation_*.test.js` |
-| Developer 2 — scanner/check-in and event summary consumer | `backend/src/controllers/checkInController.js`; `backend/src/services/ticketTokenService.js` only if no other owner modifies it in this stage; `apps/lib/features/scanner/**`; `apps/lib/features/check_in/**`; `apps/lib/features/organizer/operations/organizer_scanner_screen.dart`; tests `apps/test/features/organizer/operations/attendee_access_widget_test.dart`; `backend/test/checkin_*.test.js` |
-| Developer 3 — attendee list/export and admin/reporting | `backend/src/controllers/adminController.js`; `backend/src/controllers/eventMetricsController.js` (exclusive owner in Tahap 2: Admin moderation + event metrics); `backend/src/controllers/reportController.js`; `backend/src/controllers/notificationController.js`; `apps/lib/features/organizer/screens/attendee_list_screen.dart`; `apps/lib/features/admin/**`; `apps/lib/features/reports/**`; `apps/lib/features/notifications/**`; `backend/test/admin_*.test.js`, `backend/test/report_*.test.js` |
-| Developer 4 post-merge | `task/TAHAP_2/LAPORAN_DEVELOPER_4.md`; `backend/test/stage2_integration.test.js`; `apps/test/stage2_integration_test.dart` only |
-
-## Locked / prohibited
-`apps/lib/app_router.dart`, `app.dart`, `main.dart`, `routes/**`, global providers/services/models/core, API client; `backend/src/app.js`, `server.js`, all `src/routes/**`, global middleware/config, Prisma/migrations, package/pubspec/lock, shared response/serializers; all D1/D2/D3-owned file globs assigned to others; PRD and architecture docs. D1–D3 dilarang mengubah atau menjalankan perubahan DB/schema/migration/SQL/seed/config. Kebutuhan database hanya dilaporkan untuk FINISHING sesuai `../FINISHING_AUTHORITY.md`; Developer 4 tidak otomatis berwenang. `ticketTokenService.js` assignment is D2 exclusive despite being a shared security surface; no other developer may touch it. If source test path already owned/shared, request a new D4-specific test path instead of editing.
-
-`backend/src/controllers/eventMetricsController.js` adalah ownership tunggal Developer 3 pada Tahap 2 karena file ini memuat Admin moderation dan event metrics; D2 hanya memakai endpoint summary/sales baseline secara read-only. Developer 2 tidak boleh mengubah controller tersebut. Bila endpoint perlu diubah, lakukan perubahan minimum yang diperlukan (utamakan adapter pada path D3), jaga kompatibilitas kontrak, dan dokumentasikan file/alasan/dampak pada laporan; jangan membuat dua owner yang saling menimpa tanpa pencatatan.
-
-No other duplicate allow-globs between the three developers. Semantic dependencies (membership event scope → scan permission → attendee reporting) are handled by frozen API contract, not by waiting on implementation. If a current endpoint is insufficient, block/report rather than change a locked route.
+| Butuh perubahan file milik developer lain | Tulis spesifikasi di PR comment + laporan; tunggu owner; jangan edit sendiri |
+| Butuh perubahan DB | Catat di `../DB_CHANGE_PROPOSAL.md`; jangan ubah schema/migration |
+| Butuh dependency Flutter baru | Ajukan ke D2 (pemilik `pubspec.yaml`) dengan alasan & alternatif |
+| Butuh endpoint baru lintas domain | Daftarkan di `INTEGRATION_CONTRACT.md` §1.3 lebih dulu |

@@ -20,11 +20,16 @@ class FakeAdminAuthService extends AuthService {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  Widget createDashboardWidget(AuthProvider authProvider) {
+  Widget createDashboardWidget(
+    AuthProvider authProvider, {
+    Future<List<Map<String, dynamic>>> Function()? eventsLoader,
+  }) {
     return MaterialApp(
       home: ChangeNotifierProvider<AuthProvider>.value(
         value: authProvider,
-        child: const AdminDashboardScreen(),
+        child: AdminDashboardScreen(
+          eventsLoader: eventsLoader ?? _fixtureEvents,
+        ),
       ),
     );
   }
@@ -107,6 +112,27 @@ void main() {
         );
       },
     );
+
+    testWidgets(
+      'Kegagalan API menampilkan error dan tombol coba lagi, tanpa data mock',
+      (tester) async {
+        final authProvider = AuthProvider(FakeAdminAuthService());
+        await authProvider.restoreSession();
+
+        await tester.pumpWidget(
+          createDashboardWidget(
+            authProvider,
+            eventsLoader: () async => throw Exception('API tidak tersedia'),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Gagal memuat data event platform.'), findsOneWidget);
+        expect(find.text('Coba lagi'), findsOneWidget);
+        // Tidak ada fallback ke daftar event mock.
+        expect(find.text('Organizer Event Nusantara'), findsNothing);
+      },
+    );
   });
 }
 
@@ -119,4 +145,35 @@ String _formatCurrency(double amount) {
     parts.add(chars[index]);
   }
   return 'Rp ${parts.reversed.join()}';
+}
+
+/// Fixture payload berbentuk JSON API `GET /api/events` (bukan data mock
+/// repository), sehingga widget test tidak bergantung pada jaringan.
+Future<List<Map<String, dynamic>>> _fixtureEvents() async {
+  final now = DateTime.now();
+  return [
+    {
+      'id': 'evt-active',
+      'title': 'Event Berjalan',
+      'status': 'published',
+      'start_date_time':
+          now.subtract(const Duration(hours: 2)).toIso8601String(),
+      'end_date_time': now.add(const Duration(hours: 4)).toIso8601String(),
+    },
+    {
+      'id': 'evt-upcoming',
+      'title': 'Event Mendatang',
+      'status': 'published',
+      'start_date_time':
+          now.add(const Duration(days: 3)).toIso8601String(),
+      'end_date_time': now.add(const Duration(days: 3, hours: 6)).toIso8601String(),
+    },
+    {
+      'id': 'evt-draft',
+      'title': 'Event Draft',
+      'status': 'draft',
+      'start_date_time': null,
+      'end_date_time': null,
+    },
+  ];
 }
