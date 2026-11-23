@@ -1,5 +1,6 @@
-﻿const asyncHandler = require('express-async-handler');
+const asyncHandler = require('express-async-handler');
 const { query, getOne, pool } = require('../config/db');
+const { writeAuditLog } = require('../utils/auditLog');
 
 const PLAN_STATUSES = new Set(['ACTIVE', 'INACTIVE', 'ARCHIVED']);
 
@@ -151,6 +152,14 @@ const createPlan = asyncHandler(async (req, res) => {
     const planId = inserted.rows[0].id;
     await syncFeatures(client, planId, req.body.features);
     await client.query('COMMIT');
+    await writeAuditLog({
+      actor: req.user,
+      action: 'CREATE_PACKAGE',
+      entityType: 'PACKAGE',
+      entityId: planId,
+      details: `Package created: ${req.body.name}`,
+      metadata: { planId, name: req.body.name },
+    });
     const features = await loadFeaturesByPlan([planId]);
     res.status(201).json({
       success: true,
@@ -218,6 +227,14 @@ const updatePlan = asyncHandler(async (req, res) => {
       await syncFeatures(client, existing.id, req.body.features);
     }
     await client.query('COMMIT');
+    await writeAuditLog({
+      actor: req.user,
+      action: 'UPDATE_PACKAGE',
+      entityType: 'PACKAGE',
+      entityId: existing.id,
+      details: `Package updated: ${existing.name}`,
+      metadata: { planId: existing.id, updates: req.body },
+    });
   } catch (error) {
     try { await client.query('ROLLBACK'); } catch (_) { /* sudah berakhir */ }
     throw error;

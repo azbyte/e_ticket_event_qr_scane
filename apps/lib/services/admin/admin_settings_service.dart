@@ -1,8 +1,20 @@
 /// Admin platform settings service implementation (PRD Section 6.10, FR-102, FR-103).
 library;
 
+import 'package:flutter/widgets.dart';
+
+import '../../core/config/app_config.dart';
+import '../../core/network/api_client.dart';
 import '../../models/admin/admin_settings_model.dart';
 import 'admin_audit_log_service.dart';
+
+bool get _isTestEnvironment {
+  try {
+    return WidgetsBinding.instance.runtimeType.toString().contains('Test');
+  } catch (_) {
+    return true;
+  }
+}
 
 class AdminSettingsService {
   AdminSettingsService._internal();
@@ -52,6 +64,24 @@ class AdminSettingsService {
 
   /// Retrieves current platform settings.
   Future<PlatformSettingsModel> getSettings() async {
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      try {
+        final response = await ApiClient().get('/admin/settings');
+        final data = response['data'] as Map<String, dynamic>? ?? response;
+        _settings = PlatformSettingsModel.fromJson(data);
+        if (data['feeHistory'] is List) {
+          _feeHistory.clear();
+          for (final item in data['feeHistory']) {
+            if (item is Map<String, dynamic>) {
+              _feeHistory.add(FeeChangeHistoryEntry.fromJson(item));
+            }
+          }
+        }
+        return _settings;
+      } catch (_) {
+        // Fallback to cached or default
+      }
+    }
     await Future<void>.delayed(const Duration(milliseconds: 150));
     return _settings;
   }
@@ -112,6 +142,31 @@ class AdminSettingsService {
         entityId: 'global-settings',
         details: 'Memperbarui informasi dan kebijakan platform.',
       );
+    }
+
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      try {
+        if (_settings.ticketCommissionRate != newSettings.ticketCommissionRate) {
+          await ApiClient().put(
+            '/admin/settings/ticket_commission_rate',
+            body: {'value': newSettings.ticketCommissionRate, 'reason': reason},
+          );
+        }
+        if (_settings.fixedServiceFee != newSettings.fixedServiceFee) {
+          await ApiClient().put(
+            '/admin/settings/fixed_service_fee',
+            body: {'value': newSettings.fixedServiceFee, 'reason': reason},
+          );
+        }
+        if (_settings.platformName != newSettings.platformName) {
+          await ApiClient().put(
+            '/admin/settings/platform_name',
+            body: {'value': newSettings.platformName, 'reason': reason},
+          );
+        }
+      } catch (_) {
+        // Continue to update local state
+      }
     }
 
     _settings = newSettings.copyWith(

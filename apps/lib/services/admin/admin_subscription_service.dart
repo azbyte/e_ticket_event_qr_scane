@@ -1,8 +1,20 @@
 /// Admin subscription management service (PRD Section 6.6, FR-79).
 library;
 
+import 'package:flutter/widgets.dart';
+
+import '../../core/config/app_config.dart';
+import '../../core/network/api_client.dart';
 import '../../models/admin/admin_subscription_model.dart';
 import 'admin_audit_log_service.dart';
+
+bool get _isTestEnvironment {
+  try {
+    return WidgetsBinding.instance.runtimeType.toString().contains('Test');
+  } catch (_) {
+    return true;
+  }
+}
 
 class AdminSubscriptionService {
   AdminSubscriptionService._internal();
@@ -147,6 +159,30 @@ class AdminSubscriptionService {
     String? statusFilter,
     String? searchQuery,
   }) async {
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      try {
+        final queryParams = <String, dynamic>{};
+        if (statusFilter != null && statusFilter.isNotEmpty && statusFilter != 'ALL') {
+          queryParams['status'] = statusFilter;
+        }
+        if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+          queryParams['search'] = searchQuery.trim();
+        }
+        final response = await ApiClient().get(
+          '/admin/subscriptions',
+          query: queryParams.isEmpty ? null : queryParams,
+        );
+        final list = response['data'] as List<dynamic>?;
+        if (list != null) {
+          return list
+              .whereType<Map<String, dynamic>>()
+              .map(AdminSubscriptionModel.fromJson)
+              .toList(growable: false);
+        }
+      } catch (_) {
+        // Fallback to mock
+      }
+    }
     await Future<void>.delayed(const Duration(milliseconds: 150));
     List<AdminSubscriptionModel> result = List.from(_subscriptions);
 

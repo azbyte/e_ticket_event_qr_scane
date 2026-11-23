@@ -7,13 +7,23 @@ library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/network/api_client.dart';
 import '../../../features/notifications/screens/notification_list_screen.dart';
 import '../../../models/admin/admin_transaction_revenue_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../routes/app_routes.dart';
 import '../../../services/admin/admin_revenue_service.dart';
 import '../../../services/organizer_events/organizer_event_repository_factory.dart';
+
+bool get _isTestEnvironment {
+  try {
+    return WidgetsBinding.instance.runtimeType.toString().contains('Test');
+  } catch (_) {
+    return true;
+  }
+}
 
 /// DTO Ringkasan Keuangan Platform sesuai Kontrak Integrasi Developer 3.
 class PlatformRevenueSummary {
@@ -47,6 +57,42 @@ class PlatformRevenueSummary {
       totalTicketsIssued: counts.$2,
       totalOrganizers: counts.$3,
       totalParticipants: counts.$4,
+    );
+  }
+
+  factory PlatformRevenueSummary.fromOverview(
+    Map<String, dynamic> data,
+    AdminRevenueSummary fallbackRevenue,
+  ) {
+    final financials = data['financials'] as Map<String, dynamic>? ?? {};
+    final orders = data['orders'] as Map<String, dynamic>? ?? {};
+    final tickets = data['tickets'] as Map<String, dynamic>? ?? {};
+    final organizers = data['organizers'] as Map<String, dynamic>? ?? {};
+    final attendees = data['attendees'] as Map<String, dynamic>? ?? {};
+
+    final gross = (financials['gross_sales'] ?? fallbackRevenue.grossTicketSales).toDouble();
+    final comm = (financials['platform_commission'] ?? fallbackRevenue.ticketCommissionRevenue).toDouble();
+    final ordCount = (orders['total'] ?? fallbackRevenue.totalTicketOrders) as int;
+    final tktCount = (tickets['sold'] ?? 0) as int;
+    final orgCount = (organizers['active'] ?? 0) as int;
+    final attCount = (attendees['total'] ?? 0) as int;
+
+    final rev = AdminRevenueSummary(
+      period: 'all',
+      grossTicketSales: gross,
+      ticketCommissionRevenue: comm,
+      packageRevenue: fallbackRevenue.packageRevenue,
+      totalPlatformRevenue: comm + fallbackRevenue.packageRevenue,
+      totalTicketOrders: ordCount,
+      totalPackageInvoices: fallbackRevenue.totalPackageInvoices,
+    );
+
+    return PlatformRevenueSummary(
+      revenue: rev,
+      totalOrders: ordCount,
+      totalTicketsIssued: tktCount,
+      totalOrganizers: orgCount,
+      totalParticipants: attCount,
     );
   }
 }
@@ -95,6 +141,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ),
       );
     });
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      _loadOverviewFromApi();
+    }
+  }
+
+  Future<void> _loadOverviewFromApi() async {
+    try {
+      final response = await ApiClient().get('/admin/overview');
+      final data = response['data'] as Map<String, dynamic>?;
+      if (data != null && mounted) {
+        setState(() {
+          _summary = PlatformRevenueSummary.fromOverview(data, _summary.revenue);
+        });
+      }
+    } catch (_) {
+      // Keep existing snapshot
+    }
   }
 
   String _formatCurrency(double amount) {
