@@ -5,8 +5,13 @@ import 'package:e_ticket_event_qr_scane/models/report/support_report_model.dart'
 import 'package:e_ticket_event_qr_scane/providers/report_provider.dart';
 import 'package:e_ticket_event_qr_scane/services/report/report_service.dart';
 
+import '../../../helpers/test_mock_server.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    await TestMockServer.start();
+  });
 
   group('ReportService & ReportProvider Tests (FR-94 s.d. FR-101)', () {
     late ReportService service;
@@ -14,6 +19,7 @@ void main() {
 
     setUp(() {
       ReportService.resetMockData();
+      TestMockServer.resetReports();
       service = ReportService();
       provider = ReportProvider(reportService: service);
     });

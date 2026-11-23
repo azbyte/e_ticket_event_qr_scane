@@ -4,7 +4,19 @@
 
 - `backend/prisma/schema.prisma` adalah rancangan Prisma 6.19 untuk PostgreSQL
   Supabase (32 model/tabel target), dengan seluruh objek aplikasi berada di
-  schema `public`.
+  schema `public`; ini sumber kebenaran schema yang ditetapkan repository.
+- Migration Prisma yang dimiliki set schema tersebut berada di
+  `backend/prisma/migrations/`. File `backend/supabase/migrations/` adalah SQL
+  legacy yang dipertahankan untuk fungsi/riwayat tertentu; bukan baseline Prisma
+  paralel. Jangan menyimpulkan migration itu tidak diperlukan hanya karena Prisma
+  menjadi schema authority, dan jangan menjalankan/menghapusnya tanpa
+  rekonsiliasi fungsi/status serta persetujuan tertulis FINISHING.
+- Developer 1–3 tidak memiliki otoritas mengubah schema, migration, SQL, seed,
+  konfigurasi DB atau menjalankan perintah mutasi DB. Kebutuhan perubahan
+  diajukan sebagai proposal. Hanya penanggung jawab FINISHING yang ditetapkan
+  setelah gate FINISHING dibuka boleh mengimplementasikan perubahan yang
+  disetujui; Developer 4 tidak otomatis berwenang. Prosedur ada di
+  `../task/FINISHING_AUTHORITY.md`.
 - Backend tidak memakai Prisma Client maupun Supabase JS untuk query runtime;
   API Express memakai koneksi PostgreSQL langsung (`pg`) melalui
   `src/config/db.js`. Modul `src/config/supabase.js` hanya alias kompatibilitas
@@ -24,8 +36,9 @@
     `-- This is an empty migration.` (tidak ada drift struktur).
   - Function `moderate_event`, `create_event_order`, `simulate_event_payment`,
     dan `expire_event_order_reservations` tersedia di schema `public`.
-  - Migration SQL lama di `supabase/migrations/` tetap bukan pengganti baseline
-    Prisma dan tidak dijalankan pada database target.
+  - SQL legacy di `supabase/migrations/` bukan pengganti baseline Prisma.
+    Riwayat/fungsi SQL legacy harus direkonsiliasi sebelum operator memutuskan
+    apakah/di mana ia dijalankan; jangan menyatakan semuanya tidak diperlukan.
 - Kredensial DB dan `JWT_SECRET` telah dikonfirmasi dirotasi. Jangan menyalin
   nilainya ke log, issue, atau dokumentasi. RLS/grants belum aman: **0/32 tabel
   mengaktifkan RLS, 0 policy**, tetapi role `anon` dan `authenticated` memiliki 7
@@ -45,10 +58,14 @@
   periode/kuota tiket, hold kuota, pembuatan order/peserta individual per
   tiket/pembayaran, pelepasan hold yang kedaluwarsa, dan penerbitan tiket saat
   pembayaran simulasi sukses.
-  Backend menghitung biaya layanan Rp5.000 per order berbayar dan komisi 5%
-  dari subtotal sebagai snapshot; frontend tidak mengirim harga. Token akses
-  order guest dikirim satu kali, disimpan di secure storage Flutter, dan
-  dikirim kembali melalui header `X-Order-Access-Token` (bukan URL/log request).
+   Kondisi implementasi yang tercatat: backend menghitung biaya layanan Rp5.000
+   per order berbayar dan komisi 5% dari subtotal sebagai snapshot; frontend
+   tidak mengirim harga. Ini **fakta implementasi**, bukan keputusan formula
+   produk; formula/pihak penanggung masih OPEN pada PRD C-01. Token akses order
+   guest dikirim satu kali, disimpan di secure storage Flutter, dan dikirim
+   kembali melalui header `X-Order-Access-Token` (bukan URL/log request). Ini
+   juga tidak menetapkan bahwa guest token mengotorisasi simulasi payment; C-02
+   tetap OPEN.
 - Pembayaran VA di sini tetap simulasi, bukan gateway/bank. Endpoint simulasi
   dinonaktifkan kecuali `SIMULATED_PAYMENTS_ENABLED=true` dikonfigurasi untuk
   lingkungan pengujian/non-produksi. Tidak ada pembayaran sungguhan yang

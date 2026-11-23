@@ -1,14 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:e_ticket_event_qr_scane/features/organizer/shell/access_denied_screen.dart';
+import 'package:e_ticket_event_qr_scane/services/organizer_events/mock_organizer_event_repository.dart';
 import 'package:e_ticket_event_qr_scane/services/organizer_shell/organizer_shell_service.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  const secureStorageChannel = MethodChannel(
+    'plugins.it_nomads.com/flutter_secure_storage',
+  );
+  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+      .setMockMethodCallHandler(secureStorageChannel, (call) async => null);
+
   group('OrganizerShellService & Metrics (FR-66, FR-70)', () {
     late OrganizerShellService shellService;
 
     setUp(() {
-      shellService = OrganizerShellService.instance;
+      shellService = OrganizerShellService.forRepository(
+        MockOrganizerEventRepository.shared(),
+      );
     });
 
     test('Organizer metrics only displays gross sales and strictly excludes platform commission', () async {

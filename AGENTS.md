@@ -1,10 +1,25 @@
 # Panduan AI dan developer — E-Ticket Event & QR Scanner
 
 Gunakan Bahasa Indonesia untuk komunikasi dan dokumentasi kecuali nama teknis.
-Jika melanjutkan checkpoint T03, mulai dengan [`task/HANDOVER_AI_T03.md`](task/HANDOVER_AI_T03.md),
-kemudian baca dokumen lain yang dirujuk hanya jika diperlukan. Jangan membaca
-seluruh `task/archive/` atau `archive/` secara default.
-Sebelum mengubah kode, baca `README.md`, `prd.md`, dan bagian arsitektur yang
+Entry point workflow developer adalah [`task/PEMBAGIAN_TUGAS_FINAL.md`](task/PEMBAGIAN_TUGAS_FINAL.md).
+
+**Perintah tugas dari pemilik proyek adalah otorisasi implementasi.** Untuk
+permintaan berbentuk “Kerjakan Developer N Tahap M”, “Lanjutkan tugas Developer N”,
+atau “Perbaiki bug tahap sebelumnya”, jalankan *Autonomous Execution Protocol* pada
+controller tersebut: identifikasi task, baca konteks seperlunya, ambil keputusan
+teknis sendiri, implementasikan, uji, perbaiki error, audit, lalu laporkan. Jangan
+meminta approval teknis/kedua, jangan menanyakan lokasi test atau pendekatan
+implementasi, dan jangan berhenti setelah menghasilkan analisis/audit/GAP report.
+Baca hanya task, ownership, integration contract, laporan sebelumnya dan source
+relevan; jangan membaca seluruh repository atau `task/archive/` / `archive/` secara
+default. Mode read-only hanya berlaku bila pemilik proyek secara eksplisit meminta
+audit/review/investigasi tanpa perubahan. Handover T03 lama dipindahkan ke
+`task/archive/HANDOVER_AI_T03.md` dan hanya untuk sejarah, bukan entry point.
+
+**Pengecualian: Developer 1 Tahap 1 berstatus FROZEN.** Task, status, approval,
+laporan, dan Amendment A-1 miliknya dipertahankan apa adanya; jangan mengerjakan
+ulang atau mengubahnya ketika menjalankan tugas developer/tahap lain.
+Sebelum mengubah kode, baca `README.md`, `PRD.md`, dan bagian arsitektur yang
 terdampak di `docs/ARCHITECTURE.md`. Untuk aturan khusus gunakan skills di
 `.agents/skills/` (lihat `SKILL.md` sebagai katalog). Jangan menganggap prototipe
 atau dummy sebagai jaminan keamanan maupun perilaku backend.
@@ -17,9 +32,12 @@ atau dummy sebagai jaminan keamanan maupun perilaku backend.
   `models`, `providers`, `services`.
 - Backend: JavaScript CommonJS, Node.js, Express 4 di `backend/`; controller,
   routes, middleware, services, models dan validators di `backend/src/`.
-- Persistence/auth: Supabase/PostgreSQL, JWT dan role. SQL migration aktual
-  berada di `backend/supabase/migrations/`. Ikuti implementasi dan migration,
-  jangan mengandalkan schema lama di README backend.
+- Persistence/auth: PostgreSQL/Supabase, JWT dan role. Sumber schema dan riwayat
+  migration aktif yang ditetapkan adalah `backend/prisma/schema.prisma` dan
+  `backend/prisma/migrations/`. `backend/supabase/migrations/` berisi SQL legacy
+  yang masih dipertahankan untuk fungsi/riwayat tertentu; jangan menjalankannya
+  atau menghapusnya sebagai baseline Prisma tanpa rekonsiliasi dan persetujuan
+  penanggung jawab FINISHING. Backend runtime memakai `pg`, bukan Prisma Client.
 - Flutter memakai API backend secara default; mode demo harus diaktifkan secara
   eksplisit dengan `MOCK_MODE=true`. Integrasi seluruh modul belum selesai dan
   backend membutuhkan environment variables.
@@ -50,19 +68,34 @@ berlaku untuk pekerjaan backend sesuai cakupannya:
 Skill tidak perlu dijalankan semuanya untuk setiap perubahan. Ikuti prasyarat
 dan pemeriksaan yang dinyatakan oleh skill terpilih.
 
-Requirement sumber adalah `prd.md` serta migration/source aktual; PRD UI prototype
-memiliki batas cakupan tersendiri. Jika permintaan menyentuh backend, cek konteks
-dan mandat terkini—jangan menganggap roadmap PRD sebagai approval otomatis.
+Requirement produk aktif adalah `PRD.md`; implementation/source dan schema
+menunjukkan kondisi teknis, bukan pengganti keputusan produk. PRD mencatat
+keputusan yang perlu konfirmasi dan gap; jangan menganggap roadmap sebagai
+approval otomatis. OPEN DECISION tidak menghentikan pekerjaan teknis: pilih
+interpretasi paling aman dan konsisten PRD, implementasikan, lalu catat sebagai
+asumsi yang perlu konfirmasi pada laporan.
 
 ## Batas perubahan
 
 - Jangan mengubah flow bisnis, skema/database, API, role, atau dependensi runtime
   sebagai bagian pekerjaan tooling tanpa alasan/mandat eksplisit.
+- Developer 1–3 dilarang mengubah schema, migration, struktur/relasi tabel,
+  konfigurasi/seed database, atau SQL langsung. Kebutuhan perubahan dilaporkan
+  sebagai proposal untuk FINISHING. Hanya penanggung jawab FINISHING yang telah
+  ditetapkan dan setelah gate FINISHING dibuka boleh mengimplementasikan DB;
+  Developer 4 tidak otomatis berwenang. Rincian di `task/FINISHING_AUTHORITY.md`.
+  Batas ini **tidak menghentikan task**: selesaikan seluruh bagian yang tidak
+  memerlukan DB, catat proposalnya, dan lanjutkan.
 - Jangan pernah menaruh secret, `.env`, service role key, atau token ke kode,
   fixture, log, dokumentasi, maupun aplikasi Flutter.
 - Validasi authorization di backend; menyembunyikan kontrol UI bukan keamanan.
 - Pertahankan pola dan library yang telah digunakan. Hindari duplikasi
   service/helper serta dependency baru untuk fungsi yang sudah ada.
+- Perubahan di luar allow-list/file developer lain diperbolehkan bila benar-benar
+  diperlukan untuk menyelesaikan tugas: lakukan perubahan **minimum**, jaga bentuk
+  response/kontrak yang ada, jangan merusak pekerjaan developer lain, dan
+  dokumentasikan file/alasan/dampak pada laporan. Jangan berhenti hanya karena
+  file berada di area yang sebelumnya dikerjakan developer lain.
 - Perubahan Flutter harus menjaga loading/error/empty state, navigasi, aksesibilitas,
   layout sempit/lebar dan gaya visual yang telah ada. Periksa widget test.
 - Perubahan backend harus menjaga bentuk response dan middleware error yang ada;
@@ -82,7 +115,10 @@ dan mandat terkini—jangan menganggap roadmap PRD sebagai approval otomatis.
    keduanya.
 4. Tinjau diff dan catat PASS/FAIL/BLOCKED/NOT RUN. Bedakan analisis statis,
    unit/widget test, integrasi Supabase/API dan validasi UI/perangkat.
-5. Perbarui dokumentasi bila fakta atau cara kerja berubah. Jangan mengklaim
+5. Bila pemeriksaan gagal, analisis akar masalahnya, perbaiki sendiri, dan jalankan
+   ulang sampai selesai; jangan mengembalikan error yang masih dapat diperbaiki
+   kepada pemilik proyek.
+6. Perbarui dokumentasi bila fakta atau cara kerja berubah. Jangan mengklaim
    provider eksternal, deployment, aksesibilitas penuh, atau keamanan penuh telah diuji.
 
 ## Keamanan dan data
