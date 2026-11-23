@@ -42,6 +42,7 @@ class _EventListScreenState extends State<EventListScreen> {
   }
 
   void _onSearchChanged(String value) {
+    _provider.setSearchQuery(value);
     _provider.loadEvents();
   }
 
@@ -148,7 +149,49 @@ class _EventListScreenState extends State<EventListScreen> {
                 ),
 
                 // Main Content States
-                if (events.isEmpty)
+                if (_provider.isLoading)
+                  const SliverFillRemaining(
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 16),
+                          Text('Memuat daftar event...'),
+                        ],
+                      ),
+                    ),
+                  )
+                else if (_provider.hasError || _provider.error != null)
+                  SliverFillRemaining(
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.error_outline,
+                              size: 64,
+                              color: Colors.redAccent,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              _provider.error ?? 'Gagal memuat daftar event.',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 15),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _provider.loadEvents,
+                              child: const Text('Coba Lagi'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                else if (events.isEmpty)
                   SliverFillRemaining(
                     child: Center(
                       child: Column(

@@ -132,20 +132,21 @@ const getMyEvents = asyncHandler(async (req, res) => {
   const events = rows.map((r) => serializeEvent(attachCategory(r)));
   res.json({ success: true, count: events.length, events });
 });
-const createEvent = asyncHandler(async (req, res) => {
-  const { title, description, date, event_date, start_date_time } = req.body;
+const validateEventInput = (body) => {
+  if (!body || typeof body !== 'object') return false;
+  const { title, date, event_date, start_date_time } = body;
   const eventDate = event_date || start_date_time || date;
   const normalizedTitle = String(title || '').trim();
-  const eventFormat = String(req.body.event_format || req.body.event_type || 'OFFLINE').toUpperCase();
+  const eventFormat = String(body.event_format || body.event_type || 'OFFLINE').toUpperCase();
   const validFormats = ['OFFLINE', 'ONLINE', 'HYBRID'];
   const parsedStart = Date.parse(eventDate || '');
-  const parsedEnd = Date.parse(req.body.end_date_time || '');
-  const location = String(req.body.location || '').trim();
-  const onlineUrl = String(req.body.online_url || '').trim();
-  const organizerName = String(req.body.organizer_name || '').trim();
-  const contactInfo = String(req.body.contact_info || '').trim();
+  const parsedEnd = Date.parse(body.end_date_time || '');
+  const location = String(body.location || '').trim();
+  const onlineUrl = String(body.online_url || '').trim();
+  const organizerName = String(body.organizer_name || '').trim();
+  const contactInfo = String(body.contact_info || '').trim();
   const validOnlineUrl = /^https?:\/\/\S+$/i.test(onlineUrl);
-  const attendeeFields = req.body.attendee_fields;
+  const attendeeFields = body.attendee_fields;
 
   if (normalizedTitle.length < 3 || !Number.isFinite(parsedStart) || !Number.isFinite(parsedEnd) ||
       parsedEnd <= parsedStart || !validFormats.includes(eventFormat) || !organizerName || !contactInfo ||
@@ -154,6 +155,23 @@ const createEvent = asyncHandler(async (req, res) => {
       !Array.isArray(attendeeFields) || attendeeFields.length === 0 ||
       !attendeeFields.includes('name') ||
       attendeeFields.some((field) => !['name', 'email', 'phone', 'organization'].includes(field))) {
+    return false;
+  }
+  return true;
+};
+
+const createEvent = asyncHandler(async (req, res) => {
+  const { title, description, date, event_date, start_date_time } = req.body;
+  const eventDate = event_date || start_date_time || date;
+  const normalizedTitle = String(title || '').trim();
+  const eventFormat = String(req.body.event_format || req.body.event_type || 'OFFLINE').toUpperCase();
+  const location = String(req.body.location || '').trim();
+  const onlineUrl = String(req.body.online_url || '').trim();
+  const organizerName = String(req.body.organizer_name || '').trim();
+  const contactInfo = String(req.body.contact_info || '').trim();
+  const attendeeFields = req.body.attendee_fields;
+
+  if (!validateEventInput(req.body)) {
     res.status(400);
     throw new Error('Provide a valid title, date, event format, and date range');
   }
@@ -507,4 +525,9 @@ module.exports = {
   addEventMember,
   updateEventMemberPermissions,
   removeEventMember,
+  validateEventInput,
+  normalizePermissions,
+  EDITABLE_EVENT_STATUSES,
+  EVENT_PERMISSION_CODES,
+  getEventForOwner,
 };
