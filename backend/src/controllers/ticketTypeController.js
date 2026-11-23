@@ -5,10 +5,75 @@ const EDITABLE_EVENT_STATUSES = [
   'DRAFT',
 ];
 
-const toTicketTypeDto = (row) => ({
-  ...row,
-  price: Number(row.price),
-});
+const toTicketTypeDto = (row) => {
+  const sold = Number(row.sold) || 0;
+  const held = Number(row.held) || 0;
+  const quota = Number(row.quota) || 0;
+  const remainingQuota = Math.max(0, quota - sold - held);
+  const now = Date.now();
+  const start = row.sales_start ? Date.parse(row.sales_start) : null;
+  const end = row.sales_end ? Date.parse(row.sales_end) : null;
+  const isOutOfWindow = (start !== null && now < start) || (end !== null && now > end);
+  const isSoldOut = remainingQuota <= 0;
+  const isAvailable = Boolean(row.is_active !== false && !isOutOfWindow && !isSoldOut);
+
+  return {
+    ...row,
+    price: Number(row.price),
+    sold,
+    held,
+    quota,
+    remaining_quota: remainingQuota,
+    is_sold_out: isSoldOut,
+    is_available: isAvailable,
+  };
+};
+
+const validateTicketTypeAvailability = (ticketType, at = new Date()) => {
+  const errors = [];
+  if (!ticketType) {
+    errors.push('Ticket type is required');
+    return errors;
+  }
+  if (ticketType.is_active === false) {
+    errors.push('Ticket category is inactive');
+  }
+  const sold = Number(ticketType.sold) || 0;
+  const held = Number(ticketType.held) || 0;
+  const quota = Number(ticketType.quota) || 0;
+  const remaining = quota - sold - held;
+  if (quota <= 0 || remaining <= 0) {
+    errors.push('Ticket category is sold out');
+  }
+  const currentTime = at instanceof Date ? at.getTime() : (Number(at) || Date.parse(at));
+  if (ticketType.sales_start) {
+    const start = Date.parse(ticketType.sales_start);
+    if (Number.isFinite(start) && currentTime < start) {
+      errors.push('Ticket sales have not started yet');
+    }
+  }
+  if (ticketType.sales_end) {
+    const end = Date.parse(ticketType.sales_end);
+    if (Number.isFinite(end) && currentTime > end) {
+      errors.push('Ticket sales have already ended');
+    }
+  }
+  return errors;
+};
+
+const validateTicketTypePricing = (existingTypes, newPrice) => {
+  if (!Array.isArray(existingTypes) || existingTypes.length === 0) return null;
+  const isEventFree = existingTypes.some((t) => Number(t.price) === 0);
+  const isEventPaid = existingTypes.some((t) => Number(t.price) > 0);
+  const priceNum = Number(newPrice);
+  if (isEventFree && priceNum > 0) {
+    return 'Event gratis tidak boleh memiliki kategori tiket berbayar';
+  }
+  if (isEventPaid && priceNum === 0) {
+    return 'Event berbayar tidak boleh memiliki kategori tiket gratis';
+  }
+  return null;
+};
 
 const getEvent = async (eventId) => {
   const event = await getOne(
@@ -153,6 +218,15 @@ const createTicketType = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error(errors.join('; '));
   }
+  const existingTypes = await query(
+    'SELECT id, price FROM ticket_types WHERE event_id = $1',
+    [req.params.eventId]
+  );
+  const pricingError = validateTicketTypePricing(existingTypes, req.body.price);
+  if (pricingError) {
+    res.status(400);
+    throw new Error(pricingError);
+  }
   const row = await getOne(
     `INSERT INTO ticket_types (id, event_id, name, description, price, quota, max_per_order, sales_start, sales_end, is_active, created_at, updated_at)
      VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
@@ -263,4 +337,7 @@ module.exports = {
   validateDraft,
   validateTicketTypeUpdate,
   buildTicketTypeUpdate,
+  toTicketTypeDto,
+  validateTicketTypeAvailability,
+  validateTicketTypePricing,
 };

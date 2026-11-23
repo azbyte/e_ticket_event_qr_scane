@@ -263,6 +263,7 @@ Future<void> _openTicketForm(
         provider: _provider,
         eventId: event.id,
         initial: existing,
+        existingTypes: _provider.ticketTypes,
       ),
     ),
   );
