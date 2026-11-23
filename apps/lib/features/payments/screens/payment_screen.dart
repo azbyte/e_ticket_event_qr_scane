@@ -144,8 +144,39 @@ class _PaymentScreenState extends State<PaymentScreen> {
           }
 
           final isPaid = payment.status == AppConstants.paymentStatusPaid;
+          final isPending =
+              payment.status == AppConstants.paymentStatusPending;
+          final isFailed = payment.status == AppConstants.paymentStatusFailed;
+          final isExpired = payment.status == AppConstants.paymentStatusExpired;
+          final isCancelled =
+              payment.status == AppConstants.paymentStatusCancelled;
           final vaNumber = payment.virtualAccountNumber;
           final bankName = payment.vaBank ?? 'VA Simulasi';
+          final statusTitle = isPaid
+              ? 'Pembayaran Berhasil'
+              : isPending
+              ? 'Menunggu Pembayaran'
+              : isExpired
+              ? 'Pembayaran Kedaluwarsa'
+              : isCancelled
+              ? 'Pembayaran Dibatalkan'
+              : 'Pembayaran Gagal';
+          final statusDescription = isPaid
+              ? 'Tiket Anda telah diterbitkan.'
+              : isPending
+              ? 'Batas waktu: ${app_date.DateUtils.formatDateTime(payment.expiredAt ?? DateTime.now().add(const Duration(hours: 24)))}'
+              : isExpired
+              ? 'Batas waktu pembayaran sudah lewat. Silakan buat pesanan baru '
+                    'dari halaman event.'
+              : isCancelled
+              ? 'Pembayaran untuk pesanan ini dibatalkan.'
+              : 'Simulasi pembayaran gagal. Anda dapat mencoba lagi selama '
+                    'pesanan belum kedaluwarsa.';
+          final statusColor = isPaid
+              ? Colors.green
+              : isPending
+              ? Colors.amber.shade800
+              : Colors.red.shade700;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
@@ -157,19 +188,21 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: isPaid ? Colors.green.shade50 : Colors.amber.shade50,
+                    color: statusColor.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isPaid
-                          ? Colors.green.shade200
-                          : Colors.amber.shade300,
+                      color: statusColor.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Row(
                     children: [
                       Icon(
-                        isPaid ? Icons.check_circle : Icons.access_time_filled,
-                        color: isPaid ? Colors.green : Colors.amber.shade800,
+                        isPaid
+                            ? Icons.check_circle
+                            : isPending
+                            ? Icons.access_time_filled
+                            : Icons.error_outline,
+                        color: statusColor,
                         size: 32,
                       ),
                       const SizedBox(width: 14),
@@ -178,27 +211,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              isPaid
-                                  ? 'Pembayaran Berhasil'
-                                  : 'Menunggu Pembayaran',
+                              statusTitle,
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
-                                color: isPaid
-                                    ? Colors.green.shade900
-                                    : Colors.amber.shade900,
+                                color: statusColor,
                               ),
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              isPaid
-                                  ? 'Tiket Anda telah diterbitkan.'
-                                  : 'Batas waktu: ${app_date.DateUtils.formatDateTime(payment.expiredAt ?? DateTime.now().add(const Duration(hours: 24)))}',
+                              statusDescription,
                               style: TextStyle(
                                 fontSize: 12,
-                                color: isPaid
-                                    ? Colors.green.shade700
-                                    : Colors.amber.shade900,
+                                color: statusColor,
                               ),
                             ),
                           ],
@@ -209,8 +234,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Virtual Account Card
-                if (vaNumber != null) ...[
+                // Virtual Account Card (hanya relevan saat masih pending)
+                if (isPending && vaNumber != null) ...[
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
@@ -400,7 +425,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 const SizedBox(height: 32),
 
                 // Simulation Buttons
-                if (!isPaid) ...[
+                if (isPending) ...[
                   SizedBox(
                     width: double.infinity,
                     height: 52,
@@ -440,7 +465,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       ),
                     ),
                   ),
-                ] else ...[
+                ] else if (isPaid) ...[
                   SizedBox(
                     width: double.infinity,
                     height: 52,
@@ -463,6 +488,29 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
+                    ),
+                  ),
+                ] else ...[
+                  // Status FAILED / EXPIRED / CANCELLED: tidak ada VA aktif.
+                  if (isFailed) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        key: const Key('payment-retry-button'),
+                        onPressed: () => _handleSimulation(success: true),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Coba Simulasi Pembayaran Lagi'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      child: const Text('Tutup'),
                     ),
                   ),
                 ],

@@ -5,6 +5,7 @@
 /// ringkasan bersifat lokal dan hanya untuk prototipe UI (PRD bagian 15 & 18).
 library;
 
+import '../../core/config/app_config.dart';
 import '../../core/constants/app_constants.dart';
 import '../../models/event/event_model.dart';
 import '../../models/event/ticket_type_model.dart';
@@ -488,12 +489,17 @@ extension OrganizerEventModelExtension on EventModel {
       eventType == OrganizerEventFormat.offline ||
       eventType == OrganizerEventFormat.hybrid;
 
-  /// Tautan registrasi yang dapat disalin.
+  /// Tautan registrasi publik yang dapat disalin.
   ///
-  /// Memakai [publicUrl] bila event sudah dipublikasikan; jika belum, memakai
-  /// tautan demo lokal dan [registrationUrlIsDemo] bernilai true supaya UI tidak
-  /// mengklaim event sudah tayang di server.
-  String get registrationUrl => publicUrl ?? 'https://demo.eticket.local/e/$id';
+  /// Nilainya berasal dari `public_url` server dan hanya ada untuk event yang
+  /// sudah tayang. Tautan demo hanya dipakai pada `MOCK_MODE`; alur produksi
+  /// tidak lagi menampilkan tautan palsu (D1-3).
+  String get registrationUrl =>
+      publicUrl ??
+      (AppConfig.mockMode ? 'https://demo.eticket.local/e/$id' : '');
 
   bool get registrationUrlIsDemo => publicUrl == null;
+
+  /// True bila server sudah memberikan tautan publik nyata.
+  bool get hasPublicLink => publicUrl != null && publicUrl!.isNotEmpty;
 }

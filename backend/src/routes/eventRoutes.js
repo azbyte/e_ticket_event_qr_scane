@@ -9,6 +9,7 @@ const {
   updateEvent,
   deleteEvent,
   submitForReview,
+  publishEvent,
   getEventMembers,
   addEventMember,
   updateEventMemberPermissions,
@@ -43,6 +44,7 @@ router.post('/:id/members', authMiddleware, allowRoles('organizer'), addEventMem
 router.put('/:id/members/:userId/permissions', authMiddleware, allowRoles('organizer'), updateEventMemberPermissions);
 router.delete('/:id/members/:userId', authMiddleware, allowRoles('organizer'), removeEventMember);
 router.get('/:id', optionalAuth, getEventById);
+router.post('/:id/publish', authMiddleware, allowRoles('organizer'), publishEvent);
 router.post('/:id/submit-review', authMiddleware, allowRoles('organizer'), submitForReview);
 router.post('/', authMiddleware, allowRoles('organizer', 'admin'), createEvent);
 router.put('/:id', authMiddleware, allowRoles('organizer', 'admin'), updateEvent);

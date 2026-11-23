@@ -3,12 +3,13 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../../core/validators/input_validator.dart';
+import '../../../models/event/attendee_field_definition.dart';
 import '../../../models/event/event_model.dart';
 import '../../../models/event/ticket_type_model.dart';
 import '../../../providers/order_provider.dart';
 import '../../../providers/event_provider.dart';
 import '../../payments/screens/payment_screen.dart';
+import '../../tickets/screens/ticket_list_screen.dart';
 
 /// Registration screen — choose ticket types & quantity + attendee info (PRD sections 3.1 #5,#6, 4.4, 7.2 D).
 class RegistrationScreen extends StatefulWidget {
@@ -23,11 +24,11 @@ class RegistrationScreen extends StatefulWidget {
 
 class _RegistrationScreenState extends State<RegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
-  final Map<String, TextEditingController> _nameControllers = {};
-  final Map<String, TextEditingController> _emailControllers = {};
-  final Map<String, TextEditingController> _phoneControllers = {};
+  final Map<String, TextEditingController> _controllers = {};
+  final Map<String, bool> _checkboxValues = {};
+  final Map<String, String> _selectValues = {};
 
-  final Map<String, int> _selectedQuantities = {};
+  String? _selectedTicketTypeId;
   bool _isSubmitting = false;
   final String _idempotencyKey = _newIdempotencyKey();
 
@@ -45,98 +46,126 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     ).map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
   }
 
-  String _attendeeKey(String ticketTypeId, int index) => '$ticketTypeId:$index';
-
-  void _syncAttendeeControllers() {
-    final activeKeys = <String>{};
-    for (final entry in _selectedQuantities.entries) {
-      for (var index = 0; index < entry.value; index++) {
-        final key = _attendeeKey(entry.key, index);
-        activeKeys.add(key);
-        _nameControllers.putIfAbsent(key, TextEditingController.new);
-        _emailControllers.putIfAbsent(key, TextEditingController.new);
-        _phoneControllers.putIfAbsent(key, TextEditingController.new);
-      }
-    }
-
-    for (final controllers in [
-      _nameControllers,
-      _emailControllers,
-      _phoneControllers,
-    ]) {
-      final removedKeys = controllers.keys
-          .where((key) => !activeKeys.contains(key))
-          .toList();
-      for (final key in removedKeys) {
-        controllers.remove(key)?.dispose();
+  /// Siapkan state form untuk setiap field peserta event (D1-5).
+  void _prepareFieldState(EventModel event) {
+    for (final field in event.resolvedAttendeeFields) {
+      if (field.isCheckbox) {
+        _checkboxValues.putIfAbsent(field.key, () => false);
+      } else if (field.isSelect) {
+        _selectValues.putIfAbsent(field.key, () => '');
+      } else {
+        _controllers.putIfAbsent(field.key, TextEditingController.new);
       }
     }
   }
 
-  List<Map<String, String>> _attendeePayload() {
-    final attendees = <Map<String, String>>[];
-    for (final ticketType in _ticketTypes) {
-      final quantity = _selectedQuantities[ticketType.id] ?? 0;
-      for (var index = 0; index < quantity; index++) {
-        final key = _attendeeKey(ticketType.id, index);
-        attendees.add({
-          'ticket_type_id': ticketType.id,
-          'name': _nameControllers[key]!.text.trim(),
-          'email': _emailControllers[key]!.text.trim(),
-          if (_phoneControllers[key]!.text.trim().isNotEmpty)
-            'phone': _phoneControllers[key]!.text.trim(),
-        });
+  Map<String, dynamic> _collectAnswers(EventModel event) {
+    final answers = <String, dynamic>{};
+    for (final field in event.resolvedAttendeeFields) {
+      if (field.isCheckbox) {
+        answers[field.key] = _checkboxValues[field.key] ?? false;
+      } else if (field.isSelect) {
+        final value = _selectValues[field.key] ?? '';
+        if (value.isNotEmpty) answers[field.key] = value;
+      } else {
+        final value = _controllers[field.key]?.text.trim() ?? '';
+        if (value.isNotEmpty) answers[field.key] = value;
       }
     }
-    return attendees;
+    return answers;
   }
 
-  List<Widget> _buildAttendeeForms() {
+  String? _validateField(AttendeeFieldDefinition field, String? raw) {
+    final value = raw?.trim() ?? '';
+    if (value.isEmpty) {
+      return field.required ? '"${field.label}" wajib diisi.' : null;
+    }
+    if (field.isEmail &&
+        !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value)) {
+      return 'Format email tidak valid.';
+    }
+    if (field.isNumber && num.tryParse(value) == null) {
+      return '"${field.label}" harus berupa angka.';
+    }
+    if (field.isDate && DateTime.tryParse(value) == null) {
+      return '"${field.label}" harus berupa tanggal (YYYY-MM-DD).';
+    }
+    return null;
+  }
+
+  List<Widget> _buildAttendeeForms(EventModel event) {
     final fields = <Widget>[];
-    for (final ticketType in _ticketTypes) {
-      final quantity = _selectedQuantities[ticketType.id] ?? 0;
-      for (var index = 0; index < quantity; index++) {
-        final key = _attendeeKey(ticketType.id, index);
-        fields.addAll([
-          Text(
-            '${ticketType.name} - Peserta ${index + 1}',
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            key: ValueKey('attendee-name-$key'),
-            controller: _nameControllers[key],
-            decoration: const InputDecoration(
-              labelText: 'Nama Lengkap *',
-              prefixIcon: Icon(Icons.person_outline),
+    for (final field in event.resolvedAttendeeFields) {
+      if (field.isCheckbox) {
+        fields.add(
+          CheckboxListTile(
+            key: Key('attendee-field-${field.key}'),
+            contentPadding: EdgeInsets.zero,
+            value: _checkboxValues[field.key] ?? false,
+            onChanged: (checked) => setState(
+              () => _checkboxValues[field.key] = checked ?? false,
             ),
-            validator: (value) =>
-                InputValidator.required(value, field: 'Nama peserta'),
+            title: Text(field.required ? '${field.label} *' : field.label),
+            controlAffinity: ListTileControlAffinity.leading,
           ),
-          const SizedBox(height: 10),
-          TextFormField(
-            key: ValueKey('attendee-email-$key'),
-            controller: _emailControllers[key],
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-              labelText: 'Alamat Email Aktif *',
-              prefixIcon: Icon(Icons.email_outlined),
-            ),
-            validator: InputValidator.email,
-          ),
-          const SizedBox(height: 10),
-          TextFormField(
-            key: ValueKey('attendee-phone-$key'),
-            controller: _phoneControllers[key],
-            keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(
-              labelText: 'Nomor WhatsApp / HP (Opsional)',
-              prefixIcon: Icon(Icons.phone_outlined),
-            ),
-          ),
-          const SizedBox(height: 18),
-        ]);
+        );
+        continue;
       }
+      if (field.isSelect) {
+        final current = _selectValues[field.key];
+        fields.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: DropdownButtonFormField<String>(
+              key: Key('attendee-field-${field.key}'),
+              initialValue: field.options.contains(current) ? current : null,
+              decoration: InputDecoration(
+                labelText: field.required ? '${field.label} *' : field.label,
+              ),
+              items: field.options
+                  .map(
+                    (option) => DropdownMenuItem<String>(
+                      value: option,
+                      child: Text(option),
+                    ),
+                  )
+                  .toList(growable: false),
+              onChanged: (value) =>
+                  setState(() => _selectValues[field.key] = value ?? ''),
+              validator: (value) =>
+                  field.required && (value == null || value.trim().isEmpty)
+                  ? '"${field.label}" wajib dipilih.'
+                  : null,
+            ),
+          ),
+        );
+        continue;
+      }
+      fields.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: TextFormField(
+            key: Key('attendee-field-${field.key}'),
+            controller: _controllers.putIfAbsent(
+              field.key,
+              TextEditingController.new,
+            ),
+            maxLines: field.isMultiline ? 3 : 1,
+            keyboardType: field.isNumber
+                ? TextInputType.number
+                : field.isEmail
+                ? TextInputType.emailAddress
+                : field.isPhone
+                ? TextInputType.phone
+                : TextInputType.text,
+            decoration: InputDecoration(
+              labelText: field.required ? '${field.label} *' : field.label,
+              hintText: field.isDate ? 'YYYY-MM-DD' : null,
+            ),
+            validator: (value) => _validateField(field, value),
+          ),
+        ),
+      );
     }
     return fields;
   }
@@ -158,47 +187,34 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     await _eventProvider.loadEvent(eventId);
     if (mounted) {
+      final event = _eventProvider.selectedEvent ?? widget.event;
       setState(() {
-        _event = _eventProvider.selectedEvent ?? widget.event;
+        _event = event;
         _ticketTypes = _eventProvider.ticketTypes;
         _loadError = _eventProvider.loadError ?? _eventProvider.error;
         _isLoadingEvent = false;
-        for (final tt in _ticketTypes) {
-          _selectedQuantities[tt.id] = 0;
-        }
-        _syncAttendeeControllers();
+        if (event != null) _prepareFieldState(event);
       });
     }
   }
 
   @override
   void dispose() {
-    for (final controllers in [
-      _nameControllers,
-      _emailControllers,
-      _phoneControllers,
-    ]) {
-      for (final controller in controllers.values) {
-        controller.dispose();
-      }
+    for (final controller in _controllers.values) {
+      controller.dispose();
     }
     super.dispose();
   }
 
-  int get _totalTicketCount =>
-      _selectedQuantities.values.fold(0, (sum, q) => sum + q);
-
-  double get _subtotalAmount {
-    double total = 0;
-    for (final tt in _ticketTypes) {
-      final qty = _selectedQuantities[tt.id] ?? 0;
-      total += tt.price * qty;
+  TicketTypeModel? get _selectedTicketType {
+    if (_selectedTicketTypeId == null) return null;
+    for (final type in _ticketTypes) {
+      if (type.id == _selectedTicketTypeId) return type;
     }
-    return total;
+    return null;
   }
 
-  double get _serviceFee => _subtotalAmount > 0 ? 5000.0 : 0.0;
-  double get _grandTotal => _subtotalAmount + _serviceFee;
+  double get _subtotalAmount => _selectedTicketType?.price ?? 0;
 
   String _formatCurrency(double amount) {
     if (amount <= 0) return 'Gratis';
@@ -209,42 +225,20 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     return 'Rp $str';
   }
 
-  void _updateQuantity(String ticketTypeId, int delta) {
-    final current = _selectedQuantities[ticketTypeId] ?? 0;
-    final newQty = current + delta;
-    if (newQty < 0) return;
-
-    final tt = _ticketTypes.firstWhere((t) => t.id == ticketTypeId);
-    if (newQty > tt.availableQuota) {
+  void _selectTicket(TicketTypeModel type) {
+    if (!type.isSellableAt(DateTime.now())) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Sisa kuota untuk "${tt.name}" hanya ${tt.availableQuota} tiket.',
+            'Kategori "${type.name}" sedang tidak dapat dipesan (habis atau di '
+            'luar periode penjualan).',
           ),
         ),
       );
       return;
     }
-
-    if (delta > 0 && _totalTicketCount >= 1) {
-      if (current >= 1) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Pada tahap ini, maksimal 1 tiket per pesanan.'),
-          ),
-        );
-        return;
-      }
-      _selectedQuantities.clear();
-      _nameControllers.clear();
-      _emailControllers.clear();
-      _phoneControllers.clear();
-    }
-
-    setState(() {
-      _selectedQuantities[ticketTypeId] = newQty;
-      _syncAttendeeControllers();
-    });
+    // Satu order = satu kategori = satu tiket (PRD §7).
+    setState(() => _selectedTicketTypeId = type.id);
   }
 
   Future<void> _submitOrder() async {
@@ -256,7 +250,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       return;
     }
 
-    if (_totalTicketCount != 1) {
+    final ticketType = _selectedTicketType;
+    if (ticketType == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Pemesanan harus berisi tepat 1 tiket.'),
@@ -271,10 +266,28 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     setState(() => _isSubmitting = true);
 
+    final answers = _collectAnswers(event);
+    final name = (answers['name'] ?? '').toString();
+    final email = (answers['email'] ?? '').toString();
+    final phone = (answers['phone'] ?? '').toString();
+    final customFields = <String, dynamic>{
+      for (final entry in answers.entries)
+        if (entry.key != 'name' && entry.key != 'email' && entry.key != 'phone')
+          entry.key: entry.value,
+    };
+
     final newOrder = await OrderProvider.instance.createOrder(
       eventId: event.id,
-      selectedTicketQuantities: _selectedQuantities,
-      attendees: _attendeePayload(),
+      selectedTicketQuantities: <String, int>{ticketType.id: 1},
+      attendees: <Map<String, dynamic>>[
+        <String, dynamic>{
+          'ticket_type_id': ticketType.id,
+          'name': name,
+          'email': email,
+          if (phone.isNotEmpty) 'phone': phone,
+          if (customFields.isNotEmpty) 'custom_fields': customFields,
+        },
+      ],
       idempotencyKey: _idempotencyKey,
     );
 
@@ -282,11 +295,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     if (!mounted) return;
 
-    if (newOrder != null) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => PaymentScreen(orderId: newOrder.id)),
-      );
-    } else {
+    if (newOrder == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -295,7 +304,21 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           backgroundColor: Colors.red,
         ),
       );
+      return;
     }
+
+    // Order gratis langsung PAID dan tiketnya terbit tanpa pembayaran.
+    if (newOrder.isPaid || newOrder.grandTotal <= 0) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => TicketListScreen(orderId: newOrder.id),
+        ),
+      );
+      return;
+    }
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => PaymentScreen(orderId: newOrder.id)),
+    );
   }
 
   @override
@@ -385,114 +408,107 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Section 1: Choose Tickets
+              // Section 1: pilih tepat satu kategori tiket (PRD §7).
               const Text(
-                '1. Pilih Jenis & Jumlah Tiket',
+                '1. Pilih Kategori Tiket',
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Satu pendaftaran hanya untuk satu tiket dan satu peserta.',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
               ),
               const SizedBox(height: 12),
 
               if (_ticketTypes.isEmpty)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: CircularProgressIndicator(),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'Belum ada kategori tiket yang dapat dipesan.',
+                    style: TextStyle(color: Colors.grey),
                   ),
                 )
               else
                 ..._ticketTypes.map((tt) {
-                  final qty = _selectedQuantities[tt.id] ?? 0;
-                  final isSoldOut = tt.isSoldOut;
+                  final available = tt.isSellableAt(DateTime.now());
+                  final selected = _selectedTicketTypeId == tt.id;
 
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: isSoldOut ? Colors.grey.shade100 : Colors.white,
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: InkWell(
+                      key: Key('ticket-option-${tt.id}'),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: qty > 0
-                            ? AppTheme.primaryColor
-                            : Colors.grey.shade300,
-                        width: qty > 0 ? 1.5 : 1,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                tt.name,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                  color: isSoldOut
-                                      ? Colors.grey
-                                      : Colors.black87,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _formatCurrency(tt.price),
-                                style: TextStyle(
-                                  color: isSoldOut
-                                      ? Colors.grey
-                                      : AppTheme.primaryColor,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                isSoldOut
-                                    ? 'Habis terjual'
-                                    : 'Sisa kuota: ${tt.availableQuota}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: isSoldOut
-                                      ? Colors.red
-                                      : Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
+                      onTap: available ? () => _selectTicket(tt) : null,
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: available
+                              ? Colors.white
+                              : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: selected
+                                ? AppTheme.primaryColor
+                                : Colors.grey.shade300,
+                            width: selected ? 1.6 : 1,
                           ),
                         ),
-                        if (isSoldOut)
-                          const Text(
-                            'HABIS',
-                            style: TextStyle(
-                              color: Colors.red,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
+                        child: Row(
+                          children: [
+                            Icon(
+                              selected
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_unchecked,
+                              color: available
+                                  ? AppTheme.primaryColor
+                                  : Colors.grey.shade400,
                             ),
-                          )
-                        else
-                          Row(
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.remove_circle_outline),
-                                color: qty > 0
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    tt.name,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      color: available
+                                          ? Colors.black87
+                                          : Colors.grey,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    available
+                                        ? 'Sisa kuota: ${tt.remainingQuota}'
+                                        : 'Tidak tersedia',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: available
+                                          ? Colors.grey.shade600
+                                          : Colors.red,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              _formatCurrency(tt.price),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: available
                                     ? AppTheme.primaryColor
-                                    : Colors.grey.shade400,
-                                onPressed: qty > 0
-                                    ? () => _updateQuantity(tt.id, -1)
-                                    : null,
+                                    : Colors.grey,
                               ),
-                              Text(
-                                '$qty',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.add_circle_outline),
-                                color: AppTheme.primaryColor,
-                                onPressed: () => _updateQuantity(tt.id, 1),
-                              ),
-                            ],
-                          ),
-                      ],
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   );
                 }),
@@ -511,10 +527,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ),
               const SizedBox(height: 14),
 
-              if (_totalTicketCount == 0)
-                const Text('Pilih tiket untuk menambahkan data peserta.')
+              if (_selectedTicketType == null)
+                const Text('Pilih kategori tiket untuk menambahkan data peserta.')
               else
-                ..._buildAttendeeForms(),
+                ..._buildAttendeeForms(event),
 
               const SizedBox(height: 24),
 
@@ -541,43 +557,20 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Jumlah Tiket ($_totalTicketCount tiket)',
+                          'Jumlah Tiket (${_selectedTicketType == null ? 0 : 1} tiket)',
                           style: TextStyle(color: Colors.grey.shade700),
                         ),
                         Text(_formatCurrency(_subtotalAmount)),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Biaya Layanan & Admin',
-                          style: TextStyle(color: Colors.grey.shade700),
-                        ),
-                        Text(_formatCurrency(_serviceFee)),
-                      ],
-                    ),
-                    const Divider(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Total Pembayaran',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        Text(
-                          _formatCurrency(_grandTotal),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                            color: AppTheme.primaryColor,
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 8),
+                    Text(
+                      'Biaya layanan dan total final dihitung oleh server pada '
+                      'langkah pembayaran.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: Colors.grey.shade600,
+                      ),
                     ),
                   ],
                 ),
@@ -606,7 +599,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                           ),
                         )
                       : Text(
-                          _grandTotal == 0
+                          _subtotalAmount <= 0
                               ? 'Daftar Sekarang (Gratis)'
                               : 'Lanjut ke Pembayaran',
                           style: const TextStyle(

@@ -48,6 +48,7 @@ class AppConstants {
   static const String paymentStatusPaid = 'paid';
   static const String paymentStatusFailed = 'failed';
   static const String paymentStatusExpired = 'expired';
+  static const String paymentStatusCancelled = 'cancelled';
 
   // ----------------------------------------------------------------
   // Support report statuses (PRD section 4.10)

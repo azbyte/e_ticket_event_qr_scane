@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const { createHash, randomBytes } = require('node:crypto');
 const { query, getOne } = require('../config/db');
+const { buildInviteUrl } = require('../utils/eventResponse');
 
 const DEFAULT_EXPIRY_DAYS = 7;
 const DEFAULT_PERMISSIONS = ['VIEW_EVENT', 'SCAN_TICKET', 'CHECK_IN_TICKET'];
@@ -77,6 +78,9 @@ const createInvitation = asyncHandler(async (req, res) => {
       name: inviteeName,
       token: rawToken,
       invitation_link: origin ? `${origin}/invite/${rawToken}` : null,
+      // Tautan undangan kanonik dari APP_PUBLIC_URL (aditif; tidak mengubah
+      // `invitation_link` lama agar klien lain tetap kompatibel).
+      invite_url: buildInviteUrl(rawToken),
       permissions: perms,
     },
   });

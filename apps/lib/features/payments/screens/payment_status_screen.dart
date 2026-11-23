@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/constants/app_constants.dart';
 import '../../../models/payment/payment_model.dart';
 import '../../events/screens/event_list_screen.dart';
 import '../../tickets/screens/ticket_list_screen.dart';
@@ -28,8 +29,37 @@ class PaymentStatusScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final success = isSuccess ?? (payment?.status == 'paid');
+    final status = payment?.status;
+    final success = isSuccess ?? (status == AppConstants.paymentStatusPaid);
     final effectiveOrderId = orderId ?? payment?.orderId ?? '-';
+    final isExpired = status == AppConstants.paymentStatusExpired;
+    final isCancelled = status == AppConstants.paymentStatusCancelled;
+    final canRetry = !success && !isExpired && !isCancelled;
+    final statusLabel = switch (status) {
+      AppConstants.paymentStatusPaid => 'Lunas (PAID)',
+      AppConstants.paymentStatusPending => 'Menunggu pembayaran (PENDING)',
+      AppConstants.paymentStatusExpired => 'Kedaluwarsa (EXPIRED)',
+      AppConstants.paymentStatusCancelled => 'Dibatalkan (CANCELLED)',
+      AppConstants.paymentStatusFailed => 'Gagal (FAILED)',
+      _ => success ? 'Lunas (PAID)' : 'Gagal (FAILED)',
+    };
+    final title = success
+        ? 'Pembayaran Berhasil Dikonfirmasi!'
+        : isExpired
+        ? 'Pembayaran Kedaluwarsa'
+        : isCancelled
+        ? 'Pembayaran Dibatalkan'
+        : 'Pembayaran Gagal';
+    final description = success
+        ? 'Tiket elektronik (E-Ticket) dengan QR Code unik telah berhasil '
+              'diterbitkan dan siap digunakan untuk check-in.'
+        : isExpired
+        ? 'Batas waktu pembayaran sudah lewat sehingga tiket tidak diterbitkan. '
+              'Silakan buat pesanan baru dari halaman event.'
+        : isCancelled
+        ? 'Pesanan ini dibatalkan sehingga tiket tidak diterbitkan.'
+        : 'Transaksi simulasi tidak berhasil diselesaikan. Anda dapat mencoba '
+              'lagi selama pesanan belum kedaluwarsa.';
 
     return Scaffold(
       appBar: AppBar(
@@ -57,9 +87,7 @@ class PaymentStatusScreen extends StatelessWidget {
               const SizedBox(height: 20),
 
               Text(
-                success
-                    ? 'Pembayaran Berhasil Dikonfirmasi!'
-                    : 'Pembayaran Gagal / Dibatalkan',
+                title,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 20,
@@ -70,9 +98,7 @@ class PaymentStatusScreen extends StatelessWidget {
               const SizedBox(height: 8),
 
               Text(
-                success
-                    ? 'Tiket elektronik (E-Ticket) dengan QR Code unik telah berhasil diterbitkan dan siap digunakan untuk check-in.'
-                    : 'Transaksi simulasi tidak berhasil diselesaikan. Anda dapat mencoba lagi atau kembali ke daftar pesanan.',
+                description,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
@@ -112,7 +138,7 @@ class PaymentStatusScreen extends StatelessWidget {
                     const Divider(height: 20),
                     _buildRow(
                       'Status',
-                      success ? 'Lunas (PAID)' : 'Gagal (FAILED)',
+                      statusLabel,
                       textColor: success ? Colors.green.shade700 : Colors.red,
                       isBold: true,
                     ),
@@ -168,22 +194,25 @@ class PaymentStatusScreen extends StatelessWidget {
                   ),
                 ),
               ] else ...[
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              PaymentScreen(orderId: effectiveOrderId),
-                        ),
-                      );
-                    },
-                    child: const Text('Coba Bayar Lagi'),
+                if (canRetry) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      key: const Key('payment-status-retry-button'),
+                      onPressed: () {
+                        Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                PaymentScreen(orderId: effectiveOrderId),
+                          ),
+                        );
+                      },
+                      child: const Text('Coba Bayar Lagi'),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 12),
+                ],
                 SizedBox(
                   width: double.infinity,
                   height: 48,
