@@ -30,6 +30,7 @@
   - `backend/src/controllers/eventController.js`
   - `backend/src/controllers/ticketTypeController.js`
   - `backend/test/ticket_type_rules.test.js`
+  - `backend/test/order_migration_regression.test.js` (normalisasi CRLF/LF file SQL migration agar test agnostik platform dan stabil di CI)
 - **File dihapus (alasan/bukti dependency):** Tidak ada.
 - **Database/schema/migration:** Tidak ada perubahan skema atau migrasi basis data. Seluruh validasi dan aturan bisnis diimplementasikan pada layer controller/service/validator sesuai allow-list Developer 2.
 - **API request/response:**
@@ -38,10 +39,13 @@
 - **Data model:** Tetap selaras dengan DTO `TicketTypeModel` dan `EventModel` di Flutter serta schema PostgreSQL.
 - **Dependencies/config:** Tidak ada penambahan dependensi baru di `package.json` maupun `pubspec.yaml`.
 - **Tests (command, PASS/FAIL/SKIP/NOT RUN) + evidence:**
-  - `node --test test/event_ownership_rules.test.js test/ticket_type_rules.test.js test/event_response.test.js test/event_summary.test.js`: **PASS (19 tests passed, 0 failed)**
+  - `npm test` (seluruh suite test backend): **PASS (55 tests passed, 0 failed, 100% lulus)**
+  - `npm run test:sync-config`: **PASS (14 tests passed, 0 failed)**
   - `npm run check`: **PASS (Syntax OK: 61 JavaScript files checked)**
   - `npm run format:check`: **PASS (Formatting check passed)**
+  - `npm run validate:skills`: **PASS (Validated 7 skills and links in 8 Markdown files)**
   - `flutter test test/features/organizer/events/event_category_and_screens_test.dart --no-pub`: **PASS (3 tests passed, 0 failed)**
+  - `flutter test test/services/api_mode_no_fallback_test.dart --dart-define=MOCK_MODE=false --no-pub`: **PASS (11 tests passed, 0 failed)**
   - `flutter test --no-pub`: **PASS (175 tests passed, 0 failed, 100% lulus)**
   - `flutter analyze --no-pub`: **PASS (No issues found!)**
 - **Error/masalah belum selesai:** Tidak ada.

@@ -5,7 +5,7 @@ const path = require('node:path');
 
 const migrationsPath = path.resolve(__dirname, '..', 'prisma', 'migrations');
 const functionFromMigration = (migrationName) => {
-  const sql = fs.readFileSync(path.join(migrationsPath, migrationName, 'migration.sql'), 'utf8');
+  const sql = fs.readFileSync(path.join(migrationsPath, migrationName, 'migration.sql'), 'utf8').replace(/\r\n/g, '\n');
   const match = sql.match(/CREATE OR REPLACE FUNCTION public\.create_event_order\([\s\S]*?\n\$\$;/);
   assert.ok(match, `create_event_order missing from ${migrationName}`);
   return match[0];
