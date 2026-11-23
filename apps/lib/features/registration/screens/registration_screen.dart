@@ -2,7 +2,6 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
-import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/validators/input_validator.dart';
 import '../../../models/event/event_model.dart';
@@ -227,15 +226,19 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       return;
     }
 
-    if (delta > 0 && _totalTicketCount >= AppConstants.maxTicketsPerOrder) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Maksimal ${AppConstants.maxTicketsPerOrder} tiket per pesanan.',
+    if (delta > 0 && _totalTicketCount >= 1) {
+      if (current >= 1) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pada tahap ini, maksimal 1 tiket per pesanan.'),
           ),
-        ),
-      );
-      return;
+        );
+        return;
+      }
+      _selectedQuantities.clear();
+      _nameControllers.clear();
+      _emailControllers.clear();
+      _phoneControllers.clear();
     }
 
     setState(() {
@@ -253,10 +256,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       return;
     }
 
-    if (_totalTicketCount == 0) {
+    if (_totalTicketCount != 1) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Silakan pilih minimal 1 tiket untuk melanjutkan.'),
+          content: Text('Pemesanan harus berisi tepat 1 tiket.'),
         ),
       );
       return;

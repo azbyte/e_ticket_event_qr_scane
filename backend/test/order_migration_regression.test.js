@@ -27,7 +27,7 @@ test('migration 004 casts order payment status and retains migration 003 stable 
 
   for (const migration of [migration003, migration004]) {
     assert.match(migration, /WHERE idempotency_key = p_idempotency_key\s+AND idempotency_fingerprint = p_idempotency_fingerprint/);
-    const replay = migration.match(/IF FOUND THEN([\s\S]*?)\n  END IF;\n  IF EXISTS/);
+    const replay = migration.match(/IF FOUND THEN([\s\S]*?)\r?\n  END IF;\r?\n  IF EXISTS/);
     assert.ok(replay, 'idempotency replay block missing');
     assert.match(replay[1], /RETURN order_id;/);
     assert.doesNotMatch(replay[1], /UPDATE\s+public\.event_orders/i);
