@@ -1,28 +1,47 @@
-# Tahap 2 — Developer 3: attendee, export, Admin/report/notification
+# Tahap 2 — Developer 3: Attendee, Export, Order Monitoring, Admin Platform
 
-> **Eksekusi autonomous.** Perintah pemilik proyek ("Kerjakan Developer 3 Tahap 2") sudah merupakan otorisasi implementasi; tidak perlu menunggu Tahap 1 GO atau bukti baseline. Untuk C-03 (plan/subscription/entitlement) pilih interpretasi paling aman dan konsisten PRD, implementasikan bagian yang tidak bertentangan, lalu catat sebagai asumsi. Fitur attendee/export/Admin dikerjakan memakai interface yang direkonstruksi dari kode aktual. Tanpa perubahan database/schema: kebutuhan DB ditulis sebagai proposal FINISHING.
+> **Ringkasan.** Sumber lengkap: [`RENCANA_KERJA.md`](RENCANA_KERJA.md) §E, [`INTEGRATION_CONTRACT.md`](INTEGRATION_CONTRACT.md), [`FILE_OWNERSHIP.md`](FILE_OWNERSHIP.md).
 
-## Tujuan
-Lengkapi operasi pasca-registrasi MVP: attendee list paid-first/stable number/export dan Admin monitoring/report surfaces yang authorized and persistent where existing API supports them.
+## Peran
 
-## Kondisi awal
-Baca PRD §§2, 7, 10, 12–16; contracts/ownership; baseline; README feature integration limits; source Admin/report/notification and attendee endpoints. Classify existing implementation vs missing before editing.
+Developer 3 memiliki alur: **daftar peserta paid-first + nomor registrasi → detail → export → order/payment monitoring → revenue organizer → seluruh konsol Admin → notifikasi Organizer**, serta kepemilikan `backend/src/app.js` dan util `auditLog.js`.
 
-## Pekerjaan
-1. Trace organizer attendee list endpoint/UI and verify paid-first + stable original registration number in visible/exported data.
-2. Implement export only in owned paths and only from an agreed payload/interface. Attendee endpoint/controller is D2-owned in this stage; do not edit it. If the payload lacks a stable original order number or paid-first ordering, solve it with the minimum change needed (adapter in D3 paths first, otherwise a minimal documented cross-owner change), record the interface, file, reason and impact in the report, and keep working; safe CSV escaping and synthetic tests apply to the available dataset.
-3. Audit Admin accounts/events/transactions/report/suspend and Organizer reports/notifications. Fix only owned controller/screen code for API wiring/error states/persistence where API exists.
-4. Do not fabricate backend APIs or in-memory success. Missing endpoint/global route support: implement the minimum required change following existing patterns and document it in the report. Missing DB/schema support: write a proposal in ../DB_CHANGE_PROPOSAL.md, finish every non-DB part, and continue.
-5. Add tests for permission denial, sorting/order, export escaping and loading/empty/error/retry.
+## Kondisi awal yang harus dipahami
 
-## Files / dependencies
-Only D3 globs in FILE_OWNERSHIP. D1/D2 files (including `eventMetricsController.js` and attendee endpoint/controller), routes/schema/global router/API client are prohibited. Use existing frozen routes/contracts; no waiting for other implementations. C-03 only blocks plan entitlement-dependent acceptance.
+- Endpoint attendee hanya membaca `tickets` dan urut `purchased_at DESC` (`checkInController.js:230-265`); tanpa nomor registrasi/status payment → tidak memenuhi AC-09.
+- UI attendee memakai repository in-memory dengan `eventId` default `evt-1001` (`attendee_list_screen.dart:35-56`).
+- Export hanya CSV mock (`organizer_operations_repository.dart:776-813`).
+- Akun Admin, audit, settings, revenue, paket, langganan adalah mock; `audit_logs`/`platform_settings` belum dipakai backend.
+- Dashboard Admin memakai angka hardcoded (`admin_dashboard_screen.dart:38-43, 643-676`).
+- Suspend akun tanpa alasan & tanpa audit (`adminController.js:15-31`).
+- Notifikasi Organizer **selalu** mock (`organizer_notifications_service.dart:68-74`).
 
-## Acceptance/tests
-- UI and export same rows, paid-first and stable registration identifiers.
-- Organizer cannot see another event; Admin only through server authorization.
-- Export safely escapes delimiters/quotes/newlines; no unintended fields.
-- UI has correct API/loading/empty/error states and no mock fallback.
-- Existing API persistence verified in a focused test; if the database/test environment is unavailable, mark that single check NOT RUN with the specific reason and cover the rest with unit/widget tests. Run tests, report skips.
+## Daftar task
 
-No unsupported plan/price or notification promises; no delete of unused features. Complete actual-change report.
+| ID | Judul | Depends |
+|---|---|---|
+| D3-A | `utils/auditLog.js` + mount path kosong di `app.js` (blocking Hari 1) | — |
+| D3-1 | Attendee data nyata: paid-first, nomor registrasi, detail, permission | — |
+| D3-2 | Export CSV, order/payment monitoring, revenue & laporan Organizer | D3-1 |
+| D3-3 | Admin akun + audit log + platform settings (backend & UI) | — |
+| D3-4 | Admin dashboard nyata + revenue + paket + langganan | D3-3 |
+| D3-5 | Admin event monitoring/suspend, laporan, notifikasi, integrasi Tahap 2 | D1-3, D2-2, D3-1..D3-4 |
+
+> **D3-A wajib di-merge lebih dulu.** Helper audit dan mount path kosong di
+> `app.js` harus ada agar D1/D2 dapat menambah route tanpa mengedit `app.js`.
+> D3-A juga prasyarat D3-3/D3-4. Detail di [`RENCANA_KERJA.md`](RENCANA_KERJA.md) §E.
+
+## Batas
+
+- **Boleh:** hanya file D3 pada `INTEGRATION_CONTRACT.md` Bagian 2.
+- **Dilarang:** schema/migration/seed, file D1/D2, mengubah kontrak yang dipakai developer lain, menghapus fitur.
+- `listEventAttendees` di `checkInController.js` adalah **area koordinasi** dengan D2 — tulis spesifikasi lalu sepakati.
+- Fee/komisi CONFIRMED tidak boleh diubah selama C-01 terbuka.
+
+## Definisi selesai
+
+Kriteria K per task terpenuhi, `npm test` + `flutter analyze` + `flutter test` PASS, bukti data nyata (bukan mock), laporan diperbarui, ringkasan gate G2 disiapkan.
+
+## Laporan
+
+Isi [`LAPORAN_DEVELOPER_3.md`](LAPORAN_DEVELOPER_3.md) dengan baseline, task, file, endpoint baru (`/admin/audit-logs`, `/admin/settings`, `/admin/subscriptions`, `/admin/overview`, `/events/:id/orders`, `/events/:id/attendees/export`), bukti test, status platform, risiko.

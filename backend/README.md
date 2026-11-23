@@ -60,10 +60,10 @@ backend/
     │   ├── errorMiddleware.js     # Global error handler
     │   ├── notFoundMiddleware.js  # 404 handler
     │   └── validationMiddleware.js# Hasil express-validator
-    ├── models/
-    │   ├── User.js      # Model profil pengguna (Supabase)
-    │   ├── Event.js     # Model event
-    │   └── Ticket.js    # Model tiket & QR code
+    ├── models/            # Legacy (tidak dipakai runtime; lihat catatan di bawah)
+    │   ├── User.js      # Model profil pengguna (legacy Supabase client)
+    │   ├── Event.js     # Model event (legacy)
+    │   └── Ticket.js    # Model tiket & QR code (legacy)
     ├── routes/
     │   ├── authRoutes.js
     │   ├── eventRoutes.js
@@ -73,8 +73,12 @@ backend/
     │   ├── ticketRoutes.js
     │   └── ticketTypeRoutes.js
     ├── services/
-    │   ├── authService.js   # Logic auth (token, hash password)
-    │   └── qrService.js     # Generate & parse QR code
+    │   ├── authService.js          # Logic auth (token, hash password)
+    │   ├── ticketTokenService.js   # Token QR tiket bertanda tangan (HMAC)
+    │   ├── emailService.js         # Pengiriman email tiket
+    │   ├── notificationService.js  # Notifikasi in-app
+    │   ├── seedService.js          # Seed data demo
+    │   └── adminBootstrapService.js# Bootstrap akun admin
     ├── utils/
     │   ├── response.js    # Helper response standar
     │   ├── constants.js   # Konstanta aplikasi
@@ -83,6 +87,12 @@ backend/
         ├── authValidator.js     # Validasi register/login
         └── ticketValidator.js   # Validasi tiket
 ```
+
+> **Catatan legacy:** `src/models/*.js` dan `src/config/supabase.js` adalah sisa
+> lapisan Supabase JS client lama. Runtime sekarang memakai `pg` melalui
+> `src/config/db.js`, dan tidak ada modul yang mengimpor `models/*`. Keduanya
+> dipertahankan sementara karena berada di area konfigurasi database yang
+> wewenangnya ada pada FINISHING; lihat proposal di laporan audit struktur.
 
 ## Endpoint API
 
@@ -191,24 +201,41 @@ npx prisma migrate deploy
 
 Jangan gunakan `prisma migrate reset` atau `db push` pada database berisi data.
 
-## Roles, demo accounts, dan staf event
+## Roles, akun Admin, dan staf event
 
 1. Isi `DATABASE_URL` (aplikasi) dan `DIRECT_URL` (migrasi) dengan kredensial
    PostgreSQL/Supabase. Jangan menaruh kredensial di Flutter atau repositori.
 2. Jalankan `npx prisma migrate deploy` dan pastikan
    `npx prisma migrate status` menyatakan schema up to date.
-3. Set `SEED_DEMO_ACCOUNTS=true` lalu jalankan `npm start` sekali. Seeder bersifat
-   idempotent (upsert berdasarkan email) dan tidak menghapus profil.
-   Set kembali ke `false` setelah selesai.
-4. Arahkan Flutter ke API dengan
+3. Siapkan akun Admin pertama (tidak ada password default di source code):
+
+   ```bash
+   # backend/.env (jangan commit)
+   ADMIN_EMAIL=admin@your-domain.test
+   ADMIN_PASSWORD=<password kuat minimal 8 karakter>
+   ADMIN_NAME=Administrator Platform
+   ADMIN_USERNAME=admin
+   ADMIN_RESET_PASSWORD=false
+   ```
+
+   ```bash
+   npm run admin:provision
+   ```
+
+   Skrip bersifat idempotent: dijalankan berulang tidak membuat Admin duplikat
+   dan tidak mengubah password kecuali `ADMIN_RESET_PASSWORD=true`. Akun
+   tersimpan di tabel `profiles` dengan `role = 'admin'` dan hash bcrypt;
+   mekanisme login sama dengan `POST /api/auth/login`. `npm start` juga
+   menjalankan bootstrap ini bila kedua variabel terisi.
+4. Akun Organizer dibuat lewat `POST /api/auth/register` (role selalu
+   organizer). Tidak ada seed akun demo dengan password tetap.
+5. Arahkan Flutter ke API dengan
    `--dart-define=API_BASE_URL=http://10.0.2.2:5000/api` (emulator Android).
 
-Demo credentials:
-
-| Role | Username | Email | Password |
-|---|---|---|---|
-| Admin | `admin` | `admin@event.com` | `Admin123!` |
-| Organizer | `organizer` | `organizer@event.com` | `Organizer123!` |
+Email akun Admin bukan "sertifikat" hak akses: role dibaca ulang dari database
+pada setiap request (`authMiddleware`), sehingga perubahan role/disable berlaku
+tanpa menunggu token kedaluwarsa. Jangan pernah memberi hak Admin berdasarkan
+nama atau email yang dikirim klien.
 
 `/api/auth/register` selalu membuat role organizer; role tidak diterima dari
 input publik. Otorisasi event menggunakan role dari database dan `created_by`.
@@ -230,7 +257,12 @@ token dan masa berlaku.
 | `ALLOWED_ORIGINS` | Daftar origin CORS dipisah koma | `http://localhost:3000` |
 | `CORS_ORIGIN` | Alias lama CORS (kompatibilitas) | `http://localhost:3000` |
 | `SIMULATED_PAYMENTS_ENABLED` | Aktifkan simulasi pembayaran non-produksi | `false` |
-| `SEED_DEMO_ACCOUNTS` | Seed akun demo idempotent saat startup | `false` |
+| `ADMIN_EMAIL` | Email akun Admin yang di-bootstrap ke tabel `profiles` | `admin@your-domain.test` |
+| `ADMIN_PASSWORD` | Password awal Admin (minimal 8 karakter, hanya di `.env`) | nilai acak kuat |
+| `ADMIN_NAME` | Nama tampilan Admin | `Administrator Platform` |
+| `ADMIN_USERNAME` | Username login Admin (opsional) | `admin` |
+| `ADMIN_RESET_PASSWORD` | Rotasi password Admin yang sudah ada saat bootstrap | `false` |
+| `SEED_DEMO_ACCOUNTS` | Legacy; tidak lagi membuat akun dengan password tetap | `false` |
 
 ## Database Schema
 
@@ -241,12 +273,13 @@ Sumber kebenaran schema adalah `prisma/schema.prisma` dan migration di
 memeriksa tabel, kolom, constraint, index, enum, function, RLS, dan riwayat
 migrasi. Ringkasan relasi ada di `docs/DATABASE.md`.
 
-Catatan keamanan: RLS **belum diaktifkan** (0/32 tabel, 0 policy) dan role
-`anon`/`authenticated` masih memiliki privilege penuh (SELECT/INSERT/UPDATE/
-DELETE/TRUNCATE/REFERENCES/TRIGGER) pada seluruh tabel `public`. Karena backend
-terhubung sebagai pemilik tabel (`postgres`), mengaktifkan RLS tidak memutus
-backend, tetapi wajib dilakukan sebelum rilis agar data tidak dapat diakses lewat
-Supabase REST dengan `anon` key.
+Catatan keamanan (verifikasi read-only 23 November 2026, lihat
+`../task/DATABASE_AUDIT_FINAL.md`): RLS aktif pada **32/32** tabel aplikasi dengan
+**0 policy** (deny-by-default untuk akses REST langsung) dan **0 grant** untuk
+`anon`/`authenticated`; hanya `service_role` memiliki privilege. Pemilik tabel
+adalah `postgres` (juga role koneksi backend), sehingga aktivasi RLS tidak
+memutus backend. Otorisasi aplikasi tetap ditegakkan di middleware/controller
+backend, bukan oleh RLS.
 
 ## Integrasi dengan Flutter (Frontend)
 

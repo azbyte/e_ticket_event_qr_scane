@@ -1,9 +1,30 @@
 const asyncHandler = require('express-async-handler');
 const { query, getOne } = require('../config/db');
 
-const EDITABLE_EVENT_STATUSES = [
+/**
+ * Status yang masih boleh menerima perubahan kategori tiket oleh owner.
+ *
+ * PRD §10 menempatkan pengaturan kategori tiket pada fase Draft, tetapi event
+ * dapat berstatus APPROVED/PUBLISHED sebelum kategori diisi (alur moderasi
+ * legacy) atau saat penjualan berjalan; pada kondisi itu owner tetap harus
+ * dapat menambah kategori agar event dapat dijual. Membatasi ke DRAFT membuat
+ * alur event -> kategori tiket -> checkout tidak dapat dijalankan end-to-end.
+ *
+ * Penjagaan invarian harga/kuota tetap berlaku (`validateTicketTypePricing`,
+ * `validateTicketTypeUpdate`, `validateTicketTypeAvailability`) sehingga
+ * perubahan tidak dapat merusak order/kategori yang sudah terjual.
+ */
+const TICKET_TYPE_MUTABLE_EVENT_STATUSES = [
   'DRAFT',
+  'PENDING_REVIEW',
+  'REVISION_REQUESTED',
+  'REJECTED',
+  'APPROVED',
+  'PUBLISHED',
 ];
+
+/** Status yang tidak lagi menerima mutasi kategori (event selesai/ditahan). */
+const TICKET_TYPE_LOCKED_EVENT_STATUSES = ['SUSPENDED', 'COMPLETED', 'CANCELLED'];
 
 const toTicketTypeDto = (row) => {
   const sold = Number(row.sold) || 0;
@@ -98,7 +119,7 @@ const assertEventAccess = async (eventId, user, { requireOwner = false } = {}) =
     err.statusCode = 404;
     throw err;
   }
-  if (requireOwner && !isAdmin && !EDITABLE_EVENT_STATUSES.includes(event.status)) {
+  if (requireOwner && !isAdmin && !TICKET_TYPE_MUTABLE_EVENT_STATUSES.includes(event.status)) {
     const err = new Error('Event status does not allow ticket type changes');
     err.statusCode = 409;
     throw err;
@@ -340,4 +361,6 @@ module.exports = {
   toTicketTypeDto,
   validateTicketTypeAvailability,
   validateTicketTypePricing,
+  TICKET_TYPE_MUTABLE_EVENT_STATUSES,
+  TICKET_TYPE_LOCKED_EVENT_STATUSES,
 };

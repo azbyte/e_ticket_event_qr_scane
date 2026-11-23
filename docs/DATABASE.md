@@ -25,27 +25,30 @@
 - Prisma Client/koneksi PostgreSQL hanya untuk backend tepercaya. Jangan pernah
   menaruh URL database atau Prisma Client di Flutter; koneksi database
   privileged dapat melewati RLS, sehingga otorisasi tetap wajib pada backend.
-- Prisma initial migration dan 5 migration lanjutan **sudah diterapkan** dan
-  tercatat di `_prisma_migrations` (6 migration, terakhir
-  `20261118000100_fix_payment_status_enum`). `prisma migrate status` menyatakan
-  schema up to date. Verifikasi read-only 18 November 2026:
+- Prisma initial migration dan 8 migration lanjutan **sudah diterapkan** dan
+  tercatat di `_prisma_migrations` (9 migration, terakhir
+  `20261118000400_restore_payment_status_enum_cast`). `prisma migrate status`
+  menyatakan schema up to date. Verifikasi read-only 23 November 2026:
   - 32 tabel aplikasi + `_prisma_migrations`, 19 enum, 54 foreign key,
     105 index aplikasi.
-  - `prisma migrate diff --from-schema-datasource prisma/schema.prisma
+  - `npx prisma migrate diff --from-schema-datasource prisma/schema.prisma
     --to-schema-datamodel prisma/schema.prisma --script` menghasilkan
     `-- This is an empty migration.` (tidak ada drift struktur).
   - Function `moderate_event`, `create_event_order`, `simulate_event_payment`,
-    dan `expire_event_order_reservations` tersedia di schema `public`.
+    dan `expire_event_order_reservations` tersedia di schema `public`;
+    `node scripts/diagnose-db-functions.js` menyatakan 4/4 function identik
+    dengan definisi migration terakhir.
   - SQL legacy di `supabase/migrations/` bukan pengganti baseline Prisma.
     Riwayat/fungsi SQL legacy harus direkonsiliasi sebelum operator memutuskan
     apakah/di mana ia dijalankan; jangan menyatakan semuanya tidak diperlukan.
 - Kredensial DB dan `JWT_SECRET` telah dikonfirmasi dirotasi. Jangan menyalin
-  nilainya ke log, issue, atau dokumentasi. RLS/grants belum aman: **0/32 tabel
-  mengaktifkan RLS, 0 policy**, tetapi role `anon` dan `authenticated` memiliki 7
-  privilege penuh pada setiap tabel (termasuk DELETE/TRUNCATE). Verifikasi
-  18 November 2026: `anon`=231 grant, `authenticated`=231 grant.
-  Pemilik tabel adalah `postgres` (juga role koneksi backend), sehingga
-  mengaktifkan RLS tidak memutus backend. Wajib ditutup sebelum rilis.
+  nilainya ke log, issue, atau dokumentasi. Status RLS/grants aktual (verifikasi
+  read-only 23 November 2026, lihat `../task/DATABASE_AUDIT_FINAL.md`):
+  **32/32 tabel aplikasi mengaktifkan RLS dengan 0 policy** (deny-by-default) dan
+  **0 grant untuk role `anon`/`authenticated`**; hanya `service_role` yang
+  memiliki privilege. Pemilik tabel adalah `postgres` (juga role koneksi
+  backend), sehingga RLS tidak memutus backend. Catatan historis "0/32 RLS,
+  231 grant" pada dokumen versi sebelumnya sudah tidak berlaku.
 - Flutter API mode sekarang menjadi default. Jalur Organizer Event dan moderasi
   event Admin memakai API untuk operasi event, kategori tiket, ringkasan,
   grafik, dan keputusan moderasi. Order/pembayaran serta pengambilan tiket

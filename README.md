@@ -91,7 +91,10 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5000/api
 ```
 
 Mode demo hanya aktif jika diminta eksplisit dengan
-`--dart-define=MOCK_MODE=true`. Akun demo hanya berlaku pada mode tersebut.
+`--dart-define=MOCK_MODE=true`. Persona demo pada mode itu tidak memakai akun
+database dan bukan jalur login Admin. Akun Admin sebenarnya dibuat di tabel
+`profiles` dengan `npm run admin:provision` setelah `ADMIN_EMAIL`/`ADMIN_PASSWORD`
+diisi pada `backend/.env` (lihat `backend/README.md`).
 Integrasi belum mencakup semua modul. Manajemen event/kategori tiket Organizer,
 moderasi event Admin, registrasi order, pembayaran simulasi, dan pembacaan tiket
 order kini memakai API. Dashboard keuangan, paket, langganan, check-in/scanner,

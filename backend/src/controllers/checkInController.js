@@ -391,4 +391,5 @@ module.exports = {
   listEventCheckIns,
   syncCheckIns,
   assertScanPermission,
+  normalizeTicketStatus,
 };

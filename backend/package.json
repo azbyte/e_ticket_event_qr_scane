@@ -12,6 +12,7 @@
                     "lint":  "node scripts/check-syntax.js",
                     "format:check":  "node scripts/check-format.js",
                     "validate:skills":  "node ../scripts/validate-skills.js",
+    "admin:provision":  "node scripts/provision-admin.js",
                     "prisma:validate":  "prisma validate --schema prisma/schema.prisma",
                     "prisma:generate":  "prisma generate --schema prisma/schema.prisma",
                     "verify:db-schema":  "node scripts/verify-schema-sync.js",

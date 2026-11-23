@@ -1,6 +1,7 @@
 const { createHash, randomBytes, randomUUID, timingSafeEqual } = require('node:crypto');
 const asyncHandler = require('express-async-handler');
 const { query, getOne } = require('../config/db');
+const { serializeOrder } = require('../utils/orderResponse');
 
 const ORDER_BASE_SELECT = `
   eo.id, eo.order_number, eo.event_id, eo.purchaser_id, eo.assisted_by_member_id,
@@ -170,7 +171,7 @@ const createOrder = asyncHandler(async (req, res) => {
       success: true,
       idempotent_replay: true,
       message: 'Checkout ini sudah diproses sebelumnya. Gunakan token akses dari respons pertama.',
-      order: replay,
+      order: serializeOrder(replay),
       order_access_token: null,
     });
   }
@@ -206,7 +207,7 @@ const createOrder = asyncHandler(async (req, res) => {
 
   res.status(201).json({
     success: true,
-    order,
+    order: serializeOrder(order),
     order_access_token: tokenMatches ? accessToken : null,
     ...(tokenMatches ? {} : { idempotent_replay: true }),
   });
@@ -221,7 +222,8 @@ const getOrder = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Order not found');
   }
-  res.json({ success: true, order, data: order });
+  const serialized = serializeOrder(order);
+  res.json({ success: true, order: serialized, data: serialized });
 });
 
 const listMyOrders = asyncHandler(async (req, res) => {
@@ -261,7 +263,7 @@ const listMyOrders = asyncHandler(async (req, res) => {
     paymentsByOrder[p.order_id].push(p);
   }
 
-  const orders = orderRows.map((order) => ({
+  const orders = orderRows.map((order) => serializeOrder({
     ...order,
     events: { title: order.event_title },
     order_items: itemsByOrder[order.id] || [],
