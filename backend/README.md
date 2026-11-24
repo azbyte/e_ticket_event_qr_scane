@@ -126,7 +126,9 @@ backend/
 | GET/POST | `/api/events/:id/invitations` | Daftar/buat undangan staf | Owner/Admin |
 | DELETE | `/api/events/:id/invitations/:invitationId` | Cabut undangan | Owner/Admin |
 | POST | `/api/invitations/:token/accept` | Terima undangan (email harus cocok) | Private |
+| GET | `/api/invitations/:token` | Pratinjau undangan publik (email disamarkan) | Public |
 | GET | `/api/invitations/me` | Undangan pending milik pengguna | Private |
+| GET | `/api/me/memberships` | Event yang diikuti pengguna sebagai staf + izinnya | Private |
 | GET | `/api/organizer/overview` | Ringkasan event Organizer | Organizer |
 | GET | `/api/organizer/events/summaries` | Ringkasan per event Organizer | Organizer |
 | PUT | `/api/admin/events/:id/moderation` | Keputusan moderasi atomik dan audit | Admin |
@@ -140,7 +142,7 @@ backend/
 | GET | `/api/tickets/my-tickets` | Tiket milik user login; guest mengirim `order_id` + header `X-Order-Access-Token` | Private/order token |
 | GET | `/api/tickets/:id` | Detail tiket milik user login atau `order_id` + header `X-Order-Access-Token` | Private/order token |
 | POST | `/api/tickets/validate` | Validasi QR tanpa mutasi; wajib izin petugas event | Private (staff) |
-| POST | `/api/tickets/verify` | Verifikasi QR dan tandai tiket used secara atomik | Private (staff) |
+| POST | `/api/tickets/verify` | Verifikasi QR dan catat check-in (`check_ins` + `scan_logs`) secara atomik; 409 bila sudah dipakai | Private (staff) |
 
 ### Check-in
 | Method | Endpoint | Deskripsi | Akses |

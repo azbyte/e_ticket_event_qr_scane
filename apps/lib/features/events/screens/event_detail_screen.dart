@@ -56,6 +56,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         final ticketTypes = _provider.ticketTypes;
         final loading = _provider.isLoading;
         final error = _provider.loadError ?? _provider.error;
+        // Hanya event tayang dengan kategori yang dapat dipesan yang boleh
+        // menampilkan alur pendaftaran (D1-4 K5).
+        final canRegister =
+            event != null &&
+            event.isPublic &&
+            (event.status == 'published' || event.status == 'approved') &&
+            ticketTypes.any((type) => type.isSellableAt(DateTime.now()));
 
         return Scaffold(
           body: loading
@@ -359,14 +366,17 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                           ),
                         ),
                         ElevatedButton(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    RegistrationScreen(event: event),
-                              ),
-                            );
-                          },
+                          key: const Key('event-detail-register-button'),
+                          onPressed: canRegister
+                              ? () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          RegistrationScreen(event: event),
+                                    ),
+                                  );
+                                }
+                              : null,
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 28,
@@ -376,9 +386,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Text(
-                            'Pesan Tiket',
-                            style: TextStyle(
+                          child: Text(
+                            canRegister ? 'Daftar Sekarang' : 'Tidak tersedia',
+                            style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
                             ),

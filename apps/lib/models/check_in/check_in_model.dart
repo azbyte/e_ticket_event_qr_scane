@@ -21,17 +21,22 @@ class CheckInModel {
   });
 
   factory CheckInModel.fromJson(Map<String, dynamic> json) {
+    // Backend mengirim `actor_user_id`/`actor_name` (petugas yang memindai);
+    // `staff_*` dipertahankan untuk kompatibilitas data lama/demo.
+    final staffId = (json['staff_id'] ?? json['actor_user_id'] ?? '').toString();
+    final staffName =
+        (json['staff_name'] ?? json['actor_name'] ?? '').toString();
     return CheckInModel(
       id: json['id'] as String? ?? '',
       ticketId: json['ticket_id'] as String? ?? '',
       eventId: json['event_id'] as String? ?? '',
-      staffId: json['staff_id'] as String? ?? '',
-      staffName: json['staff_name'] as String? ?? '',
+      staffId: staffId,
+      staffName: staffName,
       checkedInAt: json['checked_in_at'] != null
           ? DateTime.tryParse(json['checked_in_at'] as String) ?? DateTime.now()
           : DateTime.now(),
-      synced: json['synced'] as bool? ?? false,
-      syncStatus: json['sync_status'] as String?,
+      synced: json['synced'] as bool? ?? true,
+      syncStatus: json['sync_status'] as String? ?? 'synced',
     );
   }
 

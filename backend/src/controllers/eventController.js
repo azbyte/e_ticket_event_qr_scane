@@ -1,6 +1,11 @@
 const asyncHandler = require('express-async-handler');
 const { query, getOne, pool } = require('../config/db');
-const { serializeEvent } = require('../utils/eventResponse');
+const { serializeEvent, buildPublicUrl } = require('../utils/eventResponse');
+const {
+  normalizeAttendeeFields,
+  validateAttendeeFields,
+  resolvePublishTransition,
+} = require('../utils/eventValidation');
 
 const EVENT_PERMISSION_CODES = new Set([
   'VIEW_EVENT', 'VIEW_PARTICIPANTS', 'ASSIST_REGISTRATION', 'VIEW_ORDERS', 'SCAN_TICKET',
@@ -45,7 +50,12 @@ const getCategory = async (name) => {
 };
 
 const getEventForOwner = async (eventId, user) => {
-  const event = await getOne(`SELECT * FROM events WHERE id = $1`, [eventId]);
+  const event = await getOne(
+    `SELECT e.*, c.name AS category_name
+     FROM events e LEFT JOIN event_categories c ON e.category_id = c.id
+     WHERE e.id = $1`,
+    [eventId]
+  );
   if (!event) {
     const err = new Error('Event not found');
     err.statusCode = 404;
@@ -146,18 +156,53 @@ const validateEventInput = (body) => {
   const organizerName = String(body.organizer_name || '').trim();
   const contactInfo = String(body.contact_info || '').trim();
   const validOnlineUrl = /^https?:\/\/\S+$/i.test(onlineUrl);
-  const attendeeFields = body.attendee_fields;
+  const attendeeFieldErrors = validateAttendeeFields(body.attendee_fields);
 
   if (normalizedTitle.length < 3 || !Number.isFinite(parsedStart) || !Number.isFinite(parsedEnd) ||
       parsedEnd <= parsedStart || !validFormats.includes(eventFormat) || !organizerName || !contactInfo ||
       (['OFFLINE', 'HYBRID'].includes(eventFormat) && !location) ||
       (['ONLINE', 'HYBRID'].includes(eventFormat) && !validOnlineUrl) ||
-      !Array.isArray(attendeeFields) || attendeeFields.length === 0 ||
-      !attendeeFields.includes('name') ||
-      attendeeFields.some((field) => !['name', 'email', 'phone', 'organization'].includes(field))) {
+      attendeeFieldErrors.length > 0) {
     return false;
   }
   return true;
+};
+
+/**
+ * Terapkan hasil validasi publikasi ke tabel `events`.
+ *
+ * Status ditulis sebagai literal terkontrol (bukan parameter) karena kolomnya
+ * bertipe enum PostgreSQL; nilai hanya berasal dari `resolvePublishTransition`.
+ */
+const applyPublishTransition = async (eventId, transition) => {
+  const published = transition.status === 'PUBLISHED';
+  return getOne(
+    `UPDATE events
+        SET status = ${published ? "'PUBLISHED'" : "'DRAFT'"},
+            is_public = $1,
+            review_note = $2,
+            submitted_at = CASE WHEN $3::boolean THEN NOW() ELSE submitted_at END,
+            public_url = $4,
+            updated_at = NOW()
+      WHERE id = $5
+      RETURNING *`,
+    [
+      transition.isPublic,
+      transition.reviewNote,
+      published,
+      published ? buildPublicUrl(eventId) : null,
+      eventId,
+    ]
+  );
+};
+
+/** Muat ulang event beserta nama kategori untuk response API. */
+const reloadSerializedEvent = async (eventId) => {
+  const row = await getOne(
+    `SELECT ${EVENT_SELECT_ALIAS} ${EVENT_FROM} WHERE e.id = $1`,
+    [eventId]
+  );
+  return row ? serializeEvent(attachCategory(row)) : null;
 };
 
 const createEvent = asyncHandler(async (req, res) => {
@@ -169,7 +214,7 @@ const createEvent = asyncHandler(async (req, res) => {
   const onlineUrl = String(req.body.online_url || '').trim();
   const organizerName = String(req.body.organizer_name || '').trim();
   const contactInfo = String(req.body.contact_info || '').trim();
-  const attendeeFields = req.body.attendee_fields;
+  const attendeeFields = normalizeAttendeeFields(req.body.attendee_fields).fields;
 
   if (!validateEventInput(req.body)) {
     res.status(400);
@@ -216,8 +261,20 @@ const createEvent = asyncHandler(async (req, res) => {
       new Date().toISOString(),
     ]
   );
+
+  // Auto-publish: event langsung tayang bila lolos validasi. Pada saat create
+  // belum ada kategori tiket, sehingga event valid tetap DRAFT dengan alasan
+  // yang dapat diperbaiki Organizer lalu diterbitkan via POST /:id/publish.
+  const transition = resolvePublishTransition(created, []);
+  await applyPublishTransition(created.id, transition);
   created.event_categories = [{ name: category.name }];
-  res.status(201).json({ success: true, event: serializeEvent(attachCategory(created)) });
+
+  res.status(201).json({
+    success: true,
+    published: transition.valid,
+    validation_errors: transition.errors,
+    event: (await reloadSerializedEvent(created.id)) || serializeEvent(attachCategory(created)),
+  });
 });
 const updateEvent = asyncHandler(async (req, res) => {
   const existing = await getEventForOwner(req.params.id, req.user);
@@ -305,8 +362,35 @@ const updateEvent = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Event not found or unauthorized');
   }
-  row.event_categories = existing.event_categories || (row.category_name ? [{ name: row.category_name }] : null);
-  res.json({ success: true, event: serializeEvent(attachCategory(row)) });
+
+  let validation = null;
+  if (['PUBLISHED', 'APPROVED'].includes(existing.status)) {
+    // Edit event tayang memicu validasi ulang. Bila menjadi tidak valid, event
+    // kembali DRAFT dan hilang dari daftar publik (K4 D1-2).
+    const ticketTypes = await query(
+      'SELECT * FROM ticket_types WHERE event_id = $1',
+      [req.params.id]
+    );
+    validation = resolvePublishTransition(row, ticketTypes, {
+      enforceFutureStart: false,
+    });
+    await applyPublishTransition(req.params.id, validation);
+  }
+
+  const serialized = await reloadSerializedEvent(req.params.id);
+  res.json({
+    success: true,
+    published: validation ? validation.valid : undefined,
+    validation_errors: validation ? validation.errors : [],
+    event:
+      serialized ||
+      serializeEvent({
+        ...row,
+        event_categories: existing.category_name
+          ? [{ name: existing.category_name }]
+          : null,
+      }),
+  });
 });
 const deleteEvent = asyncHandler(async (req, res) => {
   const existing = await getEventForOwner(req.params.id, req.user);
@@ -336,20 +420,56 @@ const deleteEvent = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Event deleted' });
 });
 
-const submitForReview = asyncHandler(async (req, res) => {
+/** Status yang tidak boleh diterbitkan ulang tanpa intervensi Admin. */
+const NON_PUBLISHABLE_STATUSES = ['SUSPENDED', 'CANCELLED', 'COMPLETED'];
+
+/**
+ * Inti auto-publish: validasi server lalu tetapkan `PUBLISHED` atau tetap
+ * `DRAFT` beserta daftar alasan yang dapat diperbaiki Organizer.
+ *
+ * Dipakai oleh `POST /api/events/:id/publish` dan alias
+ * `POST /api/events/:id/submit-review` (perilaku baru, lihat D1-2).
+ */
+const publishEventForOwner = async (req, res) => {
   const event = await getEventForOwner(req.params.id, req.user);
-  if (!['DRAFT', 'REVISION_REQUESTED', 'REJECTED'].includes(event.status)) {
+  if (NON_PUBLISHABLE_STATUSES.includes(event.status)) {
     res.status(409);
-    throw new Error('Event is not eligible for moderation review');
+    throw new Error('Event status does not allow publishing');
   }
-  const now = new Date().toISOString();
-  const row = await getOne(
-    `UPDATE events SET status = 'PENDING_REVIEW', submitted_at = $1, review_note = null
-     WHERE id = $2 RETURNING *`,
-    [now, req.params.id]
+
+  const ticketTypes = await query(
+    'SELECT * FROM ticket_types WHERE event_id = $1',
+    [req.params.id]
   );
-  res.json({ success: true, event: serializeEvent(attachCategory(row)) });
-});
+  const transition = resolvePublishTransition(event, ticketTypes);
+  await applyPublishTransition(req.params.id, transition);
+  const serialized = await reloadSerializedEvent(req.params.id);
+
+  if (!transition.valid) {
+    return res.status(422).json({
+      success: false,
+      published: false,
+      message: `Event belum memenuhi syarat publikasi: ${transition.errors.join('; ')}`,
+      validation_errors: transition.errors,
+      event: serialized,
+    });
+  }
+
+  return res.json({
+    success: true,
+    published: true,
+    validation_errors: [],
+    event: serialized,
+  });
+};
+
+const publishEvent = asyncHandler(publishEventForOwner);
+
+/**
+ * Alias perilaku baru: pengajuan moderasi kini langsung menerbitkan event bila
+ * valid (tidak ada lagi approval Admin sebagai syarat tayang).
+ */
+const submitForReview = asyncHandler(publishEventForOwner);
 
 const ensureEventOwner = async (eventId, userId) => {
   const data = await getOne('SELECT id, created_by FROM events WHERE id = $1', [eventId]);
@@ -521,6 +641,7 @@ module.exports = {
   updateEvent,
   deleteEvent,
   submitForReview,
+  publishEvent,
   getEventMembers,
   addEventMember,
   updateEventMemberPermissions,

@@ -46,7 +46,10 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
       _loadError = null;
     });
     try {
-      final list = await _service.listMembers(widget.eventId);
+      final list = await _service.listMembers(
+        widget.eventId,
+        eventTitle: widget.eventTitle,
+      );
       if (!mounted) return;
       setState(() {
         _members = list;
@@ -165,7 +168,7 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
                   final name = nameController.text.trim();
                   Navigator.pop(ctx);
                   try {
-                    await _service.inviteStaff(
+                    final invited = await _service.inviteStaff(
                       eventId: widget.eventId,
                       eventTitle: widget.eventTitle,
                       email: email,
@@ -173,12 +176,16 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
                       permissions: selectedPermissions,
                     );
                     if (!mounted) return;
+                    final inviteUrl = invited.inviteUrl;
                     messenger.showSnackBar(
                       SnackBar(
                         content: Text(
-                          'Undangan demo dibuat untuk $email (berlaku 7 hari).',
+                          inviteUrl != null && inviteUrl.isNotEmpty
+                              ? 'Undangan terkirim ke $email. Tautan: $inviteUrl'
+                              : 'Undangan dibuat untuk $email (berlaku 7 hari).',
                         ),
                         backgroundColor: Colors.green.shade800,
+                        duration: const Duration(seconds: 6),
                       ),
                     );
                     await _loadMembers();
@@ -266,6 +273,7 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
                     eventId: widget.eventId,
                     memberId: member.id,
                     permissions: tempPermissions,
+                    userId: member.userId,
                   );
                   if (!mounted) return;
                   messenger.showSnackBar(
@@ -579,6 +587,7 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
                                                 .revokeAccess(
                                                   eventId: widget.eventId,
                                                   memberId: m.id,
+                                                  userId: m.userId,
                                                 );
                                             if (!mounted) return;
                                             messenger.showSnackBar(

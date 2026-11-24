@@ -62,7 +62,7 @@ class OrderProvider extends ChangeNotifier {
     String attendeeEmail = '',
     String? attendeePhone,
     required Map<String, int> selectedTicketQuantities,
-    List<Map<String, String>> attendees = const [],
+    List<Map<String, dynamic>> attendees = const [],
     String? idempotencyKey,
   }) async {
     _setLoading(true);

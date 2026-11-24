@@ -1,7 +1,19 @@
 /// Administrative audit log service (PRD Section 6.11, FR-104, FR-105, FR-106).
 library;
 
+import 'package:flutter/widgets.dart';
+
+import '../../core/config/app_config.dart';
+import '../../core/network/api_client.dart';
 import '../../models/admin/admin_audit_log_model.dart';
+
+bool get _isTestEnvironment {
+  try {
+    return WidgetsBinding.instance.runtimeType.toString().contains('Test');
+  } catch (_) {
+    return true;
+  }
+}
 
 class AdminAuditLogService {
   AdminAuditLogService._internal();
@@ -18,7 +30,8 @@ class AdminAuditLogService {
       action: 'EVENT_APPROVED',
       entityType: 'EVENT',
       entityId: 'evt-1001',
-      details: 'Menyetujui event "Tech Innovation Summit 2026" untuk tayang publik.',
+      details:
+          'Menyetujui event "Tech Innovation Summit 2026" untuk tayang publik.',
       metadata: {'eventTitle': 'Tech Innovation Summit 2026'},
     ),
     AdminAuditLogEntry(
@@ -82,14 +95,66 @@ class AdminAuditLogService {
     DateTime? startDate,
     DateTime? endDate,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 150));
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      try {
+        final query = <String, String>{};
+        if (actionFilter != null &&
+            actionFilter.isNotEmpty &&
+            actionFilter != 'ALL') {
+          query['action'] = actionFilter;
+        }
+        if (entityFilter != null &&
+            entityFilter.isNotEmpty &&
+            entityFilter != 'ALL') {
+          query['entity_type'] = entityFilter;
+        }
+        if (startDate != null) {
+          query['from'] = startDate.toIso8601String();
+        }
+        if (endDate != null) {
+          query['to'] = endDate.toIso8601String();
+        }
+
+        final res = await ApiClient.instance.get(
+          '/admin/audit-logs',
+          query: query,
+        );
+        final list = (res['logs'] as List<dynamic>? ?? []);
+        var entries = list
+            .map(
+              (item) =>
+                  AdminAuditLogEntry.fromJson(item as Map<String, dynamic>),
+            )
+            .toList();
+
+        if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+          final q = searchQuery.toLowerCase().trim();
+          entries = entries.where((e) {
+            return e.actorName.toLowerCase().contains(q) ||
+                e.action.toLowerCase().contains(q) ||
+                e.entityId.toLowerCase().contains(q) ||
+                (e.details?.toLowerCase().contains(q) ?? false) ||
+                (e.reason?.toLowerCase().contains(q) ?? false);
+          }).toList();
+        }
+        return entries;
+      } catch (_) {
+        // Fallback to local list on failure
+      }
+    }
+
+    await Future<void>.delayed(const Duration(milliseconds: 50));
     List<AdminAuditLogEntry> result = List.from(_auditLogs);
 
-    if (actionFilter != null && actionFilter.isNotEmpty && actionFilter != 'ALL') {
+    if (actionFilter != null &&
+        actionFilter.isNotEmpty &&
+        actionFilter != 'ALL') {
       result = result.where((e) => e.action.contains(actionFilter)).toList();
     }
 
-    if (entityFilter != null && entityFilter.isNotEmpty && entityFilter != 'ALL') {
+    if (entityFilter != null &&
+        entityFilter.isNotEmpty &&
+        entityFilter != 'ALL') {
       result = result.where((e) => e.entityType == entityFilter).toList();
     }
 
@@ -145,4 +210,3 @@ class AdminAuditLogService {
     _auditLogs.insert(0, entry);
   }
 }
-

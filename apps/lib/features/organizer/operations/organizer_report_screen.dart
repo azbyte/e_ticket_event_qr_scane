@@ -6,6 +6,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../services/organizer_operations/organizer_operations_repository.dart';
 import '../../../services/organizer_operations/organizer_permission.dart';
@@ -32,6 +33,31 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
 
   String _selectedTierFilter = 'Semua';
   DateTimeRange? _selectedDateRange;
+  OrganizerReportMetrics? _apiReport;
+  bool _isLoadingReport = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!AppConfig.mockMode) {
+      _loadReport();
+    }
+  }
+
+  Future<void> _loadReport() async {
+    setState(() => _isLoadingReport = true);
+    try {
+      final rep = await _repo.fetchEventReportFromApi(widget.eventId);
+      if (mounted) {
+        setState(() => _apiReport = rep);
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingReport = false);
+      }
+    }
+  }
 
   String _formatCurrency(double amount) {
     final str = amount.toInt().toString().replaceAllMapped(
@@ -154,21 +180,29 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
       );
     }
 
-    final report = _repo.getEventReport(
-      widget.eventId,
-      ticketType: _selectedTierFilter == 'Semua' ? null : _selectedTierFilter,
-      from: _selectedDateRange?.start,
-      through: _selectedDateRange == null
-          ? null
-          : DateTime(
-              _selectedDateRange!.end.year,
-              _selectedDateRange!.end.month,
-              _selectedDateRange!.end.day,
-              23,
-              59,
-              59,
-            ),
-    );
+    if (_isLoadingReport && _apiReport == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Laporan Event')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final report = _apiReport ??
+        _repo.getEventReport(
+          widget.eventId,
+          ticketType: _selectedTierFilter == 'Semua' ? null : _selectedTierFilter,
+          from: _selectedDateRange?.start,
+          through: _selectedDateRange == null
+              ? null
+              : DateTime(
+                  _selectedDateRange!.end.year,
+                  _selectedDateRange!.end.month,
+                  _selectedDateRange!.end.day,
+                  23,
+                  59,
+                  59,
+                ),
+        );
 
     return Scaffold(
       appBar: AppBar(

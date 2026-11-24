@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const { createHash, randomBytes } = require('node:crypto');
 const { query, getOne } = require('../config/db');
+const { buildInviteUrl } = require('../utils/eventResponse');
 
 const DEFAULT_EXPIRY_DAYS = 7;
 const DEFAULT_PERMISSIONS = ['VIEW_EVENT', 'SCAN_TICKET', 'CHECK_IN_TICKET'];
@@ -77,6 +78,9 @@ const createInvitation = asyncHandler(async (req, res) => {
       name: inviteeName,
       token: rawToken,
       invitation_link: origin ? `${origin}/invite/${rawToken}` : null,
+      // Tautan undangan kanonik dari APP_PUBLIC_URL (aditif; tidak mengubah
+      // `invitation_link` lama agar klien lain tetap kompatibel).
+      invite_url: buildInviteUrl(rawToken),
       permissions: perms,
     },
   });
@@ -237,10 +241,132 @@ const myInvitations = asyncHandler(async (req, res) => {
   res.json({ success: true, count: Object.keys(grouped).length, invitations: Object.values(grouped) });
 });
 
+/**
+ * Pratinjau undangan publik (`GET /api/invitations/:token`).
+ *
+ * Endpoint publik yang didokumentasikan pada `INTEGRATION_CONTRACT.md` §1.3.
+ * Data yang dikembalikan sengaja minimal: judul/jadwal/lokasi event dan status
+ * undangan. Email undangan **ditutup sebagian** (masking) supaya halaman
+ * penerimaan tetap informatif tanpa membocorkan PII ke siapa pun yang memiliki
+ * tautan.
+ */
+const maskEmail = (email) => {
+  const value = String(email || '');
+  const at = value.indexOf('@');
+  if (at <= 0) return '***';
+  const name = value.slice(0, at);
+  const domain = value.slice(at + 1);
+  const visible = name.slice(0, Math.min(2, name.length));
+  return `${visible}${'*'.repeat(Math.max(name.length - visible.length, 1))}@${domain}`;
+};
+
+const getInvitationPreview = asyncHandler(async (req, res) => {
+  const token = req.params.token;
+  if (!token) {
+    res.status(400);
+    throw new Error('Token undangan diperlukan');
+  }
+
+  const invitation = await getOne(
+    `SELECT i.id, i.event_id, i.email, i.status, i.expires_at, i.created_at,
+            e.title AS event_title, e.status AS event_status, e.event_date,
+            e.end_date_time, e.location, e.event_format, e.online_url
+     FROM event_invitations i
+     JOIN events e ON e.id = i.event_id
+     WHERE i.token_hash = $1`,
+    [hashToken(token)]
+  );
+  if (!invitation) {
+    res.status(404);
+    throw new Error('Undangan tidak valid atau tidak ditemukan');
+  }
+
+  const perms = await query(
+    'SELECT permission FROM event_invitation_permissions WHERE event_invitation_id = $1',
+    [invitation.id]
+  );
+
+  const expired = new Date(invitation.expires_at) <= new Date();
+  const effectiveStatus = invitation.status === 'PENDING' && expired
+    ? 'EXPIRED'
+    : invitation.status;
+
+  res.json({
+    success: true,
+    invitation: {
+      status: effectiveStatus,
+      expires_at: invitation.expires_at,
+      invited_email: maskEmail(invitation.email),
+      permissions: (perms || []).map((row) => row.permission),
+      event: {
+        id: invitation.event_id,
+        title: invitation.event_title,
+        status: invitation.event_status,
+        event_date: invitation.event_date,
+        end_date_time: invitation.end_date_time,
+        location: invitation.location,
+        event_format: invitation.event_format,
+        online_url: invitation.event_format === 'ONLINE' ? invitation.online_url : null,
+      },
+    },
+  });
+});
+
+/**
+ * Event yang diikuti pengguna sebagai staf (`GET /api/me/memberships`).
+ *
+ * Bentuk mengikuti `INTEGRATION_CONTRACT.md` §1.4:
+ * `{ event_id, event_title, status, permissions[], expires_at }`.
+ * Tabel `event_members` tidak menyimpan status/expiry per anggota, sehingga
+ * status diturunkan dari keberadaan baris membership (aktif) dan `expires_at`
+ * bernilai `null`.
+ */
+const myMemberships = asyncHandler(async (req, res) => {
+  const user = req.user;
+  const rows = await query(
+    `SELECT em.id AS member_id, em.event_id, em.role, em.created_at,
+            e.title AS event_title, e.status AS event_status,
+            e.event_date, e.location, e.event_format,
+            ep.permission
+     FROM event_members em
+     JOIN events e ON e.id = em.event_id
+     LEFT JOIN event_member_permissions ep ON ep.event_member_id = em.id
+     WHERE em.user_id = $1
+     ORDER BY e.event_date DESC`,
+    [user.id]
+  );
+
+  const grouped = new Map();
+  for (const row of rows) {
+    if (!grouped.has(row.member_id)) {
+      grouped.set(row.member_id, {
+        member_id: row.member_id,
+        event_id: row.event_id,
+        event_title: row.event_title,
+        event_status: row.event_status,
+        event_date: row.event_date,
+        location: row.location,
+        event_format: row.event_format,
+        role: row.role || 'staff',
+        status: 'ACTIVE',
+        joined_at: row.created_at,
+        expires_at: null,
+        permissions: [],
+      });
+    }
+    if (row.permission) grouped.get(row.member_id).permissions.push(row.permission);
+  }
+
+  const memberships = [...grouped.values()];
+  res.json({ success: true, count: memberships.length, memberships });
+});
+
 module.exports = {
   createInvitation,
   listInvitations,
   revokeInvitation,
   acceptInvitation,
   myInvitations,
+  getInvitationPreview,
+  myMemberships,
 };

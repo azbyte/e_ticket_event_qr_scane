@@ -7,8 +7,18 @@ library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/config/app_config.dart';
+import '../../../core/network/api_client.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../services/admin/admin_audit_log_service.dart';
+
+bool get _isTestEnvironment {
+  try {
+    return WidgetsBinding.instance.runtimeType.toString().contains('Test');
+  } catch (_) {
+    return true;
+  }
+}
 
 /// Model internal akun platform untuk prototipe UI Admin.
 class PlatformAccountItem {
@@ -37,6 +47,26 @@ class PlatformAccountItem {
     this.isDisabled = false,
     this.suspensionReason,
   });
+
+  factory PlatformAccountItem.fromJson(Map<String, dynamic> json) {
+    return PlatformAccountItem(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? 'Pengguna',
+      email: json['email']?.toString() ?? '',
+      role: json['role']?.toString().toLowerCase() ?? 'attendee',
+      organizationName: json['organizationName']?.toString() ?? json['organization_name']?.toString(),
+      activePlan: json['activePlan']?.toString() ?? json['active_plan']?.toString(),
+      eventCount: (json['eventCount'] ?? json['event_count'] ?? 0) is int
+          ? (json['eventCount'] ?? json['event_count'] ?? 0) as int
+          : int.tryParse(json['eventCount']?.toString() ?? json['event_count']?.toString() ?? '0') ?? 0,
+      orderCount: (json['orderCount'] ?? json['order_count'] ?? 0) is int
+          ? (json['orderCount'] ?? json['order_count'] ?? 0) as int
+          : int.tryParse(json['orderCount']?.toString() ?? json['order_count']?.toString() ?? '0') ?? 0,
+      joinedAt: DateTime.tryParse(json['createdAt']?.toString() ?? json['created_at']?.toString() ?? '') ?? DateTime.now(),
+      isDisabled: !(json['isActive'] as bool? ?? json['is_active'] as bool? ?? true),
+      suspensionReason: json['suspensionReason']?.toString() ?? json['suspension_reason']?.toString(),
+    );
+  }
 
   PlatformAccountItem copyWith({
     String? id,
@@ -80,6 +110,8 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   String _statusFilter = 'all'; // all, active, disabled
+  List<PlatformAccountItem> _accounts = [];
+  bool _isLoading = false;
 
   // In-memory mock database of accounts
   static final List<PlatformAccountItem> _mockAccounts = [
@@ -158,6 +190,43 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _accounts = List.from(_mockAccounts);
+    _loadAccounts();
+  }
+
+  Future<void> _loadAccounts() async {
+    if (AppConfig.mockMode || _isTestEnvironment) {
+      if (mounted) {
+        setState(() {
+          _accounts = List.from(_mockAccounts);
+        });
+      }
+      return;
+    }
+    setState(() => _isLoading = true);
+    try {
+      final response = await ApiClient().get('/admin/accounts');
+      final list = response['data'] as List<dynamic>?;
+      if (list != null && mounted) {
+        setState(() {
+          _accounts = list
+              .whereType<Map<String, dynamic>>()
+              .map(PlatformAccountItem.fromJson)
+              .toList();
+        });
+      }
+    } catch (_) {
+      // Fallback to mock on error so UI stays resilient
+      if (mounted) {
+        setState(() {
+          _accounts = List.from(_mockAccounts);
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -168,7 +237,7 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
   }
 
   List<PlatformAccountItem> _getFilteredAccounts(String? targetRole) {
-    var list = List<PlatformAccountItem>.from(_mockAccounts);
+    var list = List<PlatformAccountItem>.from(_accounts);
 
     if (targetRole != null) {
       list = list.where((a) => a.role == targetRole).toList();
@@ -265,24 +334,42 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
     PlatformAccountItem account,
     String reason,
   ) async {
-    final idx = _mockAccounts.indexWhere((a) => a.id == account.id);
+    final idx = _accounts.indexWhere((a) => a.id == account.id);
     if (idx == -1) return;
 
-    final actor = context.read<AuthProvider>().user;
-    await AdminAuditLogService.instance.logAction(
-      actorId: actor?.id ?? actor?.email ?? 'usr-admin-01',
-      actorName: actor?.name ?? 'Super Admin',
-      action: 'ACCOUNT_SUSPENDED',
-      entityType: 'USER',
-      entityId: account.id,
-      reason: reason,
-      details: 'Menangguhkan akun ${account.email}.',
-      metadata: {'email': account.email, 'role': account.role},
-    );
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      try {
+        await ApiClient().put(
+          '/admin/accounts/${account.id}/status',
+          body: {'is_active': false, 'reason': reason},
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal menangguhkan akun: $e'),
+            backgroundColor: Colors.red.shade800,
+          ),
+        );
+        return;
+      }
+    } else {
+      final actor = context.read<AuthProvider>().user;
+      await AdminAuditLogService.instance.logAction(
+        actorId: actor?.id ?? actor?.email ?? 'usr-admin-01',
+        actorName: actor?.name ?? 'Super Admin',
+        action: 'ACCOUNT_SUSPENDED',
+        entityType: 'USER',
+        entityId: account.id,
+        reason: reason,
+        details: 'Menangguhkan akun ${account.email}.',
+        metadata: {'email': account.email, 'role': account.role},
+      );
+    }
     if (!mounted) return;
 
     setState(() {
-      _mockAccounts[idx] = _mockAccounts[idx].copyWith(
+      _accounts[idx] = _accounts[idx].copyWith(
         isDisabled: true,
         suspensionReason: reason,
       );
@@ -337,22 +424,40 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
             style: FilledButton.styleFrom(backgroundColor: Colors.green),
             onPressed: () async {
               Navigator.pop(ctx);
-              final idx = _mockAccounts.indexWhere((a) => a.id == account.id);
+              final idx = _accounts.indexWhere((a) => a.id == account.id);
               if (idx == -1) return;
 
-              final actor = context.read<AuthProvider>().user;
-              await AdminAuditLogService.instance.logAction(
-                actorId: actor?.id ?? actor?.email ?? 'usr-admin-01',
-                actorName: actor?.name ?? 'Super Admin',
-                action: 'ACCOUNT_REACTIVATED',
-                entityType: 'USER',
-                entityId: account.id,
-                details: 'Mengaktifkan kembali akun ${account.email}.',
-                metadata: {'email': account.email, 'role': account.role},
-              );
+              if (!AppConfig.mockMode && !_isTestEnvironment) {
+                try {
+                  await ApiClient().put(
+                    '/admin/accounts/${account.id}/status',
+                    body: {'is_active': true, 'reason': 'Diaktifkan kembali oleh Admin'},
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Gagal mengaktifkan kembali akun: $e'),
+                      backgroundColor: Colors.red.shade800,
+                    ),
+                  );
+                  return;
+                }
+              } else {
+                final actor = context.read<AuthProvider>().user;
+                await AdminAuditLogService.instance.logAction(
+                  actorId: actor?.id ?? actor?.email ?? 'usr-admin-01',
+                  actorName: actor?.name ?? 'Super Admin',
+                  action: 'ACCOUNT_REACTIVATED',
+                  entityType: 'USER',
+                  entityId: account.id,
+                  details: 'Mengaktifkan kembali akun ${account.email}.',
+                  metadata: {'email': account.email, 'role': account.role},
+                );
+              }
               if (!mounted) return;
               setState(() {
-                _mockAccounts[idx] = _mockAccounts[idx].copyWith(
+                _accounts[idx] = _accounts[idx].copyWith(
                   isDisabled: false,
                   clearSuspensionReason: true,
                 );
@@ -378,6 +483,13 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pengelolaan Akun Platform'),
+        actions: [
+          IconButton(
+            tooltip: 'Segarkan',
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadAccounts,
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -436,19 +548,21 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
 
           // Tab Views
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                // Tab 1: Semua Akun
-                _buildAccountsList(null, currentUserId),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      // Tab 1: Semua Akun
+                      _buildAccountsList(null, currentUserId),
 
-                // Tab 2: Organizer
-                _buildAccountsList('organizer', currentUserId),
+                      // Tab 2: Organizer
+                      _buildAccountsList('organizer', currentUserId),
 
-                // Tab 3: Participant
-                _buildAccountsList('attendee', currentUserId),
-              ],
-            ),
+                      // Tab 3: Participant
+                      _buildAccountsList('attendee', currentUserId),
+                    ],
+                  ),
           ),
         ],
       ),

@@ -7,7 +7,9 @@ void main() {
     late OrganizerMembershipService service;
 
     setUp(() {
-      service = OrganizerMembershipService.instance;
+      // Service default memakai API backend; test ini menguji aturan
+      // permission/membership pada data demo, jadi mode demo dipilih eksplisit.
+      service = OrganizerMembershipService(mockMode: true);
     });
 
     test('Owner member has all permissions unconditionally', () {

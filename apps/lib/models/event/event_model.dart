@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'attendee_field_definition.dart';
+
 /// Event model (PRD sections 4.2, 6.1).
 ///
 /// Field names are tentative pending final API contract (PRD section 15).
@@ -23,7 +27,14 @@ class EventModel {
   final String? publicInfo;
 
   /// Field data peserta yang wajib diisi saat registrasi (PRD 5.4 E).
+  ///
+  /// Berisi daftar kunci; definisi bertipe tersedia pada
+  /// [attendeeFieldDefinitions].
   final List<String> attendeeFields;
+
+  /// Definisi field peserta bertipe (kontrak D1-5). Bila kosong (data lama),
+  /// gunakan [resolvedAttendeeFields].
+  final List<AttendeeFieldDefinition> attendeeFieldDefinitions;
 
   final String status;
 
@@ -35,6 +46,9 @@ class EventModel {
 
   /// Waktu pengajuan moderasi terakhir.
   final DateTime? submittedAt;
+
+  /// Daftar alasan validasi server saat publikasi gagal (D1-2 K6).
+  final List<String> validationErrors;
   final bool isPublic;
   final String? publicUrl;
   final String? registrationQrUrl;
@@ -58,9 +72,11 @@ class EventModel {
     this.organizerName,
     this.publicInfo,
     this.attendeeFields = const <String>[],
+    this.attendeeFieldDefinitions = const <AttendeeFieldDefinition>[],
     required this.status,
     this.reviewNote,
     this.submittedAt,
+    this.validationErrors = const <String>[],
     this.isPublic = true,
     this.publicUrl,
     this.registrationQrUrl,
@@ -68,7 +84,41 @@ class EventModel {
     this.updatedAt,
   });
 
+  /// Definisi field peserta yang dipakai form publik.
+  ///
+  /// Fallback ke definisi default per kunci untuk event lama/fixture yang hanya
+  /// menyimpan array string.
+  List<AttendeeFieldDefinition> get resolvedAttendeeFields =>
+      attendeeFieldDefinitions.isNotEmpty
+      ? attendeeFieldDefinitions
+      : AttendeeFieldDefinition.listFromKeys(attendeeFields);
+
+  /// Alasan validasi yang siap ditampilkan.
+  ///
+  /// Server mengirim `validation_errors`; untuk kompatibilitas, nilai JSON
+  /// array pada [reviewNote] juga diparse (server lama menyimpannya di sana).
+  List<String> get resolvedValidationErrors {
+    if (validationErrors.isNotEmpty) return validationErrors;
+    final note = reviewNote?.trim();
+    if (note == null || !note.startsWith('[')) return const <String>[];
+    try {
+      final decoded = jsonDecode(note);
+      if (decoded is List) {
+        return decoded
+            .map((item) => item.toString())
+            .where((item) => item.trim().isNotEmpty)
+            .toList(growable: false);
+      }
+    } catch (_) {
+      // Catatan moderator berupa teks biasa, bukan daftar alasan validasi.
+    }
+    return const <String>[];
+  }
+
   factory EventModel.fromJson(Map<String, dynamic> json) {
+    final definitions = AttendeeFieldDefinition.listFromJson(
+      json['attendee_fields'],
+    );
     return EventModel(
       id: json['id'] as String? ?? '',
       organizerId: json['organizer_id'] as String? ?? '',
@@ -89,15 +139,20 @@ class EventModel {
       contactInfo: json['contact_info'] as String?,
       organizerName: json['organizer_name'] as String?,
       publicInfo: json['public_info'] as String?,
-      attendeeFields: (json['attendee_fields'] as List?)
-              ?.map((e) => e.toString())
-              .toList(growable: false) ??
-          const <String>[],
+      attendeeFields: definitions
+          .map((field) => field.key)
+          .toList(growable: false),
+      attendeeFieldDefinitions: definitions,
       status: json['status'] as String? ?? 'draft',
       reviewNote: json['review_note'] as String?,
       submittedAt: json['submitted_at'] != null
           ? DateTime.tryParse(json['submitted_at'] as String)
           : null,
+      validationErrors: (json['validation_errors'] as List?)
+              ?.map((error) => error.toString())
+              .where((error) => error.trim().isNotEmpty)
+              .toList(growable: false) ??
+          const <String>[],
       isPublic: json['is_public'] as bool? ?? true,
       publicUrl: json['public_url'] as String?,
       registrationQrUrl: json['registration_qr_url'] as String?,
@@ -127,10 +182,13 @@ class EventModel {
       'contact_info': contactInfo,
       'organizer_name': organizerName,
       'public_info': publicInfo,
-      'attendee_fields': attendeeFields,
+      'attendee_fields': attendeeFieldDefinitions.isNotEmpty
+          ? attendeeFieldDefinitions.map((field) => field.toJson()).toList()
+          : attendeeFields,
       'status': status,
       'review_note': reviewNote,
       'submitted_at': submittedAt?.toIso8601String(),
+      'validation_errors': validationErrors,
       'is_public': isPublic,
       'public_url': publicUrl,
       'registration_qr_url': registrationQrUrl,
@@ -156,9 +214,11 @@ class EventModel {
     String? organizerName,
     String? publicInfo,
     List<String>? attendeeFields,
+    List<AttendeeFieldDefinition>? attendeeFieldDefinitions,
     String? status,
     String? reviewNote,
     DateTime? submittedAt,
+    List<String>? validationErrors,
     bool? isPublic,
     String? publicUrl,
     String? registrationQrUrl,
@@ -188,9 +248,12 @@ class EventModel {
       organizerName: organizerName ?? this.organizerName,
       publicInfo: publicInfo ?? this.publicInfo,
       attendeeFields: attendeeFields ?? this.attendeeFields,
+      attendeeFieldDefinitions:
+          attendeeFieldDefinitions ?? this.attendeeFieldDefinitions,
       status: status ?? this.status,
       reviewNote: clearReviewNote ? null : (reviewNote ?? this.reviewNote),
       submittedAt: submittedAt ?? this.submittedAt,
+      validationErrors: validationErrors ?? this.validationErrors,
       isPublic: isPublic ?? this.isPublic,
       publicUrl: clearPublicUrl ? null : (publicUrl ?? this.publicUrl),
       registrationQrUrl: registrationQrUrl ?? this.registrationQrUrl,

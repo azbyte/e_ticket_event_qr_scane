@@ -45,6 +45,15 @@
 - **Gate:** C-01 formula fee dan aturan fee/komisi free order tetap OPEN; jangan menetapkan DB behavior final berdasarkan migration. C-02 guest payment auth juga tetap OPEN.
 - **Tests:** reject create/update mixed category; free order payment state/ticket issuance tanpa paid simulation; paid failure/expiry no ticket; paid success exactly-one ticket; price immutable per order; quota concurrency; rollback.
 
+## DP-04 — penyimpanan `attendees.custom_fields` oleh RPC order
+
+- **Dasar PRD:** §7 (form registrasi dapat dikonfigurasi Organizer), AC-04; kontrak data `attendees.custom_fields` pada `TAHAP_2/INTEGRATION_CONTRACT.md` §1.4.
+- **Bukti:** fungsi `public.create_event_order` (migration `20261113000400` dan revisi `20261118000300`/`20261118000400`) hanya menulis `attendees(order_item_id, name, email, phone)`; kolom `attendees.custom_fields` (JSON) ada di schema tetapi tidak pernah diisi oleh RPC.
+- **Penanganan sementara (tanpa DB):** `orderController.createOrder` menjalankan RPC dan `UPDATE attendees SET custom_fields` di dalam satu transaksi `BEGIN/COMMIT` pada koneksi yang sama, sehingga atomik. Validasi jawaban dilakukan sebelum RPC agar tidak ada order tanpa field wajib.
+- **Proposal untuk FINISHING:** bila diinginkan satu langkah atomik penuh di database, tambahkan parameter `p_custom_fields JSONB` pada `create_event_order` (atau isi `attendees.custom_fields` dari `p_attendees`) pada migration baru. Perubahan bersifat aditif; signature lama harus tetap kompatibel atau diberi versi fungsi baru.
+- **Dampak data lama:** order yang dibuat sebelum perubahan tidak memiliki `custom_fields`; tetap valid karena kolom nullable. Tidak ada backfill otomatis.
+- **Test yang disarankan:** create order dengan field wajib kosong (ditolak), field select di luar opsi (ditolak), jawaban tersimpan dan terbaca kembali, rollback saat penyimpanan gagal.
+
 ## Proses review FINISHING yang disyaratkan
 
 Untuk setiap proposal di atas, sebelum perubahan: pemilik produk mengesahkan acceptance terkait; maintainer menetapkan penanggung jawab FINISHING; gate FINISHING dibuka; proposal, data impact, baseline dan file scope disetujui; disposable DB/no secrets tersedia; reviewer serta forward/rollback plan dicatat. Sampai terpenuhi, status tetap **BLOCKED / PROPOSAL ONLY**.

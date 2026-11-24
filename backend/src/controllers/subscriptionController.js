@@ -1,4 +1,4 @@
-﻿const asyncHandler = require('express-async-handler');
+const asyncHandler = require('express-async-handler');
 const { query, getOne, pool } = require('../config/db');
 const { notify } = require('../services/notificationService');
 
@@ -272,11 +272,74 @@ const listMyPayments = asyncHandler(async (req, res) => {
   });
 });
 
+const listAdminSubscriptions = asyncHandler(async (req, res) => {
+  const { status, plan_id, search, limit = 50, offset = 0 } = req.query;
+  const whereClauses = [];
+  const params = [];
+
+  if (status && status !== 'all') {
+    params.push(status.toUpperCase());
+    whereClauses.push(`s.status = $${params.length}`);
+  }
+  if (plan_id) {
+    params.push(plan_id);
+    whereClauses.push(`s.plan_id = $${params.length}`);
+  }
+  if (search && search.trim()) {
+    params.push(`%${search.trim().toLowerCase()}%`);
+    whereClauses.push(`(LOWER(p.name) LIKE $${params.length} OR LOWER(p.email) LIKE $${params.length})`);
+  }
+
+  const whereStr = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+  const pageLimit = Math.min(Number(limit) || 50, 100);
+  const pageOffset = Number(offset) || 0;
+
+  const rows = await query(
+    `SELECT s.*, p.name AS organizer_name, p.email AS organizer_email, pl.name AS plan_name, pl.price_monthly, pl.price_yearly
+     FROM subscriptions s
+     LEFT JOIN profiles p ON p.id = s.organizer_id
+     LEFT JOIN plans pl ON pl.id = s.plan_id
+     ${whereStr}
+     ORDER BY s.created_at DESC
+     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    [...params, pageLimit, pageOffset]
+  );
+
+  const countRow = await getOne(
+    `SELECT COUNT(*)::bigint AS total
+     FROM subscriptions s
+     LEFT JOIN profiles p ON p.id = s.organizer_id
+     ${whereStr}`,
+    params
+  );
+
+  res.json({
+    success: true,
+    count: rows.length,
+    total: Number(countRow?.total) || rows.length,
+    subscriptions: rows.map((r) => ({
+      id: r.id,
+      organizer_id: r.organizer_id,
+      organizer_name: r.organizer_name || '-',
+      organizer_email: r.organizer_email || '-',
+      plan_id: r.plan_id,
+      plan_name: r.plan_name || '-',
+      status: String(r.status).toLowerCase(),
+      billing_interval: r.billing_interval ? r.billing_interval.toLowerCase() : null,
+      starts_at: r.starts_at,
+      ends_at: r.ends_at,
+      auto_renew: r.auto_renew,
+      created_at: r.created_at,
+    })),
+  });
+});
+
 module.exports = {
   getMySubscription,
   subscribe,
   cancelSubscription,
   listMyPayments,
+  listAdminSubscriptions,
   loadPlanWithFeatures,
   toSubscriptionDto,
 };

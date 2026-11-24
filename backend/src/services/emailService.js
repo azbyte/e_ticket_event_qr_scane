@@ -34,7 +34,7 @@ const escapeHtml = (value) => String(value ?? '')
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
 const loadTicketContext = (ticketId) => getOne(
-  `SELECT t.id, t.ticket_code, t.status, a.name AS attendee_name,
+  `SELECT t.id, t.ticket_code, t.status, t.event_id, a.name AS attendee_name,
           a.email AS attendee_email, tt.name AS ticket_type_name,
           e.title AS event_title, e.event_date, e.location, e.online_url,
           e.organizer_name, e.contact_info
@@ -47,13 +47,17 @@ const loadTicketContext = (ticketId) => getOne(
 
 const buildMessage = (ticket, recipient) => {
   const date = ticket.event_date ? new Date(ticket.event_date).toISOString() : '-';
-  const url = `${config.appPublicUrl}/tickets/${ticket.id}`;
+  // Tautan menuju halaman tiket publik; token akses guest tidak pernah
+  // ditempatkan pada URL (PRD §8.2 / C-02).
+  const url = ticket.event_id
+    ? `${config.appPublicUrl}/e/${ticket.event_id}/ticket/${ticket.id}`
+    : `${config.appPublicUrl}/tickets/${ticket.id}`;
   const text = [
     `Halo ${ticket.attendee_name || 'Peserta'},`,
     `Tiket ${ticket.ticket_code} untuk ${ticket.event_title} telah terbit.`,
     `Jenis: ${ticket.ticket_type_name || '-'} | Jadwal: ${date}`,
     `Lokasi: ${ticket.location || ticket.online_url || '-'}`,
-    `Buka e-ticket dan QR di aplikasi: ${url}`,
+    `Buka e-ticket dan QR dari perangkat yang dipakai saat memesan: ${url}`,
     'QR tidak dikirim lewat email demi keamanan. Jangan bagikan QR Anda.',
   ].join('\n');
   const html = `<p>Halo ${escapeHtml(ticket.attendee_name || 'Peserta')},</p>

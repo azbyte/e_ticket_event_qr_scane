@@ -57,4 +57,34 @@ class AppRoutes {
   static const String organizerTeam = '/organizer/team';
   static const String staffAssignedEvents = '/staff/events';
   static const String accessDenied = '/access-denied';
+
+  // ---------------------------------------------------------------
+  // Route publik (D1-1) — dapat diakses tanpa login.
+  // ---------------------------------------------------------------
+  static const String publicEvent = '/e/:eventId';
+  static const String publicEventRegister = '/e/:eventId/register';
+  static const String publicEventOrder = '/e/:eventId/order/:orderId';
+  static const String publicEventPayment = '/e/:eventId/payment/:orderId';
+  static const String publicEventTicket = '/e/:eventId/ticket/:ticketId';
+
+  /// Penerimaan undangan panitia: login lalu kembali ke halaman ini.
+  static const String invitationAccept = '/invite/:token';
+
+  /// Workspace staf untuk satu event.
+  static const String staffWorkspace = '/staff/:eventId';
+
+  static String publicEventPath(String eventId) => '/e/$eventId';
+
+  static String publicEventRegisterPath(String eventId) =>
+      '/e/$eventId/register';
+
+  static String publicEventPaymentPath(String eventId, String orderId) =>
+      '/e/$eventId/payment/$orderId';
+
+  static String publicEventTicketPath(String eventId, String ticketId) =>
+      '/e/$eventId/ticket/$ticketId';
+
+  static String invitationAcceptPath(String token) => '/invite/$token';
+
+  static String staffWorkspacePath(String eventId) => '/staff/$eventId';
 }

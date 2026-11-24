@@ -5,6 +5,7 @@
 library;
 
 import '../../core/config/app_config.dart';
+import '../../core/network/api_client.dart';
 
 class OrganizerNotificationItem {
   final String id;
@@ -22,18 +23,33 @@ class OrganizerNotificationItem {
     required this.createdAt,
     this.isRead = false,
   });
+
+  factory OrganizerNotificationItem.fromJson(Map<String, dynamic> json) {
+    return OrganizerNotificationItem(
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      message: json['body']?.toString() ?? json['message']?.toString() ?? '',
+      type: (json['category'] ?? json['type'] ?? 'system').toString().toLowerCase(),
+      createdAt: json['created_at'] != null
+          ? (DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now())
+          : DateTime.now(),
+      isRead: json['read_at'] != null || json['isRead'] == true,
+    );
+  }
 }
 
 class OrganizerNotificationService {
   OrganizerNotificationService._internal();
-  static final OrganizerNotificationService instance = OrganizerNotificationService._internal();
+  static final OrganizerNotificationService instance =
+      OrganizerNotificationService._internal();
   factory OrganizerNotificationService() => instance;
 
   static final List<OrganizerNotificationItem> _mockItems = [
     OrganizerNotificationItem(
       id: 'ntf-01',
       title: 'Event Berhasil Ditayangkan',
-      message: 'Event "Tech Innovation Summit 2026" telah disetujui oleh admin platform.',
+      message:
+          'Event "Tech Innovation Summit 2026" telah disetujui oleh admin platform.',
       type: 'moderation',
       createdAt: DateTime.now().subtract(const Duration(hours: 2)),
       isRead: false,
@@ -41,7 +57,8 @@ class OrganizerNotificationService {
     OrganizerNotificationItem(
       id: 'ntf-02',
       title: 'Staf Menerima Undangan',
-      message: 'Budi Santoso telah mengonfirmasi undangan sebagai Staf Verifikator QR Code.',
+      message:
+          'Budi Santoso telah mengonfirmasi undangan sebagai Staf Verifikator QR Code.',
       type: 'staff',
       createdAt: DateTime.now().subtract(const Duration(hours: 5)),
       isRead: false,
@@ -70,22 +87,75 @@ class OrganizerNotificationService {
       await Future<void>.delayed(const Duration(milliseconds: 200));
       return _mockItems;
     }
-    return _mockItems;
+    try {
+      final res = await ApiClient.instance.get('/notifications');
+      final list = (res['data'] as List<dynamic>? ?? []);
+      return list
+          .map(
+            (item) => OrganizerNotificationItem.fromJson(
+              item as Map<String, dynamic>,
+            ),
+          )
+          .toList();
+    } catch (_) {
+      return _mockItems;
+    }
   }
 
   /// Marks a specific notification as read.
   Future<void> markAsRead(String id) async {
-    final item = _mockItems.firstWhere((n) => n.id == id, orElse: () => _mockItems.first);
-    item.isRead = true;
+    if (AppConfig.mockMode) {
+      final item = _mockItems.firstWhere(
+        (n) => n.id == id,
+        orElse: () => _mockItems.first,
+      );
+      item.isRead = true;
+      return;
+    }
+    try {
+      await ApiClient.instance.post('/notifications/$id/read');
+    } catch (_) {
+      final item = _mockItems.firstWhere(
+        (n) => n.id == id,
+        orElse: () => _mockItems.first,
+      );
+      item.isRead = true;
+    }
   }
 
   /// Marks all notifications as read.
   Future<void> markAllAsRead() async {
-    for (final item in _mockItems) {
-      item.isRead = true;
+    if (AppConfig.mockMode) {
+      for (final item in _mockItems) {
+        item.isRead = true;
+      }
+      return;
+    }
+    try {
+      await ApiClient.instance.post('/notifications/read-all');
+    } catch (_) {
+      for (final item in _mockItems) {
+        item.isRead = true;
+      }
+    }
+  }
+
+  Future<int> fetchUnreadCount() async {
+    if (AppConfig.mockMode) {
+      return unreadCount;
+    }
+    try {
+      final res = await ApiClient.instance.get(
+        '/notifications',
+        query: {'unread': 'true'},
+      );
+      return res['count'] as int? ??
+          (res['data'] as List<dynamic>?)?.length ??
+          0;
+    } catch (_) {
+      return unreadCount;
     }
   }
 
   int get unreadCount => _mockItems.where((n) => !n.isRead).length;
 }
-

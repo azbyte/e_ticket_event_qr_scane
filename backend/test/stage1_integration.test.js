@@ -52,8 +52,11 @@ const TICKET_ID = '88888888-8888-4888-8888-888888888888';
 const ATTENDEE_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
 const NOW = '2026-11-23T08:00:00.000Z';
-const FUTURE = '2026-11-24T08:00:00.000Z';
-const PAST = '2026-11-22T08:00:00.000Z';
+// Batas kedaluwarsa dihitung relatif terhadap waktu berjalan supaya test tidak
+// gagal hanya karena tanggal fixture sudah terlewati.
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const FUTURE = new Date(Date.now() + DAY_IN_MS).toISOString();
+const PAST = new Date(Date.now() - DAY_IN_MS).toISOString();
 
 const state = {
   profiles: [ORGANIZER, ADMIN, ATTENDEE],
@@ -193,7 +196,7 @@ const fakeQuery = async (sql, params = []) => {
     return [{ id: CATEGORY_ID, name: params[0] }];
   }
   if (hasSql(sql, 'INSERT INTO events')) {
-    return [{
+    const created = {
       id: DRAFT_EVENT_ID,
       title: params[0],
       description: params[1],
@@ -211,10 +214,51 @@ const fakeQuery = async (sql, params = []) => {
       category_id: params[13],
       status: 'DRAFT',
       is_public: false,
+      review_note: null,
       created_by: params[18],
       created_at: params[19],
       updated_at: params[20],
+    };
+    state.events[DRAFT_EVENT_ID] = created;
+    return [created];
+  }
+  // Auto-publish (D1-2): transisi status yang ditulis controller.
+  if (hasSql(sql, 'UPDATE events SET status =')) {
+    const eventId = params[4];
+    const existing = state.events[eventId] || {};
+    const published = normalizeSql(sql).includes("status = 'PUBLISHED'");
+    const updated = {
+      ...existing,
+      id: eventId,
+      status: published ? 'PUBLISHED' : 'DRAFT',
+      is_public: params[0],
+      review_note: params[1],
+      public_url: params[3],
+      submitted_at: params[2] ? NOW : existing.submitted_at || null,
+      event_date: existing.event_date || validEventPayload.event_date,
+      end_date_time: existing.end_date_time || validEventPayload.end_date_time,
+      event_format: existing.event_format || 'OFFLINE',
+      title: existing.title || validEventPayload.title,
+      category_id: existing.category_id || CATEGORY_ID,
+      organizer_name: existing.organizer_name || 'Himpunan Informatika',
+      contact_info: existing.contact_info || 'organizer@example.test',
+      location: existing.location || 'Auditorium Utama UNP',
+      attendee_fields: existing.attendee_fields || ['name', 'email', 'phone'],
+    };
+    state.events[eventId] = updated;
+    return [updated];
+  }
+  if (hasSql(sql, 'SELECT id, attendee_fields FROM events WHERE id = $1')) {
+    const event = state.events[params[0]];
+    if (!event) return [];
+    return [{
+      id: event.id,
+      attendee_fields: event.attendee_fields || ['name', 'email', 'phone'],
     }];
+  }
+  if (hasSql(sql, 'c.name AS category_name', 'WHERE e.id = $1')) {
+    const event = state.events[params[0]];
+    return event ? [{ ...event, category_name: 'Teknologi' }] : [];
   }
   if (hasSql(sql, 'SELECT id, created_by, status, is_public FROM events WHERE id = $1')) {
     return state.events[params[0]] ? [state.events[params[0]]] : [];
@@ -306,9 +350,9 @@ db.supabase = { query: fakeQuery, getOne: fakeGetOne };
 db.pool = {
   query: fakeQuery,
   on: () => {},
-  connect: () => {
-    throw new Error('Test integrasi Tahap 1 tidak boleh membuka koneksi database');
-  },
+  // Transaksi order (D1-5) memakai client yang sama dengan fake query;
+  // tidak ada koneksi database nyata yang dibuka.
+  connect: async () => ({ query: fakeQuery, release: () => {} }),
 };
 
 const { authMiddleware, optionalAuth } = require('../src/middleware/authMiddleware');
@@ -465,7 +509,15 @@ test('createEvent menyimpan draft dan mengembalikan kontrak EventModel', async (
   assert.equal(event.end_date_time, validEventPayload.end_date_time);
   assert.equal(event.category, 'Teknologi');
   assert.equal(event.is_public, false);
-  assert.deepEqual(event.attendee_fields, ['name', 'email', 'phone']);
+  // Kontrak attendee_fields kini bertipe (D1-5) dan kompatibel dengan array
+  // string lama; kunci tetap sama seperti payload.
+  assert.deepEqual(
+    event.attendee_fields.map((field) => field.key),
+    ['name', 'email', 'phone'],
+  );
+  assert.equal(event.attendee_fields[0].required, true);
+  assert.equal(event.validation_errors.length, 1);
+  assert.match(event.validation_errors[0], /kategori tiket aktif/i);
   assert.equal(event.contact_info, 'organizer@example.test');
 });
 

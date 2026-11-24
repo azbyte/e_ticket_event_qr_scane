@@ -80,7 +80,14 @@ class ScannerService {
   };
 
   /// Validates a scanned ticket token against the database.
-  Future<Map<String, dynamic>> validateTicket(String token) async {
+  ///
+  /// `eventId` adalah pos pemindaian staf; backend memakainya untuk memastikan
+  /// petugas berizin pada event tersebut dan tiket memang milik event itu
+  /// (`WRONG_EVENT` bila berbeda).
+  Future<Map<String, dynamic>> validateTicket(
+    String token, {
+    String? eventId,
+  }) async {
     if (AppConfig.mockMode) {
       await Future<void>.delayed(const Duration(milliseconds: 350));
 
@@ -158,16 +165,23 @@ class ScannerService {
       };
     }
 
-    return _api.post('/tickets/validate', body: {'ticket_code': token});
+    return _api.post('/tickets/validate', body: {
+      'token': token,
+      if (eventId != null && eventId.isNotEmpty) 'event_id': eventId,
+    });
   }
 
   /// Records check-in after successful scan.
+  ///
+  /// `token` dikirim bersama `ticket_id` agar backend dapat memverifikasi token
+  /// QR yang benar-benar dipindai (bukan hanya ID dari respons validasi).
   Future<Map<String, dynamic>> recordCheckIn({
     required String ticketId,
     required String eventId,
     required String staffId,
     String staffName = 'Staf Event',
     bool isOffline = false,
+    String? token,
   }) async {
     if (AppConfig.mockMode) {
       // Mark as checked in in local mock tickets table
@@ -190,6 +204,7 @@ class ScannerService {
     }
 
     return _api.post('/check-ins', body: {
+      if (token != null && token.isNotEmpty) 'token': token,
       'ticket_id': ticketId,
       'event_id': eventId,
       'staff_id': staffId,

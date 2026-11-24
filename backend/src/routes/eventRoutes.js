@@ -9,6 +9,7 @@ const {
   updateEvent,
   deleteEvent,
   submitForReview,
+  publishEvent,
   getEventMembers,
   addEventMember,
   updateEventMemberPermissions,
@@ -31,7 +32,9 @@ router.get('/mine', authMiddleware, allowRoles('organizer'), getMyEvents);
 router.get('/:id/summary', authMiddleware, allowRoles('organizer', 'admin'), eventMetrics.getEventSummary);
 router.get('/:id/sales', authMiddleware, allowRoles('organizer', 'admin'), eventMetrics.getEventSalesPoints);
 router.get('/:eventId/ticket-types', optionalAuth, ticketTypes.listEventTicketTypes);
-router.get('/:eventId/attendees', authMiddleware, allowRoles('organizer', 'admin'), listEventAttendees);
+// Daftar peserta: `staff` harus lolos gate route, sedangkan otorisasi sebenarnya
+// berbasis permission `VIEW_PARTICIPANTS` di controller (D3-1 K4).
+router.get('/:eventId/attendees', authMiddleware, allowRoles('organizer', 'admin', 'staff'), listEventAttendees);
 router.get('/:eventId/invitations', authMiddleware, allowRoles('organizer', 'admin'), listInvitations);
 router.post('/:eventId/invitations', authMiddleware, allowRoles('organizer', 'admin'), createInvitation);
 router.delete('/:eventId/invitations/:invitationId', authMiddleware, allowRoles('organizer', 'admin'), revokeInvitation);
@@ -43,6 +46,7 @@ router.post('/:id/members', authMiddleware, allowRoles('organizer'), addEventMem
 router.put('/:id/members/:userId/permissions', authMiddleware, allowRoles('organizer'), updateEventMemberPermissions);
 router.delete('/:id/members/:userId', authMiddleware, allowRoles('organizer'), removeEventMember);
 router.get('/:id', optionalAuth, getEventById);
+router.post('/:id/publish', authMiddleware, allowRoles('organizer'), publishEvent);
 router.post('/:id/submit-review', authMiddleware, allowRoles('organizer'), submitForReview);
 router.post('/', authMiddleware, allowRoles('organizer', 'admin'), createEvent);
 router.put('/:id', authMiddleware, allowRoles('organizer', 'admin'), updateEvent);

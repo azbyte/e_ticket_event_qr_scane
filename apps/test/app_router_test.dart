@@ -3,14 +3,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import 'package:e_ticket_event_qr_scane/app_router.dart';
+import 'package:e_ticket_event_qr_scane/core/config/app_config.dart';
 import 'package:e_ticket_event_qr_scane/features/admin/screens/admin_profile_screen.dart';
+import 'package:e_ticket_event_qr_scane/features/auth/screens/login_screen.dart';
 import 'package:e_ticket_event_qr_scane/features/organizer/operations/organizer_scanner_screen.dart';
 import 'package:e_ticket_event_qr_scane/features/organizer/shell/access_denied_screen.dart';
+import 'package:e_ticket_event_qr_scane/features/public_event/screens/invitation_entry_screen.dart';
+import 'package:e_ticket_event_qr_scane/features/public_event/screens/public_event_screen.dart';
+import 'package:e_ticket_event_qr_scane/features/public_event/screens/public_registration_screen.dart';
+import 'package:e_ticket_event_qr_scane/features/registration/screens/registration_screen.dart';
 import 'package:e_ticket_event_qr_scane/features/staff/screens/staff_dashboard_screen.dart';
 import 'package:e_ticket_event_qr_scane/models/user/user_model.dart';
 import 'package:e_ticket_event_qr_scane/models/user/user_role.dart';
 import 'package:e_ticket_event_qr_scane/providers/auth_provider.dart';
 import 'package:e_ticket_event_qr_scane/services/auth/auth_service.dart';
+import 'helpers/test_mock_server.dart';
 
 class _NoopAuthService extends AuthService {
   @override
@@ -38,7 +45,35 @@ Widget _appFor(String route, UserRole role) {
   );
 }
 
+Widget _appForGuest(String route) {
+  final auth = AuthProvider(_NoopAuthService());
+  return ChangeNotifierProvider<AuthProvider>.value(
+    value: auth,
+    child: MaterialApp(
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: TextButton(
+            onPressed: () => Navigator.pushNamed(context, route),
+            child: const Text('Open route'),
+          ),
+        ),
+      ),
+      onGenerateRoute: AppRouter.generateRoute,
+    ),
+  );
+}
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() async {
+    await TestMockServer.start();
+  });
+
+  setUp(() {
+    TestMockServer.attachHttpOverrides();
+  });
+
   testWidgets('Admin profile route opens the Admin profile screen', (
     tester,
   ) async {
@@ -81,7 +116,81 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(OrganizerScannerScreen), findsOneWidget);
-      expect(find.text('Pemindai Tiket QR (Mock)'), findsOneWidget);
+      // Mode API: kamera nyata + backend. Mode demo: layar simulasi.
+      expect(
+        find.text(
+          AppConfig.mockMode ? 'Pemindai Tiket QR (demo)' : 'Pemindai QR Tiket',
+        ),
+        findsOneWidget,
+      );
     },
   );
+
+  testWidgets('guest dapat membuka tautan publik event tanpa login (K1 D1-1)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_appForGuest('/e/evt-pub-1'));
+    await tester.tap(find.text('Open route'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PublicEventScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('guest dapat membuka formulir pendaftaran publik', (tester) async {
+    await tester.pumpWidget(_appForGuest('/e/evt-pub-1/register'));
+    await tester.tap(find.text('Open route'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PublicRegistrationScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('/registration/:eventId tidak lagi 404 (K4 D1-1)', (tester) async {
+    await tester.pumpWidget(_appForGuest('/registration/evt-pub-1'));
+    await tester.tap(find.text('Open route'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(RegistrationScreen), findsOneWidget);
+    expect(find.text('Halaman tidak ditemukan'), findsNothing);
+  });
+
+  testWidgets('guest tetap ditolak pada route Admin (K2 D1-1)', (tester) async {
+    await tester.pumpWidget(_appForGuest('/admin/dashboard'));
+    await tester.tap(find.text('Open route'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.byType(AdminProfileScreen), findsNothing);
+  });
+
+  testWidgets('/invite/:token tanpa login diarahkan ke login dengan redirect', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_appForGuest('/invite/token-abc'));
+    await tester.tap(find.text('Open route'));
+    await tester.pumpAndSettle();
+
+    final login = tester.widget<LoginScreen>(find.byType(LoginScreen));
+    expect(login.redirectRoute, '/invite/token-abc');
+  });
+
+  testWidgets('/invite/:token setelah login membuka halaman penerimaan (K3)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_appFor('/invite/token-abc', UserRole.organizer));
+    await tester.tap(find.text('Open route'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(InvitationEntryScreen), findsOneWidget);
+    expect(find.text('Undangan Panitia Event'), findsOneWidget);
+  });
+
+  testWidgets('/staff/:eventId membuka workspace staf', (tester) async {
+    await tester.pumpWidget(_appFor('/staff/evt-1001', UserRole.staff));
+    await tester.tap(find.text('Open route'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(StaffDashboardScreen), findsOneWidget);
+  });
 }
