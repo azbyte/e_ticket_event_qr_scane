@@ -7,9 +7,12 @@ library;
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import '../../core/config/app_config.dart';
+import '../../core/errors/app_exception.dart';
 import '../../core/network/api_client.dart';
+import '../../core/services/session_service.dart';
 import 'event_activity_service.dart';
 import 'organizer_permission.dart';
 
@@ -23,6 +26,7 @@ class OrganizerAttendee {
     required this.ticketType,
     required this.ticketCode,
     required this.orderId,
+    this.registrationNumber = '-',
     required this.registrationMethod, // 'SELF_SERVICE' or 'ASSISTED'
     required this.orderStatus, // 'confirmed', 'pending', 'cancelled'
     required this.paymentStatus, // 'paid', 'pending', 'cancelled'
@@ -44,6 +48,7 @@ class OrganizerAttendee {
   final String ticketType;
   final String ticketCode;
   final String orderId;
+  final String registrationNumber;
   final String registrationMethod;
   final String orderStatus;
   final String paymentStatus;
@@ -64,6 +69,10 @@ class OrganizerAttendee {
         : null;
     final isCheckedIn =
         status == 'used' || status == 'checked_in' || checkedInAt != null;
+    final regNum = json['registration_number']?.toString() ??
+        json['order_number']?.toString() ??
+        json['ticket_code']?.toString() ??
+        '-';
 
     return OrganizerAttendee(
       id: json['id']?.toString() ?? '',
@@ -82,6 +91,7 @@ class OrganizerAttendee {
       orderId: json['order_number']?.toString() ??
           json['order_id']?.toString() ??
           '-',
+      registrationNumber: regNum,
       registrationMethod: 'SELF_SERVICE',
       orderStatus: (json['order_status'] ?? 'confirmed').toString().toLowerCase(),
       paymentStatus: (json['payment_status'] ?? 'paid').toString().toLowerCase(),
@@ -118,6 +128,8 @@ class OrganizerAttendee {
     String? checkedInBy,
     String? ticketStatus,
     bool? isOfflinePending,
+    String? registrationNumber,
+    Map<String, dynamic>? customFields,
   }) {
     return OrganizerAttendee(
       id: id,
@@ -128,6 +140,7 @@ class OrganizerAttendee {
       ticketType: ticketType,
       ticketCode: ticketCode,
       orderId: orderId,
+      registrationNumber: registrationNumber ?? this.registrationNumber,
       registrationMethod: registrationMethod,
       orderStatus: orderStatus,
       paymentStatus: paymentStatus,
@@ -138,6 +151,7 @@ class OrganizerAttendee {
       assistedBy: assistedBy,
       createdAt: createdAt,
       isOfflinePending: isOfflinePending ?? this.isOfflinePending,
+      customFields: customFields ?? this.customFields,
     );
   }
 }
@@ -215,7 +229,9 @@ class OrganizerReportMetrics {
 
 class OrganizerOperationsRepository extends ChangeNotifier {
   OrganizerOperationsRepository._internal() {
-    _initMockAttendees();
+    if (AppConfig.mockMode) {
+      _initMockAttendees();
+    }
   }
 
   static final OrganizerOperationsRepository instance =
@@ -378,34 +394,30 @@ class OrganizerOperationsRepository extends ChangeNotifier {
     if (AppConfig.mockMode) {
       return getEventReport(eventId);
     }
-    try {
-      final res = await ApiClient.instance.get('/events/$eventId/summary');
-      final summary = res['summary'] as Map<String, dynamic>? ?? {};
-      final ticketsSold = summary['tickets_sold'] as int? ?? summary['ticketsSold'] as int? ?? 0;
-      final checkedIn = summary['checked_in'] as int? ?? summary['checkedIn'] as int? ?? 0;
-      final gross = (summary['gross_sales'] as num? ?? summary['grossSales'] as num? ?? 0).toDouble();
-      final pendingOrders = summary['pending_orders'] as int? ?? summary['pendingOrders'] as int? ?? 0;
+    final res = await ApiClient.instance.get('/events/$eventId/summary');
+    final summary = res['summary'] as Map<String, dynamic>? ?? {};
+    final ticketsSold = summary['tickets_sold'] as int? ?? summary['ticketsSold'] as int? ?? 0;
+    final checkedIn = summary['checked_in'] as int? ?? summary['checkedIn'] as int? ?? 0;
+    final gross = (summary['gross_sales'] as num? ?? summary['grossSales'] as num? ?? 0).toDouble();
+    final pendingOrders = summary['pending_orders'] as int? ?? summary['pendingOrders'] as int? ?? 0;
 
-      final commission = gross * 0.05;
-      final gatewayFee = (ticketsSold + pendingOrders) * 2500.0;
-      final proceeds = gross - commission - gatewayFee;
+    final commission = (summary['platform_commission'] as num? ?? (gross * 0.05)).toDouble();
+    final gatewayFee = (summary['payment_gateway_fee'] as num? ?? ((ticketsSold + pendingOrders) * 5000.0)).toDouble();
+    final proceeds = (summary['organizer_proceeds'] as num? ?? (gross - commission - gatewayFee)).toDouble();
 
-      return OrganizerReportMetrics(
-        eventId: eventId,
-        totalOrders: ticketsSold + pendingOrders,
-        totalTicketsSold: ticketsSold,
-        totalCheckedIn: checkedIn,
-        checkInRate: ticketsSold > 0 ? (checkedIn / ticketsSold) * 100 : 0.0,
-        grossSales: gross,
-        platformCommission: commission,
-        paymentGatewayFee: gatewayFee,
-        organizerProceeds: proceeds > 0 ? proceeds : 0.0,
-        packageRevenue: 0.0,
-        tierBreakdown: {},
-      );
-    } catch (_) {
-      return getEventReport(eventId);
-    }
+    return OrganizerReportMetrics(
+      eventId: eventId,
+      totalOrders: ticketsSold + pendingOrders,
+      totalTicketsSold: ticketsSold,
+      totalCheckedIn: checkedIn,
+      checkInRate: ticketsSold > 0 ? (checkedIn / ticketsSold) * 100 : 0.0,
+      grossSales: gross,
+      platformCommission: commission,
+      paymentGatewayFee: gatewayFee,
+      organizerProceeds: proceeds > 0 ? proceeds : 0.0,
+      packageRevenue: 0.0,
+      tierBreakdown: {},
+    );
   }
 
   List<OrganizerAttendee> getAttendeesForEvent(
@@ -418,7 +430,7 @@ class OrganizerOperationsRepository extends ChangeNotifier {
   }) {
     final query = search.trim().toLowerCase();
 
-    return _attendees.where((a) {
+    final filtered = _attendees.where((a) {
       if (a.eventId != eventId) return false;
 
       // Status filter
@@ -458,6 +470,17 @@ class OrganizerOperationsRepository extends ChangeNotifier {
 
       return true;
     }).toList();
+
+    filtered.sort((a, b) {
+      final aPaid = a.paymentStatus.toLowerCase() == 'paid' ? 0 : 1;
+      final bPaid = b.paymentStatus.toLowerCase() == 'paid' ? 0 : 1;
+      if (aPaid != bPaid) return aPaid.compareTo(bPaid);
+      final regComp = a.registrationNumber.compareTo(b.registrationNumber);
+      if (regComp != 0) return regComp;
+      return a.orderId.compareTo(b.orderId);
+    });
+
+    return filtered;
   }
 
   // ---------------------------------------------------------------------------
@@ -908,5 +931,78 @@ class OrganizerOperationsRepository extends ChangeNotifier {
     );
 
     return buffer.toString();
+  }
+
+  Future<String> exportAttendeesCsvFromApi(
+    String eventId, [
+    OrganizerMembershipContext? context,
+  ]) async {
+    if (context != null) {
+      if (context.eventId != eventId) {
+        throw Exception(
+          'Akses ditolak: keanggotaan tidak berlaku untuk event ini.',
+        );
+      }
+      if (!context.hasPermission(OrganizerPermission.exportParticipants)) {
+        throw Exception(
+          'Akses ditolak: Anda tidak memiliki izin EXPORT_PARTICIPANTS.',
+        );
+      }
+    }
+
+    if (AppConfig.mockMode) {
+      return exportAttendeesCsv(
+        eventId,
+        context ??
+            OrganizerMembershipContext.owner(
+              userId: 'usr-org-001',
+              userName: 'Penyelenggara (Mock)',
+              eventId: eventId,
+            ),
+      );
+    }
+
+    final base = Uri.parse(
+      AppConfig.apiBaseUrl.endsWith('/')
+          ? AppConfig.apiBaseUrl
+          : '${AppConfig.apiBaseUrl}/',
+    );
+    final uri = base.resolve('events/$eventId/attendees/export');
+    final token = await SessionService.instance.readToken();
+    final headers = <String, String>{
+      'Accept': 'text/csv',
+    };
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    final response = await http.get(uri, headers: headers).timeout(
+      Duration(seconds: AppConfig.receiveTimeoutSeconds),
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (context != null) {
+        EventActivityLogger.instance.log(
+          eventId: eventId,
+          actorId: context.userId,
+          actorName: context.userName,
+          action: 'EXPORT_ATTENDEES',
+          summary:
+              '${context.userName} mengekspor data peserta ke CSV dari server.',
+        );
+      }
+      return response.body;
+    }
+
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      throw AuthException(
+        'Akses ditolak untuk ekspor peserta acara ini.',
+        statusCode: response.statusCode,
+      );
+    }
+    throw NetworkException(
+      'Gagal mengunduh data ekspor peserta (${response.statusCode}).',
+      statusCode: response.statusCode,
+    );
   }
 }

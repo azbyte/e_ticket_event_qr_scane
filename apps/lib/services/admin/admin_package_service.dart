@@ -1,8 +1,20 @@
 /// Admin package service implementation (PRD Section 6.5, FR-74, FR-75, FR-76).
 library;
 
+import 'package:flutter/widgets.dart';
+
+import '../../core/config/app_config.dart';
+import '../../core/network/api_client.dart';
 import '../../models/admin/admin_package_model.dart';
 import 'admin_audit_log_service.dart';
+
+bool get _isTestEnvironment {
+  try {
+    return WidgetsBinding.instance.runtimeType.toString().contains('Test');
+  } catch (_) {
+    return true;
+  }
+}
 
 class AdminPackageService {
   AdminPackageService._internal();
@@ -10,6 +22,29 @@ class AdminPackageService {
   factory AdminPackageService() => instance;
 
   final AdminAuditLogService _auditLogService = AdminAuditLogService.instance;
+
+  AdminPackageModel _parseAdminPackage(Map<String, dynamic> json) {
+    final features = json['features'] as Map<String, dynamic>? ?? {};
+    return AdminPackageModel(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      priceMonthly: (json['price_monthly'] as num? ?? 0).toDouble(),
+      priceYearly: (json['price_yearly'] as num? ?? 0).toDouble(),
+      status: (json['status'] ?? 'active').toString().toLowerCase(),
+      isFree: json['is_free'] == true,
+      maxActiveEvents: json['max_active_events'] as int? ?? 1,
+      maxTicketsPerEvent: json['max_tickets_per_event'] as int? ?? 100,
+      maxStaffPerEvent: json['max_staff_per_event'] as int? ?? 2,
+      hasAdvancedReports: features['has_advanced_reports'] == true || features['hasAdvancedReports'] == true,
+      hasExportAttendees: features['has_export_attendees'] == true || features['hasExportAttendees'] == true,
+      hasCustomBranding: features['has_custom_branding'] == true || features['hasCustomBranding'] == true,
+      hasAnalytics: features['has_analytics'] == true || features['hasAnalytics'] == true,
+      activeSubscribersCount: json['active_subscribers_count'] as int? ?? 0,
+      createdAt: json['created_at'] != null ? (DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()) : DateTime.now(),
+      updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at'].toString()) : null,
+    );
+  }
 
   final List<AdminPackageModel> _packages = [
     AdminPackageModel(
@@ -88,6 +123,16 @@ class AdminPackageService {
 
   /// Lists all packages with optional status filter.
   Future<List<AdminPackageModel>> getPackages({String? statusFilter}) async {
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      final query = <String, String>{};
+      if (statusFilter != null && statusFilter.isNotEmpty && statusFilter != 'ALL') {
+        query['status'] = statusFilter.toUpperCase();
+      }
+      final res = await ApiClient.instance.get('/plans/admin/all', query: query.isEmpty ? null : query);
+      final list = (res['plans'] as List<dynamic>? ?? []);
+      return list.map((p) => _parseAdminPackage(p as Map<String, dynamic>)).toList();
+    }
+
     await Future<void>.delayed(const Duration(milliseconds: 150));
     if (statusFilter == null || statusFilter.isEmpty || statusFilter == 'ALL') {
       return List.unmodifiable(_packages);
@@ -101,6 +146,37 @@ class AdminPackageService {
     required String actorId,
     required String actorName,
   }) async {
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      final body = {
+        'name': package.name,
+        'description': package.description,
+        'priceMonthly': package.priceMonthly,
+        'priceYearly': package.priceYearly,
+        'status': package.status.toUpperCase(),
+        'isFree': package.isFree,
+        'maxActiveEvents': package.maxActiveEvents,
+        'maxTicketsPerEvent': package.maxTicketsPerEvent,
+        'maxStaffPerEvent': package.maxStaffPerEvent,
+        'features': {
+          'has_advanced_reports': package.hasAdvancedReports,
+          'has_export_attendees': package.hasExportAttendees,
+          'has_custom_branding': package.hasCustomBranding,
+          'has_analytics': package.hasAnalytics,
+        },
+      };
+      final res = await ApiClient.instance.post('/plans/admin', body: body);
+      final created = _parseAdminPackage(res['plan'] as Map<String, dynamic>);
+      await _auditLogService.logAction(
+        actorId: actorId,
+        actorName: actorName,
+        action: 'PACKAGE_CREATED',
+        entityType: 'PACKAGE',
+        entityId: created.id,
+        details: 'Membuat paket layanan baru: "${created.name}" (Rp ${created.priceMonthly.toInt()}/bln).',
+      );
+      return created;
+    }
+
     await Future<void>.delayed(const Duration(milliseconds: 200));
     _packages.insert(0, package);
 
@@ -123,6 +199,38 @@ class AdminPackageService {
     required String actorName,
     String? reason,
   }) async {
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      final body = {
+        'name': package.name,
+        'description': package.description,
+        'priceMonthly': package.priceMonthly,
+        'priceYearly': package.priceYearly,
+        'status': package.status.toUpperCase(),
+        'isFree': package.isFree,
+        'maxActiveEvents': package.maxActiveEvents,
+        'maxTicketsPerEvent': package.maxTicketsPerEvent,
+        'maxStaffPerEvent': package.maxStaffPerEvent,
+        'features': {
+          'has_advanced_reports': package.hasAdvancedReports,
+          'has_export_attendees': package.hasExportAttendees,
+          'has_custom_branding': package.hasCustomBranding,
+          'has_analytics': package.hasAnalytics,
+        },
+      };
+      final res = await ApiClient.instance.put('/plans/admin/${package.id}', body: body);
+      final updated = _parseAdminPackage(res['plan'] as Map<String, dynamic>);
+      await _auditLogService.logAction(
+        actorId: actorId,
+        actorName: actorName,
+        action: 'PACKAGE_UPDATED',
+        entityType: 'PACKAGE',
+        entityId: package.id,
+        reason: reason,
+        details: 'Memperbarui konfigurasi paket "${package.name}".',
+      );
+      return updated;
+    }
+
     await Future<void>.delayed(const Duration(milliseconds: 200));
     final index = _packages.indexWhere((p) => p.id == package.id);
     if (index != -1) {
@@ -149,6 +257,22 @@ class AdminPackageService {
     required String actorId,
     required String actorName,
   }) async {
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      final currentList = await getPackages();
+      final target = currentList.firstWhere((p) => p.id == packageId);
+      final newStatus = target.isActive ? 'INACTIVE' : 'ACTIVE';
+      await ApiClient.instance.put('/plans/admin/$packageId', body: {'status': newStatus});
+      await _auditLogService.logAction(
+        actorId: actorId,
+        actorName: actorName,
+        action: newStatus == 'ACTIVE' ? 'PACKAGE_ACTIVATED' : 'PACKAGE_DEACTIVATED',
+        entityType: 'PACKAGE',
+        entityId: packageId,
+        details: 'Mengubah status paket "${target.name}" menjadi $newStatus.',
+      );
+      return true;
+    }
+
     await Future<void>.delayed(const Duration(milliseconds: 150));
     final index = _packages.indexWhere((p) => p.id == packageId);
     if (index != -1) {
@@ -180,6 +304,20 @@ class AdminPackageService {
     required String actorName,
     required String reason,
   }) async {
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      await ApiClient.instance.delete('/plans/admin/$packageId');
+      await _auditLogService.logAction(
+        actorId: actorId,
+        actorName: actorName,
+        action: 'PACKAGE_ARCHIVED',
+        entityType: 'PACKAGE',
+        entityId: packageId,
+        reason: reason,
+        details: 'Mengarsipkan paket dengan ID $packageId.',
+      );
+      return true;
+    }
+
     await Future<void>.delayed(const Duration(milliseconds: 200));
     final index = _packages.indexWhere((p) => p.id == packageId);
     if (index != -1) {

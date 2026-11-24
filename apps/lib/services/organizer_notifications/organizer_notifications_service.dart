@@ -98,7 +98,7 @@ class OrganizerNotificationService {
           )
           .toList();
     } catch (_) {
-      return _mockItems;
+      rethrow;
     }
   }
 

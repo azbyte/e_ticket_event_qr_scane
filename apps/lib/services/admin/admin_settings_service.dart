@@ -28,7 +28,7 @@ class AdminSettingsService {
     contactEmail: 'support@eventplatform.id',
     contactPhone: '+62 812-3456-7890',
     ticketCommissionRate: 5.0, // 5%
-    fixedServiceFee: 2500.0, // Rp 2.500
+    fixedServiceFee: 5000.0, // Rp 5.000
     orderPaymentTimeoutMinutes: 120, // 2 jam
     termsOfServiceUrl: 'https://eventplatform.id/terms',
     privacyPolicyUrl: 'https://eventplatform.id/privacy',
@@ -45,9 +45,9 @@ class AdminSettingsService {
       actorName: 'Super Admin',
       oldCommissionRate: 8.0,
       newCommissionRate: 7.0,
-      oldFixedFee: 3000.0,
-      newFixedFee: 2500.0,
-      reason: 'Penetapan tarif awal operasional platform.',
+      oldFixedFee: 5000.0,
+      newFixedFee: 5000.0,
+      reason: 'Penetapan tarif operasional platform Rp 5.000 sesuai kebijakan C-01.',
     ),
     FeeChangeHistoryEntry(
       id: 'fch-002',
@@ -56,9 +56,9 @@ class AdminSettingsService {
       actorName: 'Super Admin',
       oldCommissionRate: 7.0,
       newCommissionRate: 5.0,
-      oldFixedFee: 2500.0,
-      newFixedFee: 2500.0,
-      reason: 'Kebijakan promosi kuartal pertama untuk mendukung pertumbuhan event organizer.',
+      oldFixedFee: 5000.0,
+      newFixedFee: 5000.0,
+      reason: 'Kebijakan promosi kuartal untuk mendukung pertumbuhan event organizer (read-only C-01).',
     ),
   ];
 
@@ -78,8 +78,8 @@ class AdminSettingsService {
           }
         }
         return _settings;
-      } catch (_) {
-        // Fallback to cached or default
+      } catch (e) {
+        rethrow;
       }
     }
     await Future<void>.delayed(const Duration(milliseconds: 150));
