@@ -15,21 +15,21 @@ class ScanResultScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = result['status'] as String? ?? 'invalid';
-    final isAlreadyUsed = status == 'already_checked_in';
-    final isOffline = status == 'queued_offline' || result['is_offline'] == true;
+    final rawStatus = (result['status'] as String? ?? 'invalid').toLowerCase();
+    final isAlreadyUsed = rawStatus == 'already_checked_in' || rawStatus == 'already_used';
+    final isOffline = rawStatus == 'queued_offline' || result['is_offline'] == true;
 
     Color headerColor;
     IconData headerIcon;
     String statusTitle;
     String statusSubtitle;
 
-    if (status == 'valid') {
+    if (rawStatus == 'valid') {
       headerColor = Colors.green;
       headerIcon = Icons.check_circle_outline;
       statusTitle = 'CHECK-IN BERHASIL';
       statusSubtitle = 'Tiket valid dan kehadiran berhasil diverifikasi.';
-    } else if (status == 'queued_offline') {
+    } else if (rawStatus == 'queued_offline') {
       headerColor = Colors.blue;
       headerIcon = Icons.cloud_queue;
       statusTitle = 'TERSINKRON OFFLINE';
@@ -39,6 +39,26 @@ class ScanResultScreen extends StatelessWidget {
       headerIcon = Icons.warning_amber_rounded;
       statusTitle = 'TIKET SUDAH DIGUNAKAN';
       statusSubtitle = 'Pencegahan Check-in Ganda: Tiket ini telah dipakai sebelumnya.';
+    } else if (rawStatus == 'wrong_event') {
+      headerColor = Colors.orange;
+      headerIcon = Icons.wrong_location_outlined;
+      statusTitle = 'EVENT TIDAK SESUAI';
+      statusSubtitle = result['message'] as String? ?? 'Tiket tidak berlaku untuk event ini.';
+    } else if (rawStatus == 'payment_required') {
+      headerColor = Colors.deepOrange;
+      headerIcon = Icons.payment_outlined;
+      statusTitle = 'PEMBAYARAN BELUM LUNAS';
+      statusSubtitle = result['message'] as String? ?? 'Pembayaran belum terkonfirmasi. Tiket belum dapat check-in.';
+    } else if (rawStatus == 'cancelled') {
+      headerColor = Colors.red;
+      headerIcon = Icons.block;
+      statusTitle = 'TIKET DIBATALKAN';
+      statusSubtitle = result['message'] as String? ?? 'Tiket ini telah dibatalkan.';
+    } else if (rawStatus == 'revoked') {
+      headerColor = Colors.red;
+      headerIcon = Icons.remove_circle_outline;
+      statusTitle = 'TIKET DICABUT';
+      statusSubtitle = result['message'] as String? ?? 'Tiket telah dicabut oleh penyelenggara.';
     } else {
       headerColor = Colors.red;
       headerIcon = Icons.cancel_outlined;
@@ -49,9 +69,16 @@ class ScanResultScreen extends StatelessWidget {
     final ticketData = (result['ticket'] as Map<String, dynamic>?) ?? {};
     final attendeeName = ticketData['attendee_name'] as String? ?? 'Tidak diketahui';
     final attendeeEmail = ticketData['attendee_email'] as String? ?? '-';
-    final ticketCode = ticketData['token'] as String? ?? ticketData['id'] as String? ?? '-';
-    final ticketType = ticketData['ticket_type'] as String? ?? 'General Admission';
-    final eventTitle = ticketData['event_title'] as String? ?? 'Tech Innovation Summit 2026';
+    final ticketCode = ticketData['ticket_code'] as String? ??
+        ticketData['token'] as String? ??
+        ticketData['id'] as String? ??
+        '-';
+    final ticketType = ticketData['ticket_type'] as String? ??
+        ticketData['ticket_type_name'] as String? ??
+        'General Admission';
+    final eventTitle = ticketData['event_title'] as String? ??
+        ticketData['events_title'] as String? ??
+        'Tech Innovation Summit 2026';
 
     return Scaffold(
       appBar: AppBar(
