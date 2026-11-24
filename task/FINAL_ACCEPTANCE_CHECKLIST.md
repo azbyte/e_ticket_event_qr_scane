@@ -1,3 +1,6 @@
+> ⚠️ **VERSI AKTIF (2026-11-25).** Checklist pengisian Tahap 3 ada di [`TAHAP_3/FINAL_ACCEPTANCE_CHECKLIST.md`](TAHAP_3/FINAL_ACCEPTANCE_CHECKLIST.md). Dokumen ini dipertahankan sebagai riwayat.
+
+
 # FINAL ACCEPTANCE CHECKLIST — E-Ticket Event
 
 - **Versi:** 1.0 (2026-11-23)

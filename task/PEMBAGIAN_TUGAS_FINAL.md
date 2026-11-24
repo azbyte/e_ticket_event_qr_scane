@@ -1,3 +1,6 @@
+> **Revisi 2026-11-25 — model Tahap 3.** Tahap 3 dijalankan dengan **FASE 1: Developer 2 + Developer 3 paralel** (tanpa Developer 1) lalu **FASE 2: Developer 1** menyelesaikan integrasi, implementasi tersisa, audit, dan acceptance. Rincian ada di [`TAHAP_3/README_TAHAP_3.md`](TAHAP_3/README_TAHAP_3.md). Bagian dokumen ini yang menyebut Developer 4 sebagai pelaksana Tahap 3 digantikan oleh model tersebut.
+
+
 # PEMBAGIAN TUGAS FINAL — Roadmap Penyelesaian E-Ticket Event
 
 - **Versi:** 3.0 (audit & restrukturisasi 2026-11-23)
@@ -16,7 +19,7 @@
 | Kontrak API lintas developer | [`TAHAP_2/INTEGRATION_CONTRACT.md`](TAHAP_2/INTEGRATION_CONTRACT.md) |
 | Kepemilikan file | [`TAHAP_2/INTEGRATION_CONTRACT.md`](TAHAP_2/INTEGRATION_CONTRACT.md) Bagian 2 + [`TAHAP_2/FILE_OWNERSHIP.md`](TAHAP_2/FILE_OWNERSHIP.md) (ringkasan) |
 | Lembar kerja per developer Tahap 2 | `TAHAP_2/DEVELOPER_{1,2,3}_TASK.md` |
-| Rincian task Tahap 3 + gate G3 | [`TAHAP_3/RENCANA_KERJA.md`](TAHAP_3/RENCANA_KERJA.md) |
+| Rincian task Tahap 3 + gate | [`TAHAP_3/README_TAHAP_3.md`](TAHAP_3/README_TAHAP_3.md) |
 | Checklist penerimaan akhir (diisi di Tahap 3) | [`FINAL_ACCEPTANCE_CHECKLIST.md`](FINAL_ACCEPTANCE_CHECKLIST.md) |
 | Kebutuhan perubahan database (tidak diotorisasi) | [`DB_CHANGE_PROPOSAL.md`](DB_CHANGE_PROPOSAL.md) |
 | Otoritas DB/FINISHING | [`FINISHING_AUTHORITY.md`](FINISHING_AUTHORITY.md) |
@@ -88,7 +91,7 @@ Protokol lama hanya tersimpan historis di `archive/PEMBAGIAN_TUGAS_FINAL_PRA_AUD
 
 **Alasan pembagian:** ketiga domain hampir tidak berpotongan file, dapat berjalan paralel setelah D1-1/D1-2 selesai, dan masing-masing menghasilkan satu alur bisnis utuh yang dapat diuji mandiri.
 
-**Developer 4 (FINISHING/integrator)** adalah pelaksana Tunggal Tahap 3 (13 task: T3-01 … T3-13). D4 **tidak** mengambil alih domain D1/D2/D3: bila menemukan bug domain, D4 melaporkan dan owner memperbaiki. Rincian di [`TAHAP_3/RENCANA_KERJA.md`](TAHAP_3/RENCANA_KERJA.md) §B.
+**Developer 4 (FINISHING/integrator)** tidak lagi menjadi pelaksana Tahap 3. Tahap 3 memakai model **FASE 1 (Developer 2 + Developer 3 paralel) → FASE 2 (Developer 1)**; rincian di [`TAHAP_3/README_TAHAP_3.md`](TAHAP_3/README_TAHAP_3.md).
 
 ---
 
@@ -291,7 +294,7 @@ Gate G2 **gagal** bila salah satu belum terpenuhi. Tahap 3 tidak boleh dimulai u
 | 2 | W2: D1-3, D1-4, D2-2, D3-2, D3-4 | Semua task W2 selesai |
 | 3 | W3: D1-5, D2-3, D2-4, D3-5 (parsial) | Semua task W3 selesai |
 | 4 | W4: integrasi, perbaikan, gate G2 | G2 lulus |
-| 5–6 | Tahap 3 — **Developer 4** (T3-01 … T3-13) | Gate G3 lulus |
+| 5–6 | Tahap 3 — **FASE 1: D2 + D3 paralel; FASE 2: D1** | Gate F1 + F2 (`TAHAP_3/README_TAHAP_3.md` §5) |
 
 Jika pemilik proyek mempercepat/memperlambat, urutan dependency dan gate tidak boleh diubah.
 
