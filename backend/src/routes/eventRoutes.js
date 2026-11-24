@@ -32,7 +32,9 @@ router.get('/mine', authMiddleware, allowRoles('organizer'), getMyEvents);
 router.get('/:id/summary', authMiddleware, allowRoles('organizer', 'admin'), eventMetrics.getEventSummary);
 router.get('/:id/sales', authMiddleware, allowRoles('organizer', 'admin'), eventMetrics.getEventSalesPoints);
 router.get('/:eventId/ticket-types', optionalAuth, ticketTypes.listEventTicketTypes);
-router.get('/:eventId/attendees', authMiddleware, allowRoles('organizer', 'admin'), listEventAttendees);
+// Daftar peserta: `staff` harus lolos gate route, sedangkan otorisasi sebenarnya
+// berbasis permission `VIEW_PARTICIPANTS` di controller (D3-1 K4).
+router.get('/:eventId/attendees', authMiddleware, allowRoles('organizer', 'admin', 'staff'), listEventAttendees);
 router.get('/:eventId/invitations', authMiddleware, allowRoles('organizer', 'admin'), listInvitations);
 router.post('/:eventId/invitations', authMiddleware, allowRoles('organizer', 'admin'), createInvitation);
 router.delete('/:eventId/invitations/:invitationId', authMiddleware, allowRoles('organizer', 'admin'), revokeInvitation);

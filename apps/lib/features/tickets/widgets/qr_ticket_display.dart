@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../core/theme/app_theme.dart';
 
@@ -38,37 +39,28 @@ class QrTicketDisplay extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Visual QR Matrix Box
-          Container(
-            width: size,
-            height: size,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade300, width: 2),
-            ),
-            child: CustomPaint(
-              painter: _MockQrPatternPainter(seed: ticketData.hashCode),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.15),
-                        blurRadius: 4,
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.qr_code_2,
-                    size: 32,
-                    color: AppTheme.primaryColor,
-                  ),
-                ),
+          // QR code asli dari token tiket (AC-06). Payload hanya identifier
+          // tiket; tidak memuat email/telepon/harga (FR-36).
+          Semantics(
+            label: 'QR code e-ticket',
+            child: Container(
+              width: size,
+              height: size,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300, width: 2),
+              ),
+              child: QrImageView(
+                key: const Key('ticket-qr-image'),
+                data: ticketData,
+                version: QrVersions.auto,
+                size: size - 24,
+                gapless: true,
+                errorCorrectionLevel: QrErrorCorrectLevel.M,
+                backgroundColor: Colors.white,
+                semanticsLabel: 'QR code e-ticket',
               ),
             ),
           ),
@@ -134,81 +126,4 @@ class QrTicketDisplay extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Stylized QR pattern painter representing an authentic 2D matrix
-class _MockQrPatternPainter extends CustomPainter {
-  _MockQrPatternPainter({required this.seed});
-
-  final int seed;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.black87
-      ..style = PaintingStyle.fill;
-
-    const int grid = 17;
-    final cellSize = size.width / grid;
-
-    // Corner Finder Patterns (Top-Left, Top-Right, Bottom-Left)
-    _drawFinderPattern(canvas, 0, 0, cellSize, paint);
-    _drawFinderPattern(canvas, (grid - 5) * cellSize, 0, cellSize, paint);
-    _drawFinderPattern(canvas, 0, (grid - 5) * cellSize, cellSize, paint);
-
-    // Pseudorandom internal matrix based on seed
-    var s = seed.abs();
-    for (int r = 0; r < grid; r++) {
-      for (int c = 0; c < grid; c++) {
-        // Skip finder pattern zones
-        if ((r < 5 && c < 5) || (r < 5 && c >= grid - 5) || (r >= grid - 5 && c < 5)) {
-          continue;
-        }
-        // Skip center logo zone
-        if (r >= 6 && r <= 10 && c >= 6 && c <= 10) {
-          continue;
-        }
-
-        s = (s * 1103515245 + 12345) & 0x7fffffff;
-        if (s % 3 == 0) {
-          canvas.drawRRect(
-            RRect.fromRectAndRadius(
-              Rect.fromLTWH(c * cellSize + 0.5, r * cellSize + 0.5, cellSize - 1, cellSize - 1),
-              const Radius.circular(1.5),
-            ),
-            paint,
-          );
-        }
-      }
-    }
-  }
-
-  void _drawFinderPattern(Canvas canvas, double x, double y, double cellSize, Paint paint) {
-    final outerSize = cellSize * 5;
-    final strokePaint = Paint()
-      ..color = Colors.black87
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = cellSize;
-
-    // Outer frame
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(x + cellSize / 2, y + cellSize / 2, outerSize - cellSize, outerSize - cellSize),
-        Radius.circular(cellSize),
-      ),
-      strokePaint,
-    );
-
-    // Inner dot
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(x + cellSize * 1.5, y + cellSize * 1.5, cellSize * 2, cellSize * 2),
-        Radius.circular(cellSize * 0.5),
-      ),
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _MockQrPatternPainter oldDelegate) => oldDelegate.seed != seed;
 }

@@ -1,7 +1,7 @@
 ﻿const asyncHandler = require('express-async-handler');
-const { query, getOne, pool } = require('../config/db');
+const { query, getOne } = require('../config/db');
 const { getAuthorizedOrder } = require('./orderController');
-const { assertScanPermission, normalizeTicketStatus } = require('./checkInController');
+const { assertScanPermission, normalizeTicketStatus, commitCheckIn } = require('./checkInController');
 const tokens = require('../services/ticketTokenService');
 const emailService = require('../services/emailService');
 const logger = require('../utils/logger');
@@ -126,31 +126,19 @@ const verifyTicket = asyncHandler(async (req, res) => {
     return res.status(409).json({ success: false, message: 'Ticket already used', ticket: await tokens.presentTicket(ticket) });
   }
 
-  const now = new Date().toISOString();
-  const client = await pool.connect();
-  let updated;
-  try {
-    await client.query('BEGIN');
-    const result = await client.query(
-      `UPDATE tickets SET status='used', used_at=$1 WHERE id=$2 AND status<>'used' RETURNING *`,
-      [now, ticket.id]
-    );
-    updated = result.rows[0];
-    if (!updated) { const err = new Error('Ticket already used'); err.statusCode = 409; throw err; }
-    await client.query(
-      `INSERT INTO scan_logs
-       (id,event_id,ticket_id,scanned_by_user_id,event_member_id,result,is_offline,scanned_at)
-       VALUES (gen_random_uuid(),$1,$2,$3,$4,'VALID',false,$5)`,
-      [ticket.event_id, ticket.id, req.user.id, memberId, now]
-    );
-    await client.query('COMMIT');
-  } catch (error) {
-    try { await client.query('ROLLBACK'); } catch (_) { /* transaksi sudah berakhir */ }
-    throw error;
-  } finally { client.release(); }
+  // D2-4 K3: verifikasi harus membuat baris check_ins (bukan hanya mengubah
+  // status tiket) supaya riwayat dan audit tetap lengkap. Jalur ini memakai
+  // transaksi atomik yang sama dengan POST /api/check-ins.
+  const { checkIn, checkedInAt } = await commitCheckIn({ ticket, user: req.user, memberId });
 
   logger.info('ticket_verified', { ticketId: ticket.id, eventId: ticket.event_id });
-  res.json({ success: true, message: 'Ticket verified successfully', ticket: await tokens.presentTicket({ ...ticket, ...updated }) });
+  res.json({
+    success: true,
+    message: 'Ticket verified successfully',
+    check_in: checkIn,
+    checked_in_at: checkedInAt,
+    ticket: await tokens.presentTicket({ ...ticket, status: 'used', used_at: checkedInAt }),
+  });
 });
 
 const resendTicketEmail = asyncHandler(async (req, res) => {

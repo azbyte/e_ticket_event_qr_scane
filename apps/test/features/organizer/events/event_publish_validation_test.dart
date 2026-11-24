@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+import 'package:e_ticket_event_qr_scane/core/config/app_config.dart';
 import 'package:e_ticket_event_qr_scane/features/organizer/events/screens/organizer_event_detail_screen.dart';
 import 'package:e_ticket_event_qr_scane/models/event/event_model.dart';
 import 'package:e_ticket_event_qr_scane/models/event/ticket_type_model.dart';
@@ -137,5 +138,7 @@ void main() {
     expect(find.text('Terbitkan event'), findsOneWidget);
     // Aksi moderasi lama tidak ditampilkan pada mode API.
     expect(find.byKey(const Key('summary-submit-button')), findsNothing);
-  });
+  },
+      // Mode demo menampilkan aksi moderasi simulasi, bukan alur publish API.
+      skip: AppConfig.mockMode);
 }

@@ -1,14 +1,17 @@
 /// QR scanner screen (PRD sections 4.5, 7.5 B).
 ///
-/// Provides camera viewfinder placeholder, manual ticket code entry,
-/// and interactive test triggers for valid, duplicate, and invalid tickets.
+/// Memakai kamera nyata (`mobile_scanner`) untuk memindai QR e-ticket, dengan
+/// input kode manual sebagai fallback bila kamera tidak tersedia. Mode offline
+/// dan tombol simulasi **tidak** ditampilkan pada alur MVP; keduanya hanya
+/// tersedia saat `MOCK_MODE=true` untuk keperluan demo.
 library;
 
 import 'package:flutter/material.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../providers/check_in_provider.dart';
 import '../../../services/check_in/check_in_service.dart';
-import '../widgets/scanner_placeholder.dart';
+import '../widgets/camera_scanner_view.dart';
 import 'scan_result_screen.dart';
 
 class ScannerScreen extends StatefulWidget {
@@ -17,13 +20,16 @@ class ScannerScreen extends StatefulWidget {
     this.checkInProvider,
     this.staffId = 'stf-001',
     this.staffName = 'Budi Santoso',
-    this.eventId = 'evt-1001',
+    this.eventId = '',
     this.initialCameraPermission = true,
   });
 
   final CheckInProvider? checkInProvider;
   final String staffId;
   final String staffName;
+
+  /// Event pos pemindaian. Wajib diisi pada alur MVP agar backend dapat
+  /// memvalidasi izin petugas dan kesesuaian tiket dengan event.
   final String eventId;
   final bool initialCameraPermission;
 
@@ -36,6 +42,9 @@ class _ScannerScreenState extends State<ScannerScreen> {
   final TextEditingController _tokenController = TextEditingController();
   bool _isFlashOn = false;
   late bool _hasCameraPermission;
+
+  /// Mencegah double-submit selama hasil pindai masih diproses (D2-3 K5).
+  bool _isProcessing = false;
 
   @override
   void initState() {
@@ -51,10 +60,12 @@ class _ScannerScreenState extends State<ScannerScreen> {
   }
 
   Future<void> _handleScan(String token) async {
-    if (token.trim().isEmpty) return;
+    final value = token.trim();
+    if (value.isEmpty || _isProcessing) return;
 
+    setState(() => _isProcessing = true);
     final result = await _provider.processTicketScan(
-      token.trim(),
+      value,
       staffId: widget.staffId,
       staffName: widget.staffName,
       eventId: widget.eventId,
@@ -62,13 +73,17 @@ class _ScannerScreenState extends State<ScannerScreen> {
 
     if (!mounted) return;
     _tokenController.clear();
+    setState(() => _isProcessing = false);
 
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => ScanResultScreen(result: result),
-      ),
+      MaterialPageRoute(builder: (_) => ScanResultScreen(result: result)),
     );
+  }
+
+  void _handleCameraUnavailable() {
+    if (!mounted) return;
+    setState(() => _hasCameraPermission = false);
   }
 
   Widget _buildCameraPermissionDenied() {
@@ -118,8 +133,6 @@ class _ScannerScreenState extends State<ScannerScreen> {
     return ListenableBuilder(
       listenable: _provider,
       builder: (context, _) {
-        final isOffline = _provider.isOfflineMode;
-
         return Scaffold(
           appBar: AppBar(
             title: const Text('Pemindai QR Tiket'),
@@ -133,37 +146,22 @@ class _ScannerScreenState extends State<ScannerScreen> {
                   });
                 },
               ),
-              IconButton(
-                tooltip: isOffline ? 'Mode Offline' : 'Mode Online',
-                icon: Icon(
-                  isOffline ? Icons.wifi_off : Icons.wifi,
-                  color: isOffline ? Colors.orange : Colors.greenAccent,
-                ),
-                onPressed: () {
-                  _provider.toggleOfflineMode(!isOffline);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        !isOffline
-                            ? 'Mode Offline aktif. Scan akan disimpan lokal.'
-                            : 'Mode Online aktif. Scan langsung ke server.',
-                      ),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                },
-              ),
             ],
           ),
           body: Stack(
             children: [
               Column(
                 children: [
-                  // Viewfinder Section (atau tampilan izin ditolak)
+                  // Viewfinder kamera nyata (atau state izin ditolak).
                   Expanded(
                     flex: 4,
                     child: _hasCameraPermission
-                        ? const ScannerPlaceholder()
+                        ? CameraScannerView(
+                            torchEnabled: _isFlashOn,
+                            paused: _isProcessing,
+                            onDetected: _handleScan,
+                            onPermissionDenied: _handleCameraUnavailable,
+                          )
                         : _buildCameraPermissionDenied(),
                   ),
 
@@ -190,131 +188,122 @@ class _ScannerScreenState extends State<ScannerScreen> {
                       ),
                     ),
 
-                  // Bottom Control & Simulation Panel
+                  // Panel kontrol bawah (input manual + status).
                   Expanded(
                     flex: 5,
                     child: Container(
-                  color: Theme.of(context).colorScheme.surface,
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Manual Token Input
-                        Row(
+                      color: Theme.of(context).colorScheme.surface,
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _tokenController,
-                                decoration: InputDecoration(
-                                  labelText: 'Input Kode / Token Tiket',
-                                  hintText: 'Contoh: TK-TECH-003',
-                                  prefixIcon: const Icon(Icons.keyboard),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                            // Manual Token Input
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _tokenController,
+                                    enabled: !_isProcessing,
+                                    decoration: InputDecoration(
+                                      labelText: 'Input Kode / Token Tiket',
+                                      hintText: 'Tempel token QR di sini',
+                                      prefixIcon: const Icon(Icons.keyboard),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      isDense: true,
+                                    ),
+                                    onSubmitted: _handleScan,
                                   ),
-                                  isDense: true,
                                 ),
-                                onSubmitted: _handleScan,
+                                const SizedBox(width: 8),
+                                FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 14,
+                                    ),
+                                  ),
+                                  onPressed: _isProcessing
+                                      ? null
+                                      : () => _handleScan(_tokenController.text),
+                                  child: const Text('Scan'),
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            if (_isProcessing) ...[
+                              const LinearProgressIndicator(),
+                              const SizedBox(height: 12),
+                            ],
+
+                            Text(
+                              _hasCameraPermission
+                                  ? 'Pindai QR e-ticket peserta. Bila kamera tidak '
+                                      'tersedia, masukkan token tiket secara manual.'
+                                  : 'Kamera tidak aktif. Masukkan token tiket '
+                                      'secara manual untuk melanjutkan check-in.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade700,
+                                height: 1.4,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            FilledButton(
-                              style: FilledButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+
+                            // Tombol simulasi hanya tersedia pada mode demo.
+                            if (AppConfig.mockMode) ...[
+                              const SizedBox(height: 20),
+                              Text(
+                                'Simulasi Pemindaian (mode demo):',
+                                style: Theme.of(context).textTheme.labelLarge
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey.shade700,
+                                    ),
                               ),
-                              onPressed: () => _handleScan(_tokenController.text),
-                              child: const Text('Scan'),
-                            ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  ActionChip(
+                                    label: const Text('Tiket valid'),
+                                    onPressed: () => _handleScan('TK-TECH-003'),
+                                  ),
+                                  ActionChip(
+                                    label: const Text('Sudah check-in'),
+                                    onPressed: () => _handleScan('TK-TECH-001'),
+                                  ),
+                                  ActionChip(
+                                    label: const Text('Token invalid'),
+                                    onPressed: () => _handleScan('INV-999'),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
-
-                        const SizedBox(height: 16),
-
-                        // Section Title: Quick Testing Simulations
-                        Text(
-                          'Simulasi Pemindaian Cepat (Pengujian MVP):',
-                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey.shade700,
-                              ),
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Button 1: Valid Ticket
-                        OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.green.shade800,
-                            side: BorderSide(color: Colors.green.shade300),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          icon: const Icon(Icons.check_circle_outline, color: Colors.green),
-                          label: const Text('1. Simulasikan Scan Valid (TK-TECH-003)'),
-                          onPressed: () => _handleScan('TK-TECH-003'),
-                        ),
-                        const SizedBox(height: 6),
-
-                        // Button 2: Already Checked-in (Duplicate Prevention)
-                        OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.orange.shade800,
-                            side: BorderSide(color: Colors.orange.shade300),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          icon: const Icon(Icons.warning_amber, color: Colors.orange),
-                          label: const Text('2. Simulasikan Tiket Sudah Check-in (Ganda)'),
-                          onPressed: () => _handleScan('TK-TECH-001'),
-                        ),
-                        const SizedBox(height: 6),
-
-                        // Button 3: Invalid Ticket
-                        OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.red.shade800,
-                            side: BorderSide(color: Colors.red.shade300),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          icon: const Icon(Icons.cancel_outlined, color: Colors.red),
-                          label: const Text('3. Simulasikan Tiket Palsu / Invalid'),
-                          onPressed: () => _handleScan('INV-999'),
-                        ),
-                        const SizedBox(height: 6),
-
-                        // Button 4: Offline Queue Simulation
-                        OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.blue.shade800,
-                            side: BorderSide(color: Colors.blue.shade300),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          icon: const Icon(Icons.cloud_queue, color: Colors.blue),
-                          label: const Text('4. Simulasikan Check-in Offline (Lokal)'),
-                          onPressed: () {
-                            _provider.toggleOfflineMode(true);
-                            _handleScan('TK-TECH-004');
-                          },
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
+              if (_provider.isLoading)
+                Container(
+                  color: Colors.black45,
+                  child: const Center(child: CircularProgressIndicator()),
+                ),
             ],
           ),
-          if (_provider.isLoading)
-            Container(
-              color: Colors.black45,
-              child: const Center(
-                child: CircularProgressIndicator(),
-              ),
-            ),
-        ],
-      ),
+        );
+      },
     );
-  },
-);
   }
 }
+

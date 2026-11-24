@@ -12,6 +12,7 @@ const ticketRoutes = require('./routes/ticketRoutes');
 const ticketTypeRoutes = require('./routes/ticketTypeRoutes');
 const checkInRoutes = require('./routes/checkInRoutes');
 const invitationsRoutes = require('./routes/invitationsRoutes');
+const meRoutes = require('./routes/meRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const adminRoutes = require('./routes/adminRoutes');
@@ -90,7 +91,9 @@ app.use('/api/tickets', ticketRoutes);
 app.use('/api/ticket-types', ticketTypeRoutes);
 app.use('/api/check-ins', checkInRoutes);
 app.use('/api/invitations', invitationsRoutes);
-app.use('/api/me', invitationsRoutes);
+// `/api/me` hanya memuat endpoint milik pengguna yang login (membership).
+// Sebelumnya router undangan di-mount di sini sehingga terbentuk `/api/me/me`.
+app.use('/api/me', meRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/support-reports', reportRoutes);
 app.use('/api/orders', writeLimiter, orderRoutes);

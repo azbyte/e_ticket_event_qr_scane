@@ -1,14 +1,16 @@
-/// Organizer mock scanner & check-in screen (PRD sections 4.5, 4.7 & FR-50–59).
+/// Pemindai QR tiket untuk Organizer/Staf (PRD §4.5, 4.7 & FR-50–59).
 ///
-/// Features simulated camera QR input, offline queue handling, granular
-/// permission enforcement, conflict detection, and scan history.
+/// Pada mode API, layar ini mendelegasikan ke [ScannerScreen] yang memakai
+/// kamera nyata dan backend (`POST /api/tickets/validate` + `POST /api/check-ins`).
+/// Data demo in-memory hanya dipakai ketika `MOCK_MODE=true`.
 library;
 
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_theme.dart';
+import '../../../core/config/app_config.dart';
 import '../../../services/organizer_operations/organizer_operations_repository.dart';
 import '../../../services/organizer_operations/organizer_permission.dart';
+import '../../scanner/screens/scanner_screen.dart';
 
 class OrganizerScannerScreen extends StatefulWidget {
   const OrganizerScannerScreen({
@@ -139,38 +141,29 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
     final canScan = widget.contextScope.hasPermission(
       OrganizerPermission.scanTicket,
     );
+
+    // Mode API (MVP): kamera nyata + validasi backend.
+    if (!AppConfig.mockMode) {
+      if (!canScan) {
+        return Scaffold(
+          appBar: AppBar(title: const Text('Pemindai QR Tiket')),
+          body: _buildAccessDenied(),
+        );
+      }
+      return ScannerScreen(
+        eventId: widget.eventId,
+        staffName: widget.contextScope.userName,
+        staffId: widget.contextScope.userId,
+      );
+    }
+
     final canViewHistory = widget.contextScope.hasPermission(
       OrganizerPermission.viewScanHistory,
     );
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pemindai Tiket QR (Mock)'),
-        actions: [
-          // Offline mode switch
-          Row(
-            children: [
-              Text(
-                _repo.isOfflineModeEnabled ? 'OFFLINE' : 'ONLINE',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: _repo.isOfflineModeEnabled
-                      ? Colors.orange
-                      : Colors.green,
-                ),
-              ),
-              Switch(
-                value: _repo.isOfflineModeEnabled,
-                onChanged: (val) {
-                  setState(() {
-                    _repo.toggleOfflineMode(val);
-                  });
-                },
-              ),
-            ],
-          ),
-        ],
+        title: const Text('Pemindai Tiket QR (demo)'),
       ),
       body: !canScan
           ? _buildAccessDenied()
@@ -189,7 +182,7 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.event, color: AppTheme.primaryColor),
+                        const Icon(Icons.event, color: Colors.indigo),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(

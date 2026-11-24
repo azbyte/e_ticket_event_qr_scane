@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:e_ticket_event_qr_scane/core/config/app_config.dart';
 import 'package:e_ticket_event_qr_scane/features/organizer/screens/attendee_list_screen.dart';
 import 'package:e_ticket_event_qr_scane/features/organizer/operations/organizer_scanner_screen.dart';
 import 'package:e_ticket_event_qr_scane/features/scanner/screens/scanner_screen.dart';
@@ -77,7 +78,15 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Akses Ditolak'), findsNothing);
-      expect(find.text('Input Kode / Token Tiket QR'), findsOneWidget);
+      // Mode API: pemindai kamera + input manual token. Mode demo: label lama.
+      expect(
+        find.text(
+          AppConfig.mockMode
+              ? 'Input Kode / Token Tiket QR'
+              : 'Input Kode / Token Tiket',
+        ),
+        findsOneWidget,
+      );
       expect(find.byType(TextField), findsOneWidget);
     });
   });
@@ -110,7 +119,7 @@ void main() {
       expect(find.text('Arahkan QR ke dalam kotak'), findsOneWidget);
     });
 
-    testWidgets('provides manual ticket code entry and action buttons', (
+    testWidgets('provides manual ticket code entry without simulation buttons', (
       tester,
     ) async {
       tester.view.physicalSize = const Size(800, 1400);
@@ -125,9 +134,10 @@ void main() {
 
       expect(find.text('Input Kode / Token Tiket'), findsOneWidget);
       expect(find.text('Scan'), findsOneWidget);
-      expect(find.text('1. Simulasikan Scan Valid (TK-TECH-003)'), findsOneWidget);
-      expect(find.text('2. Simulasikan Tiket Sudah Check-in (Ganda)'), findsOneWidget);
-      expect(find.text('3. Simulasikan Tiket Palsu / Invalid'), findsOneWidget);
+      // Alur MVP tidak menampilkan tombol simulasi maupun toggle offline.
+      expect(find.textContaining('Simulasikan'), findsNothing);
+      expect(find.byIcon(Icons.wifi_off), findsNothing);
+      expect(find.byIcon(Icons.cloud_queue), findsNothing);
     });
   });
 

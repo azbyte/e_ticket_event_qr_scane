@@ -4,6 +4,8 @@
 /// acceptance, granular permission management, and revocation without global role pollution.
 library;
 
+import '../../core/config/app_config.dart';
+import '../api/api_service.dart';
 import '../organizer_operations/organizer_permission.dart';
 
 /// Event member entity representing Owner or Staff membership on an event.
@@ -21,6 +23,10 @@ class EventMemberModel {
   final DateTime? joinedAt;
   final DateTime expiresAt;
 
+  /// Tautan undangan kanonik (`invite_url`) yang dikembalikan backend saat
+  /// undangan dibuat. `null` untuk anggota yang sudah aktif.
+  final String? inviteUrl;
+
   const EventMemberModel({
     required this.id,
     required this.eventId,
@@ -34,6 +40,7 @@ class EventMemberModel {
     required this.invitedAt,
     this.joinedAt,
     required this.expiresAt,
+    this.inviteUrl,
   });
 
   bool get isOwner => memberRole == 'owner';
@@ -66,15 +73,79 @@ class EventMemberModel {
       invitedAt: invitedAt,
       joinedAt: joinedAt ?? this.joinedAt,
       expiresAt: expiresAt,
+      inviteUrl: inviteUrl,
+    );
+  }
+
+  /// Anggota event dari response `GET /api/events/:id/members`.
+  factory EventMemberModel.fromMemberJson(
+    Map<String, dynamic> json, {
+    required String eventId,
+    String eventTitle = '',
+    String memberRole = 'staff',
+    String status = 'accepted',
+  }) {
+    final permissions = (json['permissions'] as List? ?? const [])
+        .map((code) => OrganizerPermission.fromCode(code.toString()))
+        .whereType<OrganizerPermission>()
+        .toSet();
+    return EventMemberModel(
+      id: (json['member_id'] ?? json['id'] ?? '').toString(),
+      eventId: eventId,
+      eventTitle: eventTitle,
+      userId: (json['user_id'] ?? '').toString(),
+      email: (json['email'] ?? '').toString(),
+      name: (json['name'] ?? json['username'] ?? '').toString(),
+      memberRole: memberRole,
+      status: status,
+      permissions: permissions,
+      invitedAt: DateTime.tryParse((json['created_at'] ?? '').toString()) ??
+          DateTime.now(),
+      joinedAt: DateTime.tryParse((json['created_at'] ?? '').toString()),
+      expiresAt: DateTime.now().add(const Duration(days: 365)),
+    );
+  }
+
+  /// Anggota event dari response `GET /api/me/memberships`.
+  factory EventMemberModel.fromMembershipJson(Map<String, dynamic> json) {
+    final permissions = (json['permissions'] as List? ?? const [])
+        .map((code) => OrganizerPermission.fromCode(code.toString()))
+        .whereType<OrganizerPermission>()
+        .toSet();
+    final role = (json['role'] ?? 'staff').toString().toLowerCase();
+    final rawStatus = (json['status'] ?? 'ACTIVE').toString().toLowerCase();
+    final expiresAt = DateTime.tryParse((json['expires_at'] ?? '').toString()) ??
+        DateTime.now().add(const Duration(days: 365));
+    return EventMemberModel(
+      id: (json['member_id'] ?? json['event_id'] ?? '').toString(),
+      eventId: (json['event_id'] ?? '').toString(),
+      eventTitle: (json['event_title'] ?? '').toString(),
+      userId: (json['user_id'] ?? '').toString(),
+      email: (json['email'] ?? '').toString(),
+      name: (json['event_title'] ?? '').toString(),
+      memberRole: role,
+      status: rawStatus == 'active' ? 'accepted' : rawStatus,
+      permissions: permissions,
+      invitedAt: DateTime.tryParse((json['joined_at'] ?? '').toString()) ??
+          DateTime.now(),
+      joinedAt: DateTime.tryParse((json['joined_at'] ?? '').toString()),
+      expiresAt: expiresAt,
     );
   }
 }
 
 class OrganizerMembershipService {
-  OrganizerMembershipService._internal();
+  /// `api`/`mockMode` dapat diinjeksi untuk pengujian. Default memakai API
+  /// backend; data demo hanya aktif bila `MOCK_MODE=true`.
+  OrganizerMembershipService({ApiService? api, bool? mockMode})
+      : _api = api ?? ApiService(),
+        _useMock = mockMode ?? AppConfig.mockMode;
+
   static final OrganizerMembershipService instance =
-      OrganizerMembershipService._internal();
-  factory OrganizerMembershipService() => instance;
+      OrganizerMembershipService();
+
+  final ApiService _api;
+  final bool _useMock;
 
   // In-memory mock database for event memberships
   static final List<EventMemberModel> _mockMembers = [
@@ -171,10 +242,27 @@ class OrganizerMembershipService {
   ];
 
   /// Lists all members (Owner and Staff) for a given event.
-  Future<List<EventMemberModel>> listMembers(String eventId) async {
-    await Future<void>.delayed(const Duration(milliseconds: 200));
+  Future<List<EventMemberModel>> listMembers(
+    String eventId, {
+    String eventTitle = '',
+  }) async {
+    if (_useMock) {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      return List<EventMemberModel>.unmodifiable(
+        _mockMembers.where((m) => m.eventId == eventId),
+      );
+    }
+
+    final response = await _api.get('/events/$eventId/members');
+    final rows = (response['members'] as List?) ?? const [];
     return List<EventMemberModel>.unmodifiable(
-      _mockMembers.where((m) => m.eventId == eventId),
+      rows.map(
+        (row) => EventMemberModel.fromMemberJson(
+          Map<String, dynamic>.from(row as Map),
+          eventId: eventId,
+          eventTitle: eventTitle,
+        ),
+      ),
     );
   }
 
@@ -187,71 +275,159 @@ class OrganizerMembershipService {
     required Set<OrganizerPermission> permissions,
     int expiryDays = 7,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    final newMember = EventMemberModel(
-      id: 'mem-${DateTime.now().microsecondsSinceEpoch}',
+    if (_useMock) {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      final newMember = EventMemberModel(
+        id: 'mem-${DateTime.now().microsecondsSinceEpoch}',
+        eventId: eventId,
+        eventTitle: eventTitle,
+        userId: '',
+        email: email,
+        name: name.isNotEmpty ? name : email.split('@').first,
+        memberRole: 'staff',
+        status: 'pending',
+        permissions: Set<OrganizerPermission>.unmodifiable(permissions),
+        invitedAt: DateTime.now(),
+        joinedAt: null,
+        expiresAt: DateTime.now().add(Duration(days: expiryDays)),
+      );
+      _mockMembers.add(newMember);
+      return newMember;
+    }
+
+    final expiresAt = DateTime.now().add(Duration(days: expiryDays));
+    final response = await _api.post(
+      '/events/$eventId/invitations',
+      body: {
+        'email': email,
+        'name': name,
+        'permissions': permissions.map((p) => p.code).toList(),
+        'expiresAt': expiresAt.toUtc().toIso8601String(),
+      },
+    );
+    final invitation =
+        Map<String, dynamic>.from(response['invitation'] as Map? ?? const {});
+    return EventMemberModel(
+      id: (invitation['id'] ?? '').toString(),
       eventId: eventId,
       eventTitle: eventTitle,
       userId: '',
-      email: email,
+      email: (invitation['email'] ?? email).toString(),
       name: name.isNotEmpty ? name : email.split('@').first,
       memberRole: 'staff',
       status: 'pending',
       permissions: Set<OrganizerPermission>.unmodifiable(permissions),
       invitedAt: DateTime.now(),
       joinedAt: null,
-      expiresAt: DateTime.now().add(Duration(days: expiryDays)),
+      expiresAt: DateTime.tryParse((invitation['expires_at'] ?? '').toString()) ??
+          expiresAt,
+      inviteUrl: invitation['invite_url']?.toString(),
     );
-    _mockMembers.add(newMember);
-    return newMember;
   }
 
   /// Updates staff permissions for an event.
+  ///
+  /// Backend mengunci permission per `user_id` event member, sehingga `userId`
+  /// diperlukan pada mode API (dapat diambil dari [EventMemberModel.userId]).
   Future<bool> updatePermissions({
     required String eventId,
     required String memberId,
     required Set<OrganizerPermission> permissions,
+    String userId = '',
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-    final idx = _mockMembers.indexWhere(
-      (m) => m.id == memberId && m.eventId == eventId,
-    );
-    if (idx != -1 && !_mockMembers[idx].isOwner && _mockMembers[idx].isStaff) {
-      _mockMembers[idx] = _mockMembers[idx].copyWith(
-        permissions: Set<OrganizerPermission>.unmodifiable(permissions),
+    if (_useMock) {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      final idx = _mockMembers.indexWhere(
+        (m) => m.id == memberId && m.eventId == eventId,
       );
-      return true;
+      if (idx != -1 && !_mockMembers[idx].isOwner && _mockMembers[idx].isStaff) {
+        _mockMembers[idx] = _mockMembers[idx].copyWith(
+          permissions: Set<OrganizerPermission>.unmodifiable(permissions),
+        );
+        return true;
+      }
+      return false;
     }
-    return false;
+
+    var targetUserId = userId;
+    if (targetUserId.isEmpty) {
+      final members = await listMembers(eventId);
+      for (final member in members) {
+        if (member.id == memberId) {
+          targetUserId = member.userId;
+          break;
+        }
+      }
+    }
+    if (targetUserId.isEmpty) return false;
+
+    await _api.put(
+      '/events/$eventId/members/$targetUserId/permissions',
+      body: {'permissions': permissions.map((p) => p.code).toList()},
+    );
+    return true;
   }
 
   /// Revokes staff access from an event.
   Future<bool> revokeAccess({
     required String eventId,
     required String memberId,
+    String userId = '',
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-    final idx = _mockMembers.indexWhere(
-      (m) => m.id == memberId && m.eventId == eventId,
-    );
-    if (idx != -1 && !_mockMembers[idx].isOwner && _mockMembers[idx].isStaff) {
-      _mockMembers.removeAt(idx);
-      return true;
+    if (_useMock) {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      final idx = _mockMembers.indexWhere(
+        (m) => m.id == memberId && m.eventId == eventId,
+      );
+      if (idx != -1 && !_mockMembers[idx].isOwner && _mockMembers[idx].isStaff) {
+        _mockMembers.removeAt(idx);
+        return true;
+      }
+      return false;
     }
-    return false;
+
+    var targetUserId = userId;
+    if (targetUserId.isEmpty) {
+      final members = await listMembers(eventId);
+      for (final member in members) {
+        if (member.id == memberId) {
+          targetUserId = member.userId;
+          break;
+        }
+      }
+    }
+    if (targetUserId.isEmpty) return false;
+
+    await _api.delete('/events/$eventId/members/$targetUserId');
+    return true;
   }
 
   /// Returns active events where user is assigned as Staff.
   Future<List<EventMemberModel>> getAssignedActiveEvents(
     String userEmailOrId,
   ) async {
-    await Future<void>.delayed(const Duration(milliseconds: 250));
+    if (_useMock) {
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      return List<EventMemberModel>.unmodifiable(
+        _mockMembers.where((m) {
+          final matchesUser =
+              m.userId == userEmailOrId || m.email == userEmailOrId;
+          return matchesUser && m.isStaff && m.isAccepted && !m.isExpired;
+        }),
+      );
+    }
+
+    // Mode API: `GET /api/me/memberships` mengembalikan event yang diikuti
+    // pengguna yang sedang login, lengkap dengan permission-nya.
+    final response = await _api.get('/me/memberships');
+    final rows = (response['memberships'] as List?) ?? const [];
     return List<EventMemberModel>.unmodifiable(
-      _mockMembers.where((m) {
-        final matchesUser =
-            m.userId == userEmailOrId || m.email == userEmailOrId;
-        return matchesUser && m.isStaff && m.isAccepted && !m.isExpired;
-      }),
+      rows
+          .map(
+            (row) =>
+                EventMemberModel.fromMembershipJson(Map<String, dynamic>.from(row as Map)),
+          )
+          .where((m) => !m.isExpired),
     );
   }
 

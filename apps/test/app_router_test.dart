@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import 'package:e_ticket_event_qr_scane/app_router.dart';
+import 'package:e_ticket_event_qr_scane/core/config/app_config.dart';
 import 'package:e_ticket_event_qr_scane/features/admin/screens/admin_profile_screen.dart';
 import 'package:e_ticket_event_qr_scane/features/auth/screens/login_screen.dart';
 import 'package:e_ticket_event_qr_scane/features/organizer/operations/organizer_scanner_screen.dart';
@@ -115,7 +116,13 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(OrganizerScannerScreen), findsOneWidget);
-      expect(find.text('Pemindai Tiket QR (Mock)'), findsOneWidget);
+      // Mode API: kamera nyata + backend. Mode demo: layar simulasi.
+      expect(
+        find.text(
+          AppConfig.mockMode ? 'Pemindai Tiket QR (demo)' : 'Pemindai QR Tiket',
+        ),
+        findsOneWidget,
+      );
     },
   );
 

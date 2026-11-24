@@ -256,6 +256,52 @@ const validateTicket = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Menyelesaikan check-in secara atomik: mengunci baris tiket, menulis
+ * `check_ins`, mengubah status tiket, dan mencatat `scan_logs` dalam satu
+ * transaksi. Dipakai `recordCheckIn` dan `POST /api/tickets/verify` supaya
+ * kedua jalur selalu menghasilkan baris check-in (D2-4 K1/K3).
+ *
+ * @returns {Promise<{checkIn: object, checkedInAt: string}>}
+ */
+const commitCheckIn = async ({ ticket, user, memberId, now = new Date().toISOString() }) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const locked = await client.query('SELECT status FROM tickets WHERE id = $1 FOR UPDATE', [ticket.id]);
+    if (!locked.rows[0] || locked.rows[0].status !== 'active') {
+      const err = new Error('Tiket sudah di-check-in');
+      err.statusCode = 409;
+      throw err;
+    }
+    const inserted = await client.query(
+      `INSERT INTO check_ins (id, ticket_id, event_id, actor_user_id, event_member_id, source, checked_in_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, 'ONLINE', $5)
+       ON CONFLICT (ticket_id) DO NOTHING
+       RETURNING *`,
+      [ticket.id, ticket.event_id, user.id, memberId, now]
+    );
+    if (!inserted.rows[0]) {
+      const err = new Error('Tiket sudah di-check-in');
+      err.statusCode = 409;
+      throw err;
+    }
+    await client.query('UPDATE tickets SET status = $1, used_at = $2 WHERE id = $3', ['used', now, ticket.id]);
+    await client.query(
+      `INSERT INTO scan_logs (id, event_id, ticket_id, scanned_by_user_id, event_member_id, result, is_offline, scanned_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, 'VALID', false, $5)`,
+      [ticket.event_id, ticket.id, user.id, memberId, now]
+    );
+    await client.query('COMMIT');
+    return { checkIn: inserted.rows[0], checkedInAt: now };
+  } catch (error) {
+    try { await client.query('ROLLBACK'); } catch (_) { /* transaksi sudah berakhir */ }
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 const recordCheckIn = asyncHandler(async (req, res) => {
   const user = req.user;
   if (!user || !user.id) {
@@ -319,50 +365,13 @@ const recordCheckIn = asyncHandler(async (req, res) => {
     throw err;
   }
 
-  const now = new Date().toISOString();
-  const client = await pool.connect();
-  let checkIn;
-  try {
-    await client.query('BEGIN');
-    const locked = await client.query('SELECT status FROM tickets WHERE id = $1 FOR UPDATE', [ticket.id]);
-    if (!locked.rows[0] || locked.rows[0].status !== 'active') {
-      const err = new Error('Tiket sudah di-check-in');
-      err.statusCode = 409;
-      throw err;
-    }
-    const inserted = await client.query(
-      `INSERT INTO check_ins (id, ticket_id, event_id, actor_user_id, event_member_id, source, checked_in_at)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, 'ONLINE', $5)
-       ON CONFLICT (ticket_id) DO NOTHING
-       RETURNING *`,
-      [ticket.id, ticket.event_id, user.id, memberId, now]
-    );
-    if (!inserted.rows[0]) {
-      const err = new Error('Tiket sudah di-check-in');
-      err.statusCode = 409;
-      throw err;
-    }
-    checkIn = inserted.rows[0];
-
-    await client.query('UPDATE tickets SET status = $1, used_at = $2 WHERE id = $3', ['used', now, ticket.id]);
-    await client.query(
-      `INSERT INTO scan_logs (id, event_id, ticket_id, scanned_by_user_id, event_member_id, result, is_offline, scanned_at)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, 'VALID', false, $5)`,
-      [ticket.event_id, ticket.id, user.id, memberId, now]
-    );
-    await client.query('COMMIT');
-  } catch (error) {
-    try { await client.query('ROLLBACK'); } catch (_) { /* transaksi sudah berakhir */ }
-    throw error;
-  } finally {
-    client.release();
-  }
+  const { checkIn, checkedInAt } = await commitCheckIn({ ticket, user, memberId });
 
   res.status(201).json({
     success: true,
     message: 'Check-in berhasil dicatat.',
     check_in: checkIn,
-    ticket: { ...(await ticketTokens.presentTicket(ticket)), status: 'checked_in', checked_in_at: now },
+    ticket: { ...(await ticketTokens.presentTicket(ticket)), status: 'checked_in', checked_in_at: checkedInAt },
   });
 });
 const escapeCsvValue = (val) => {
@@ -386,7 +395,7 @@ const listEventAttendees = asyncHandler(async (req, res) => {
   const eventId = req.params.eventId || req.params.id;
   await assertParticipantPermission(eventId, user);
 
-  const { search, status, ticket_type } = req.query;
+  const { search, status, ticket_type } = req.query || {};
 
   const rows = await query(
     `WITH event_attendees AS (
@@ -512,6 +521,10 @@ const listEventAttendees = asyncHandler(async (req, res) => {
     id: t.attendee_order_item_id ? t.attendee_order_item_id : (t.attendee_id || t.ticket_id || t.id),
     ticket_id: t.ticket_id || null,
     ticket_code: t.ticket_code || null,
+    registration_number:
+      t.order_number || t.ticket_code || `REG-${String(t.ticket_id || t.id).slice(0, 8)}`,
+    order_id: t.order_id || null,
+    order_number: t.order_number || '-',
     attendee_name: t.attendee_name || '-',
     attendee_email: t.attendee_email || '-',
     attendee_phone: t.attendee_phone || '-',
@@ -519,41 +532,10 @@ const listEventAttendees = asyncHandler(async (req, res) => {
     status: normalizeTicketStatus(t.ticket_status || (t.payment_status === 'PAID' ? 'active' : 'pending')),
     purchased_at: t.purchased_at || null,
     used_at: t.used_at || null,
-    order_number: t.order_number || '-',
     payment_status: String(t.payment_status || 'PENDING').toUpperCase(),
     order_status: String(t.order_status || 'PENDING_PAYMENT').toUpperCase(),
     custom_fields: t.custom_fields || {},
     checked_in_at: t.checked_in_at || t.used_at || null,
-    `SELECT t.*,
-            a.name AS attendee_name, a.email AS attendee_email, a.phone AS attendee_phone,
-            a.order_item_id AS attendee_order_item_id,
-            tt.name AS ticket_type_name,
-            eo.id AS order_id, eo.order_number, eo.status AS payment_status
-     FROM tickets t
-     LEFT JOIN attendees a ON a.id = t.attendee_id
-     LEFT JOIN order_items oi ON oi.id = a.order_item_id
-     LEFT JOIN event_orders eo ON eo.id = oi.order_id
-     LEFT JOIN ticket_types tt ON tt.id = t.ticket_type_id
-     WHERE t.event_id = $1
-     ORDER BY (CASE WHEN eo.status = 'PAID' THEN 0 ELSE 1 END), t.purchased_at DESC`,
-    [eventId]
-  );
-
-  const attendees = rows.map((t) => ({
-    id: t.attendee_order_item_id ? t.attendee_order_item_id : t.id,
-    ticket_id: t.id,
-    ticket_code: t.ticket_code,
-    registration_number: t.order_number || t.ticket_code || `REG-${t.id.slice(0, 8)}`,
-    order_number: t.order_number || null,
-    order_id: t.order_id || null,
-    payment_status: t.payment_status || (t.status === 'used' || t.status === 'active' ? 'PAID' : 'PENDING'),
-    attendee_name: t.attendee_name,
-    attendee_email: t.attendee_email,
-    attendee_phone: t.attendee_phone,
-    ticket_type: t.ticket_type_name,
-    status: normalizeTicketStatus(t.status),
-    purchased_at: t.purchased_at,
-    used_at: t.used_at,
   }));
 
   res.json({ success: true, count: attendees.length, attendees });
@@ -960,5 +942,6 @@ module.exports = {
   orderOfTicket,
   presentScanTicket,
   normalizeTicketStatus,
+  commitCheckIn,
   SCAN_RESULTS,
 };

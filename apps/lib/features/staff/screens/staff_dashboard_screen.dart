@@ -37,7 +37,6 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
   List<EventMemberModel> _assignedEvents = [];
   EventMemberModel? _selectedAssignment;
   bool _isLoading = true;
-  bool _isOfflineMode = false;
   String? _error;
 
   @override
@@ -92,7 +91,6 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
   Widget build(BuildContext context) {
     final auth = context.read<AuthProvider>();
     final displayName = auth.user?.name ?? widget.staffName;
-    final checkInProvider = widget.checkInProvider;
 
     return Scaffold(
       appBar: AppBar(
@@ -186,24 +184,6 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                             ),
                           ],
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Card(
-                      child: SwitchListTile(
-                        title: Text(
-                          _isOfflineMode
-                              ? 'Mode offline (simulasi)'
-                              : 'Mode online (simulasi)',
-                        ),
-                        subtitle: const Text(
-                          'Status check-in demo tidak diverifikasi oleh server.',
-                        ),
-                        value: _isOfflineMode,
-                        onChanged: (value) {
-                          setState(() => _isOfflineMode = value);
-                          checkInProvider?.toggleOfflineMode(value);
-                        },
                       ),
                     ),
                     const SizedBox(height: 12),

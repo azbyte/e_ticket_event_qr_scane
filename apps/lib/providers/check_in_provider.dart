@@ -78,16 +78,22 @@ class CheckInProvider extends ChangeNotifier {
   }
 
   /// Validates and processes a scanned QR token.
+  ///
+  /// Alur MVP selalu online: validasi ke backend lalu catat check-in. Mode
+  /// offline tidak dipakai lagi pada alur ini (lihat RENCANA_KERJA §F).
   Future<Map<String, dynamic>> processTicketScan(
     String token, {
     required String staffId,
     String staffName = 'Staf Event',
-    String eventId = 'evt-1001',
+    String eventId = '',
   }) async {
     _setLoading(true);
     _error = null;
     try {
-      final validation = await _scannerService.validateTicket(token);
+      final validation = await _scannerService.validateTicket(
+        token,
+        eventId: eventId.isEmpty ? null : eventId,
+      );
 
       if (validation['valid'] == true && validation['ticket'] != null) {
         final ticketData = validation['ticket'] as Map<String, dynamic>;
@@ -99,22 +105,22 @@ class CheckInProvider extends ChangeNotifier {
           eventId: eventId,
           staffId: staffId,
           staffName: staffName,
-          isOffline: _isOfflineMode,
+          token: token,
         );
 
         final result = {
-          'status': _isOfflineMode ? 'queued_offline' : 'valid',
+          'status': 'valid',
           'valid': true,
-          'message': _isOfflineMode
-              ? 'Tersimpan di antrean offline'
-              : 'Check-in Berhasil',
+          'message': 'Check-in Berhasil',
           'ticket': ticketData,
           'check_in': recordResult['check_in'],
-          'is_offline': _isOfflineMode,
+          'is_offline': false,
         };
         _lastScanResult = result;
-        await loadCheckIns(eventId: eventId);
-        await loadAttendees(eventId: eventId);
+        if (eventId.isNotEmpty) {
+          await loadCheckIns(eventId: eventId);
+          await loadAttendees(eventId: eventId);
+        }
         notifyListeners();
         return result;
       } else {
@@ -123,7 +129,7 @@ class CheckInProvider extends ChangeNotifier {
           'valid': false,
           'message': validation['message'] ?? 'Tiket tidak valid',
           'ticket': validation['ticket'],
-          'is_offline': _isOfflineMode,
+          'is_offline': false,
         };
         _lastScanResult = result;
         notifyListeners();
@@ -135,7 +141,7 @@ class CheckInProvider extends ChangeNotifier {
         'status': 'error',
         'valid': false,
         'message': 'Terjadi kesalahan sistem saat pemindaian: $e',
-        'is_offline': _isOfflineMode,
+        'is_offline': false,
       };
       _lastScanResult = errResult;
       notifyListeners();
