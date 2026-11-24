@@ -52,8 +52,11 @@ const TICKET_ID = '88888888-8888-4888-8888-888888888888';
 const ATTENDEE_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
 const NOW = '2026-11-23T08:00:00.000Z';
-const FUTURE = '2026-11-24T08:00:00.000Z';
-const PAST = '2026-11-22T08:00:00.000Z';
+// Batas kedaluwarsa dihitung relatif terhadap waktu berjalan supaya test tidak
+// gagal hanya karena tanggal fixture sudah terlewati.
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const FUTURE = new Date(Date.now() + DAY_IN_MS).toISOString();
+const PAST = new Date(Date.now() - DAY_IN_MS).toISOString();
 
 const state = {
   profiles: [ORGANIZER, ADMIN, ATTENDEE],
