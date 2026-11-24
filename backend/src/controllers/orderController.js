@@ -1,7 +1,14 @@
 const { createHash, randomBytes, randomUUID, timingSafeEqual } = require('node:crypto');
 const asyncHandler = require('express-async-handler');
-const { query, getOne } = require('../config/db');
+const { query, getOne, pool } = require('../config/db');
 const { serializeOrder } = require('../utils/orderResponse');
+const {
+  normalizeAttendeeFields,
+  validateAttendeeAnswers,
+  splitCustomFieldAnswers,
+} = require('../utils/eventValidation');
+const { ensureOrderTokenHashes } = require('../services/ticketTokenService');
+const logger = require('../utils/logger');
 
 const ORDER_BASE_SELECT = `
   eo.id, eo.order_number, eo.event_id, eo.purchaser_id, eo.assisted_by_member_id,
@@ -72,6 +79,49 @@ const getAuthorizedOrder = async (orderId, user, accessToken) => {
 module.exports.getAuthorizedOrder = getAuthorizedOrder;
 module.exports.hashAccessToken = hashAccessToken;
 module.exports.loadOrderById = loadOrderById;
+
+/**
+ * Simpan jawaban field dinamis peserta ke `attendees.custom_fields`.
+ *
+ * RPC `create_event_order` belum menulis kolom tersebut, sehingga penyimpanan
+ * dilakukan di dalam transaksi yang sama dengan pembuatan order agar atomik
+ * (tanpa perubahan schema/migration; lihat catatan D1-5).
+ */
+const persistAttendeeCustomFields = async (client, orderId, groupedAttendees) => {
+  const result = await client.query(
+    `SELECT a.id, oi.ticket_type_id, a.email
+       FROM attendees a
+       JOIN order_items oi ON oi.id = a.order_item_id
+      WHERE oi.order_id = $1
+      ORDER BY oi.ticket_type_id ASC, a.created_at ASC, a.id ASC`,
+    [orderId]
+  );
+
+  const usedIndexes = new Map();
+  for (const row of result.rows) {
+    const candidates = groupedAttendees[row.ticket_type_id] || [];
+    const used = usedIndexes.get(row.ticket_type_id) || new Set();
+    let index = candidates.findIndex(
+      (candidate, candidateIndex) =>
+        !used.has(candidateIndex) &&
+        String(candidate.email).toLowerCase() === String(row.email).toLowerCase()
+    );
+    if (index === -1) {
+      index = candidates.findIndex((_candidate, candidateIndex) => !used.has(candidateIndex));
+    }
+    if (index === -1) continue;
+    used.add(index);
+    usedIndexes.set(row.ticket_type_id, used);
+
+    const customFields = candidates[index].custom_fields;
+    if (!customFields || Object.keys(customFields).length === 0) continue;
+    await client.query(
+      'UPDATE attendees SET custom_fields = $1::jsonb WHERE id = $2',
+      [JSON.stringify(customFields), row.id]
+    );
+  }
+};
+
 const createOrder = asyncHandler(async (req, res) => {
   if (req.body.assisted_by_member_id || req.body.assisted) {
     res.status(400);
@@ -105,7 +155,28 @@ const createOrder = asyncHandler(async (req, res) => {
   const normalizedItems = Object.fromEntries(
     Object.entries(items).map(([id, quantity]) => [id.toLowerCase(), quantity]),
   );
+
+  // Field peserta dinamis (D1-5): konfigurasi event menentukan field wajib,
+  // tipe, dan opsi yang harus dipenuhi sebelum order dibuat.
+  const eventRow = await getOne(
+    'SELECT id, attendee_fields FROM events WHERE id = $1',
+    [eventId]
+  );
+  if (!eventRow) {
+    res.status(400);
+    throw new Error('Event not found');
+  }
+  const { fields: attendeeFieldDefinitions, errors: attendeeFieldConfigErrors } =
+    normalizeAttendeeFields(eventRow.attendee_fields);
+  if (attendeeFieldConfigErrors.length > 0) {
+    res.status(400);
+    throw new Error(
+      `Event attendee field configuration is invalid: ${attendeeFieldConfigErrors.join('; ')}`
+    );
+  }
+
   const groupedAttendees = {};
+  let hasCustomFieldAnswers = false;
   for (const attendee of req.body.attendees) {
     const ticketTypeId = typeof attendee?.ticket_type_id === 'string'
       ? attendee.ticket_type_id.toLowerCase() : '';
@@ -118,8 +189,40 @@ const createOrder = asyncHandler(async (req, res) => {
       res.status(400);
       throw new Error('Every selected ticket must have valid attendee details');
     }
+
+    const extraAnswers = attendee?.custom_fields ?? attendee?.fields ?? attendee?.attendee_fields ?? {};
+    if (extraAnswers === null || typeof extraAnswers !== 'object' || Array.isArray(extraAnswers)) {
+      res.status(400);
+      throw new Error('Invalid attendee data: custom_fields harus berupa objek');
+    }
+    // Kolom nama/email/telepon tetap berasal dari field attendee; field lain
+    // (mis. organization, pertanyaan tambahan) dibaca dari custom_fields.
+    const answers = {
+      name,
+      email,
+      ...(phone ? { phone } : {}),
+      ...extraAnswers,
+    };
+    const answerErrors = validateAttendeeAnswers(attendeeFieldDefinitions, answers);
+    if (answerErrors.length > 0) {
+      res.status(400);
+      throw new Error(`Invalid attendee data: ${answerErrors.join('; ')}`);
+    }
+    const { customFields } = splitCustomFieldAnswers(attendeeFieldDefinitions, answers);
+    const sortedCustomFields = Object.fromEntries(
+      Object.entries(customFields).sort(([left], [right]) => left.localeCompare(right))
+    );
+    if (Object.keys(sortedCustomFields).length > 0) hasCustomFieldAnswers = true;
+
     if (!groupedAttendees[ticketTypeId]) groupedAttendees[ticketTypeId] = [];
-    groupedAttendees[ticketTypeId].push({ name, email, phone: phone || null });
+    groupedAttendees[ticketTypeId].push({
+      name,
+      email,
+      phone: phone || null,
+      ...(Object.keys(sortedCustomFields).length > 0
+        ? { custom_fields: sortedCustomFields }
+        : {}),
+    });
   }
   for (const [ticketTypeId, quantity] of Object.entries(normalizedItems)) {
     if (groupedAttendees[ticketTypeId]?.length !== quantity) {
@@ -176,21 +279,43 @@ const createOrder = asyncHandler(async (req, res) => {
     });
   }
 
-  await query(
-    `SELECT public.create_event_order(
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
-    )`,
-    [
-      eventId, normalizedItems, groupedAttendees,
-      primaryAttendee.name.trim(), primaryAttendee.email.trim().toLowerCase(),
-      typeof primaryAttendee.phone === 'string' && primaryAttendee.phone.trim()
-        ? primaryAttendee.phone.trim() : null,
-      req.user ? req.user.id : null,
-      `ORD-${now.getTime()}-${randomUUID().slice(0, 8)}`,
-      idempotencyKey, fingerprint, hashAccessToken(accessToken),
-      expiresAt, `88${randomBytes(8).toString('hex').slice(0, 14)}`,
-    ]
-  );
+  // Pembuatan order + penyimpanan jawaban field dinamis dijalankan dalam satu
+  // transaksi agar tidak ada order tanpa `attendees.custom_fields` (atomik).
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `SELECT public.create_event_order(
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+      )`,
+      [
+        eventId, normalizedItems, groupedAttendees,
+        primaryAttendee.name.trim(), primaryAttendee.email.trim().toLowerCase(),
+        typeof primaryAttendee.phone === 'string' && primaryAttendee.phone.trim()
+          ? primaryAttendee.phone.trim() : null,
+        req.user ? req.user.id : null,
+        `ORD-${now.getTime()}-${randomUUID().slice(0, 8)}`,
+        idempotencyKey, fingerprint, hashAccessToken(accessToken),
+        expiresAt, `88${randomBytes(8).toString('hex').slice(0, 14)}`,
+      ]
+    );
+
+    if (hasCustomFieldAnswers) {
+      const created = await client.query(
+        'SELECT id FROM event_orders WHERE idempotency_key = $1',
+        [idempotencyKey]
+      );
+      const createdOrderId = created.rows[0]?.id;
+      if (!createdOrderId) throw new Error('Created order could not be located');
+      await persistAttendeeCustomFields(client, createdOrderId, groupedAttendees);
+    }
+    await client.query('COMMIT');
+  } catch (error) {
+    try { await client.query('ROLLBACK'); } catch (_) { /* transaksi sudah berakhir */ }
+    throw error;
+  } finally {
+    client.release();
+  }
 
   const orderRow = await getOne(
     'SELECT id, guest_access_token_hash, purchaser_id FROM event_orders WHERE idempotency_key = $1',
@@ -204,6 +329,19 @@ const createOrder = asyncHandler(async (req, res) => {
     && hashAccessToken(accessToken) === orderRow.guest_access_token_hash;
   const order = await loadOrderById(orderRow.id);
   if (!order) throw new Error('Created order could not be loaded');
+
+  // Tiket gratis langsung terbit dengan status PAID, sehingga token QR-nya
+  // harus tersedia tanpa membuka halaman tiket lebih dulu (K3 D1-5).
+  if (String(order.status).toUpperCase() === 'PAID') {
+    try {
+      await ensureOrderTokenHashes(order.id);
+    } catch (error) {
+      logger.error('ticket_token_backfill_failed', {
+        orderId: order.id,
+        error: error.message,
+      });
+    }
+  }
 
   res.status(201).json({
     success: true,

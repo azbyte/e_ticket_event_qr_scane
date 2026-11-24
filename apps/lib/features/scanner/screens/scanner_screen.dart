@@ -18,12 +18,14 @@ class ScannerScreen extends StatefulWidget {
     this.staffId = 'stf-001',
     this.staffName = 'Budi Santoso',
     this.eventId = 'evt-1001',
+    this.initialCameraPermission = true,
   });
 
   final CheckInProvider? checkInProvider;
   final String staffId;
   final String staffName;
   final String eventId;
+  final bool initialCameraPermission;
 
   @override
   State<ScannerScreen> createState() => _ScannerScreenState();
@@ -33,11 +35,13 @@ class _ScannerScreenState extends State<ScannerScreen> {
   late final CheckInProvider _provider;
   final TextEditingController _tokenController = TextEditingController();
   bool _isFlashOn = false;
+  late bool _hasCameraPermission;
 
   @override
   void initState() {
     super.initState();
     _provider = widget.checkInProvider ?? CheckInProvider(CheckInService());
+    _hasCameraPermission = widget.initialCameraPermission;
   }
 
   @override
@@ -63,6 +67,48 @@ class _ScannerScreenState extends State<ScannerScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => ScanResultScreen(result: result),
+      ),
+    );
+  }
+
+  Widget _buildCameraPermissionDenied() {
+    return Container(
+      color: Colors.black87,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Center(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.videocam_off, size: 36, color: Colors.orangeAccent),
+              const SizedBox(height: 8),
+              const Text(
+                'Izin Kamera Diperlukan',
+                style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Aplikasi memerlukan akses kamera untuk scan QR. Anda juga dapat menggunakan input kode manual.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, fontSize: 11),
+              ),
+              const SizedBox(height: 8),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  visualDensity: VisualDensity.compact,
+                ),
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Coba Minta Izin Lagi'),
+                onPressed: () {
+                  setState(() {
+                    _hasCameraPermission = true;
+                  });
+                },
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -109,18 +155,45 @@ class _ScannerScreenState extends State<ScannerScreen> {
               ),
             ],
           ),
-          body: Column(
+          body: Stack(
             children: [
-              // Viewfinder Section
-              const Expanded(
-                flex: 4,
-                child: ScannerPlaceholder(),
-              ),
+              Column(
+                children: [
+                  // Viewfinder Section (atau tampilan izin ditolak)
+                  Expanded(
+                    flex: 4,
+                    child: _hasCameraPermission
+                        ? const ScannerPlaceholder()
+                        : _buildCameraPermissionDenied(),
+                  ),
 
-              // Bottom Control & Simulation Panel
-              Expanded(
-                flex: 5,
-                child: Container(
+                  // Error / Alert Banner bila terjadi kendala
+                  if (_provider.error != null)
+                    Container(
+                      color: Colors.red.shade50,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        children: [
+                          Icon(Icons.error_outline, color: Colors.red.shade800, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _provider.error!,
+                              style: TextStyle(color: Colors.red.shade900, fontSize: 12),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 18),
+                            onPressed: () => setState(() => _provider.loadAttendees(eventId: widget.eventId)),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // Bottom Control & Simulation Panel
+                  Expanded(
+                    flex: 5,
+                    child: Container(
                   color: Theme.of(context).colorScheme.surface,
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(16.0),
@@ -231,8 +304,17 @@ class _ScannerScreenState extends State<ScannerScreen> {
               ),
             ],
           ),
-        );
-      },
+          if (_provider.isLoading)
+            Container(
+              color: Colors.black45,
+              child: const Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
+        ],
+      ),
     );
+  },
+);
   }
 }

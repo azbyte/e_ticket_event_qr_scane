@@ -15,6 +15,7 @@ import '../../../../models/event/event_model.dart';
 import '../../../../models/event/ticket_type_model.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/event_provider.dart';
+import '../../../../routes/app_routes.dart';
 import '../../../../services/organizer_events/organizer_event_contract.dart';
 import '../../../../services/organizer_events/organizer_event_fixtures.dart';
 import '../../../../services/organizer_events/organizer_event_repository.dart';
@@ -94,23 +95,78 @@ void dispose() {
 }
 
 Future<void> _copyLink(EventModel event) async {
-  if (event.registrationUrl.isEmpty) {
+  if (!event.hasPublicLink) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Tautan publik belum tersedia.')),
+      const SnackBar(
+        content: Text(
+          'Tautan publik belum tersedia. Terbitkan event terlebih dahulu.',
+        ),
+      ),
     );
     return;
   }
-  await Clipboard.setData(ClipboardData(text: event.registrationUrl));
+  await Clipboard.setData(ClipboardData(text: event.publicUrl!));
   if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('Tautan pendaftaran peserta disalin.')),
+  );
+}
+
+/// Terbitkan event melalui validasi server (D1-2).
+///
+/// Hasil validasi ditampilkan apa adanya: bila gagal, event tetap DRAFT dan
+/// alasan dari server ditampilkan pada snackbar + kotak catatan validasi.
+Future<void> _publishEvent(EventModel event) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Terbitkan event?'),
+      content: const Text(
+        'Sistem akan memvalidasi kelengkapan event dan kategori tiket. Bila '
+        'lolos, event langsung tayang dan tautan publik aktif tanpa approval '
+        'Admin. Bila gagal, event tetap draft beserta daftar alasan.',
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Batal'),
+        ),
+        FilledButton(
+          key: const Key('publish-confirm-button'),
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('Terbitkan'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) return;
+
+  final updated = await _provider.submitForReview(event.id);
+  if (!mounted) return;
+  if (updated == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _provider.actionError ?? 'Event belum memenuhi syarat publikasi.',
+        ),
+        backgroundColor: AppTheme.errorColor,
+        duration: const Duration(seconds: 8),
+      ),
+    );
+    await _provider.loadEvent(widget.eventId);
+    return;
+  }
+
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Text(
-        event.registrationUrlIsDemo
-            ? 'Tautan demo disalin. Event belum dipublikasikan ke server.'
-            : 'Tautan publik disalin.',
+        updated.isPublishedLike
+            ? 'Event tayang. Tautan pendaftaran publik sudah aktif.'
+            : 'Event belum memenuhi syarat publikasi.',
       ),
     ),
   );
+  await _provider.loadEvent(widget.eventId);
 }
 
 Future<void> _openPreview(EventModel event) async {
@@ -498,37 +554,48 @@ Widget _buildRingkasan(EventModel event) {
   return ListView(
     padding: const EdgeInsets.all(16),
     children: <Widget>[
-      const OrganizerInfoBanner(
-        message:
-            'Seluruh angka pada halaman ini berasal dari fixture lokal '
-            '(simulasi Tahap 0). Tidak ada order, pembayaran, atau check-in '
-            'sungguhan.',
+      OrganizerInfoBanner(
+        message: AppConfig.mockMode
+            ? 'Seluruh angka pada halaman ini berasal dari fixture lokal '
+                  '(simulasi Tahap 0). Tidak ada order, pembayaran, atau '
+                  'check-in sungguhan.'
+            : 'Status tayang ditentukan oleh validasi server saat event '
+                  'diterbitkan, bukan approval Admin. Angka operasional tetap '
+                  'mengikuti data backend.',
       ),
       const SizedBox(height: 12),
       Row(
         children: <Widget>[
           OrganizerEventStatusChip(status: event.status),
           const Spacer(),
-          if (event.canSubmitForReview)
-            FilledButton.tonalIcon(
-              key: const Key('summary-submit-button'),
-              onPressed: () => _submitForReview(event, resubmit: false),
-              icon: const Icon(Icons.send_outlined, size: 18),
-              label: const Text('Ajukan moderasi'),
-            )
-          else if (event.canResubmit)
-            FilledButton.tonalIcon(
-              key: const Key('summary-resubmit-button'),
-              onPressed: () => _submitForReview(event, resubmit: true),
-              icon: const Icon(Icons.refresh, size: 18),
-              label: const Text('Ajukan ulang'),
-            )
-          else if (event.isPendingReview)
-            OutlinedButton.icon(
-              key: const Key('summary-simulate-button'),
-              onPressed: () => _simulateModeration(event),
-              icon: const Icon(Icons.gavel_outlined, size: 18),
-              label: const Text('Simulasi moderator'),
+          if (AppConfig.mockMode) ...<Widget>[
+            if (event.canSubmitForReview)
+              FilledButton.tonalIcon(
+                key: const Key('summary-submit-button'),
+                onPressed: () => _submitForReview(event, resubmit: false),
+                icon: const Icon(Icons.send_outlined, size: 18),
+                label: const Text('Ajukan moderasi'),
+              )
+            else if (event.canResubmit)
+              FilledButton.tonalIcon(
+                key: const Key('summary-resubmit-button'),
+                onPressed: () => _submitForReview(event, resubmit: true),
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('Ajukan ulang'),
+              )
+            else if (event.isPendingReview)
+              OutlinedButton.icon(
+                key: const Key('summary-simulate-button'),
+                onPressed: () => _simulateModeration(event),
+                icon: const Icon(Icons.gavel_outlined, size: 18),
+                label: const Text('Simulasi moderator'),
+              ),
+          ] else if (!event.isPublishedLike)
+            FilledButton.icon(
+              key: const Key('summary-publish-button'),
+              onPressed: () => _publishEvent(event),
+              icon: const Icon(Icons.publish_outlined, size: 18),
+              label: const Text('Terbitkan event'),
             ),
         ],
       ),
@@ -611,10 +678,16 @@ Widget _buildRingkasan(EventModel event) {
         OrganizerMiniBarChart(series: _provider.salesPointSeries),
       ),
       _sectionCard(
-        'Registrasi publik',
+        'Tautan Pendaftaran Peserta',
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
+            const Text(
+              'Bagikan tautan ini kepada calon peserta. Tautan hanya aktif '
+              'untuk event yang sudah tayang.',
+              style: TextStyle(fontSize: 12, color: Colors.black54),
+            ),
+            const SizedBox(height: 10),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
@@ -630,20 +703,11 @@ Widget _buildRingkasan(EventModel event) {
                       ),
                       const SizedBox(height: 6),
                       SelectableText(
-                        event.registrationUrl,
+                        event.hasPublicLink
+                            ? event.publicUrl!
+                            : 'Belum tersedia — terbitkan event terlebih dahulu.',
+                        key: const Key('event-public-link-text'),
                         style: const TextStyle(fontSize: 12.5),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        event.registrationUrlIsDemo
-                            ? 'Tautan demo: event belum dipublikasikan ke '
-                                  'server mana pun.'
-                            : 'Tautan publik simulasi untuk event yang sudah '
-                                  'disetujui.',
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          color: Colors.black45,
-                        ),
                       ),
                     ],
                   ),
@@ -656,9 +720,12 @@ Widget _buildRingkasan(EventModel event) {
               runSpacing: 8,
               children: <Widget>[
                 OutlinedButton.icon(
-                  onPressed: () => _copyLink(event),
+                  key: const Key('event-public-link-copy'),
+                  onPressed: event.hasPublicLink
+                      ? () => _copyLink(event)
+                      : null,
                   icon: const Icon(Icons.copy, size: 18),
-                  label: const Text('Salin tautan'),
+                  label: const Text('Salin tautan pendaftaran'),
                 ),
                 OutlinedButton.icon(
                   onPressed: () => _openPreview(event),
@@ -672,6 +739,33 @@ Widget _buildRingkasan(EventModel event) {
                     label: const Text('Laporan event'),
                   ),
               ],
+            ),
+          ],
+        ),
+      ),
+      _sectionCard(
+        'Tautan Undangan Panitia',
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text(
+              'Undangan panitia berbeda dari tautan pendaftaran peserta. '
+              'Tautan dibuat per undangan (email, permission, masa berlaku) dan '
+              'hanya dapat diterima akun dengan email yang cocok.',
+              style: TextStyle(fontSize: 12, color: Colors.black54),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              key: const Key('event-staff-invite-open'),
+              onPressed: () => Navigator.of(context).pushNamed(
+                AppRoutes.organizerTeam,
+                arguments: <String, dynamic>{
+                  'eventId': event.id,
+                  'eventTitle': event.title,
+                },
+              ),
+              icon: const Icon(Icons.group_add_outlined, size: 18),
+              label: const Text('Kelola undangan panitia'),
             ),
           ],
         ),
@@ -706,7 +800,9 @@ Widget _buildRingkasan(EventModel event) {
 }
 
 Widget _buildReviewNoteBox(EventModel event) {
-  if (event.reviewNote == null || event.reviewNote!.trim().isEmpty) {
+  final reasons = event.resolvedValidationErrors;
+  final note = event.reviewNote?.trim();
+  if (reasons.isEmpty && (note == null || note.isEmpty)) {
     return const SizedBox.shrink();
   }
   return Container(
@@ -726,19 +822,43 @@ Widget _buildReviewNoteBox(EventModel event) {
             const Icon(Icons.feedback_outlined, size: 18, color: Colors.orange),
             const SizedBox(width: 8),
             Text(
-              'Catatan revisi moderator',
+              'Catatan validasi / revisi',
               style: Theme.of(context).textTheme.titleSmall
                   ?.copyWith(fontWeight: FontWeight.w700),
             ),
           ],
         ),
         const SizedBox(height: 8),
-        Text(event.reviewNote!, style: const TextStyle(fontSize: 13)),
+        if (reasons.isNotEmpty) ...<Widget>[
+          const Text(
+            'Event belum dapat tayang karena:',
+            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 6),
+          for (final reason in reasons)
+            Padding(
+              key: Key('validation-error-$reason'),
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const Text('• ', style: TextStyle(fontSize: 13)),
+                  Expanded(
+                    child: Text(reason, style: const TextStyle(fontSize: 13)),
+                  ),
+                ],
+              ),
+            ),
+        ] else
+          Text(note!, style: const TextStyle(fontSize: 13)),
         const SizedBox(height: 8),
-        const Text(
-          'Catatan ini berasal dari fixture demo dan tidak dapat diubah oleh '
-          'Owner. Status moderasi juga tidak dapat diubah manual.',
-          style: TextStyle(fontSize: 11.5, color: Colors.black54),
+        Text(
+          AppConfig.mockMode
+              ? 'Catatan ini berasal dari fixture demo dan tidak dapat diubah '
+                    'oleh Owner.'
+              : 'Catatan ini berasal dari validasi server saat publikasi atau '
+                    'dari moderator. Perbaiki data lalu terbitkan ulang.',
+          style: const TextStyle(fontSize: 11.5, color: Colors.black54),
         ),
       ],
     ),

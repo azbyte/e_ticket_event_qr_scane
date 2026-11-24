@@ -8,6 +8,8 @@ const SCAN_RESULTS = {
   INVALID: 'INVALID',
   WRONG_EVENT: 'WRONG_EVENT',
   PAYMENT_REQUIRED: 'PAYMENT_REQUIRED',
+  CANCELLED: 'CANCELLED',
+  REVOKED: 'REVOKED',
 };
 
 const normalizeTicketStatus = (status) => {
@@ -17,19 +19,28 @@ const normalizeTicketStatus = (status) => {
 };
 
 const assertScanPermission = async (eventId, user) => {
+  if (!user || !user.id) {
+    const err = new Error('Authentication required');
+    err.statusCode = 401;
+    throw err;
+  }
   const event = await getOne('SELECT id, created_by FROM events WHERE id = $1', [eventId]);
   if (!event) {
-    const err = new Error('Event not found'); err.statusCode = 404; throw err;
+    const err = new Error('Event not found');
+    err.statusCode = 404;
+    throw err;
   }
   if (user.role === 'admin') return null;
   if (event.created_by === user.id) return null;
 
   const member = await getOne(
-    'SELECT id FROM event_members WHERE event_id = $1 AND user_id = $2',
+    'SELECT id, status FROM event_members WHERE event_id = $1 AND user_id = $2',
     [eventId, user.id]
   );
-  if (!member) {
-    const err = new Error('You are not a staff member of this event'); err.statusCode = 403; throw err;
+  if (!member || (member.status && member.status !== 'ACTIVE' && member.status !== 'active')) {
+    const err = new Error('You are not an active staff member of this event');
+    err.statusCode = 403;
+    throw err;
   }
 
   const perms = await query(
@@ -40,7 +51,9 @@ const assertScanPermission = async (eventId, user) => {
     (p) => p.permission === 'CHECK_IN_TICKET' || p.permission === 'SCAN_TICKET'
   );
   if (!hasPermission) {
-    const err = new Error('You do not have check-in permission for this event'); err.statusCode = 403; throw err;
+    const err = new Error('You do not have check-in permission for this event');
+    err.statusCode = 403;
+    throw err;
   }
   return member.id;
 };
@@ -83,10 +96,38 @@ const assertOrderPermission = (eventId, user) =>
   assertMemberPermission(eventId, user, ['VIEW_ORDERS']);
 
 const findTicketByToken = (rawToken) => ticketTokens.findTicketByRawToken(rawToken);
+const findTicketByIdentifier = async (rawTokenOrCode) => {
+  if (typeof rawTokenOrCode !== 'string' || !rawTokenOrCode.trim()) return null;
+  const trimmed = rawTokenOrCode.trim();
+
+  // 1. Coba cari via hash token QR (HMAC-SHA256)
+  const byToken = await ticketTokens.findTicketByRawToken(trimmed);
+  if (byToken) return byToken;
+
+  // 2. Coba cari via kode tiket human-readable (entri manual oleh staf)
+  const byCode = await getOne(
+    `SELECT t.*,
+            a.name AS attendee_name, a.email AS attendee_email, a.phone AS attendee_phone,
+            a.order_item_id AS attendee_order_item_id,
+            tt.name AS ticket_type_name
+     FROM tickets t
+     LEFT JOIN attendees a ON a.id = t.attendee_id
+     LEFT JOIN ticket_types tt ON tt.id = t.ticket_type_id
+     WHERE t.ticket_code = $1`,
+    [trimmed]
+  );
+  return byCode;
+};
 
 const orderOfTicket = async (ticket) => {
-  if (!ticket || !ticket.attendee_order_item_id) return null;
-  const item = await getOne('SELECT order_id FROM order_items WHERE id = $1', [ticket.attendee_order_item_id]);
+  if (!ticket) return null;
+  let orderItemId = ticket.attendee_order_item_id;
+  if (!orderItemId && ticket.attendee_id) {
+    const attendee = await getOne('SELECT order_item_id FROM attendees WHERE id = $1', [ticket.attendee_id]);
+    orderItemId = attendee?.order_item_id;
+  }
+  if (!orderItemId) return null;
+  const item = await getOne('SELECT order_id FROM order_items WHERE id = $1', [orderItemId]);
   if (!item) return null;
   const order = await getOne('SELECT id, status FROM event_orders WHERE id = $1', [item.order_id]);
   return order;
@@ -97,15 +138,31 @@ const presentScanTicket = async (ticket) => ({
   ...(await ticketTokens.presentTicket(ticket)),
   status: normalizeTicketStatus(ticket.status),
 });
+
 const validateTicket = asyncHandler(async (req, res) => {
-  const rawToken = req.body.token || req.body.ticket_code;
-  const { event_id } = req.body;
-  if (!rawToken) {
-    res.status(400);
-    throw new Error('Ticket token is required');
+  const user = req.user;
+  if (!user || !user.id) {
+    const err = new Error('Authentication required');
+    err.statusCode = 401;
+    res.status(401);
+    throw err;
   }
 
-  const ticket = await findTicketByToken(rawToken);
+  const rawToken = req.body.token || req.body.ticket_code;
+  const { event_id } = req.body;
+  if (!rawToken || typeof rawToken !== 'string' || !rawToken.trim()) {
+    const err = new Error('Ticket token is required');
+    err.statusCode = 400;
+    res.status(400);
+    throw err;
+  }
+
+  // 1. Jika event_id pos pemindaian dikirimkan, pastikan staf memiliki izin di pos tersebut
+  if (event_id) {
+    await assertScanPermission(event_id, user);
+  }
+
+  const ticket = await findTicketByIdentifier(rawToken);
   if (!ticket) {
     return res.json({
       success: true,
@@ -116,10 +173,12 @@ const validateTicket = asyncHandler(async (req, res) => {
     });
   }
 
-  // Validasi QR juga harus dibatasi ke petugas event terkait karena respons
-  // memuat data peserta (nama/email/telepon).
-  await assertScanPermission(ticket.event_id, req.user);
+  // 2. Jika event_id pos pemindaian tidak dikirimkan, periksa izin staf pada event tiket
+  if (!event_id) {
+    await assertScanPermission(ticket.event_id, user);
+  }
 
+  // 3. Verifikasi apakah tiket berlaku untuk event pada pos pemindaian
   if (event_id && ticket.event_id !== event_id) {
     return res.json({
       success: true,
@@ -130,6 +189,7 @@ const validateTicket = asyncHandler(async (req, res) => {
     });
   }
 
+  // 4. Verifikasi status tiket: apakah sudah pernah digunakan
   if (ticket.status === 'used') {
     return res.json({
       success: true,
@@ -140,6 +200,36 @@ const validateTicket = asyncHandler(async (req, res) => {
     });
   }
 
+  // 5. Verifikasi status tiket: apakah dibatalkan, dicabut, dsb.
+  if (ticket.status === 'cancelled') {
+    return res.json({
+      success: true,
+      valid: false,
+      status: SCAN_RESULTS.CANCELLED,
+      message: 'Tiket telah dibatalkan.',
+      ticket: await presentScanTicket(ticket),
+    });
+  }
+  if (ticket.status === 'revoked') {
+    return res.json({
+      success: true,
+      valid: false,
+      status: SCAN_RESULTS.REVOKED,
+      message: 'Tiket telah dicabut oleh penyelenggara.',
+      ticket: await presentScanTicket(ticket),
+    });
+  }
+  if (ticket.status !== 'active') {
+    return res.json({
+      success: true,
+      valid: false,
+      status: SCAN_RESULTS.INVALID,
+      message: `Tiket tidak valid (${ticket.status}).`,
+      ticket: await presentScanTicket(ticket),
+    });
+  }
+
+  // 6. Verifikasi pembayaran server-authoritative
   let paymentRequired = false;
   try {
     const order = await orderOfTicket(ticket);
@@ -168,7 +258,7 @@ const validateTicket = asyncHandler(async (req, res) => {
 
 const recordCheckIn = asyncHandler(async (req, res) => {
   const user = req.user;
-  if (!user) {
+  if (!user || !user.id) {
     res.status(401);
     throw new Error('Authentication required');
   }
@@ -176,10 +266,11 @@ const recordCheckIn = asyncHandler(async (req, res) => {
   const { ticket_id, ticket_code, token, event_id } = req.body;
   let ticket = null;
   if (token || ticket_code) {
-    ticket = await findTicketByToken(token || ticket_code);
+    ticket = await findTicketByIdentifier(token || ticket_code);
   } else if (ticket_id) {
     const row = await getOne(
       `SELECT t.*,
+              a.name AS attendee_name, a.email AS attendee_email, a.phone AS attendee_phone,
               a.order_item_id AS attendee_order_item_id,
               tt.name AS ticket_type_name
        FROM tickets t
@@ -206,6 +297,10 @@ const recordCheckIn = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('Tiket sudah digunakan untuk check-in sebelumnya');
   }
+  if (ticket.status !== 'active') {
+    res.status(400);
+    throw new Error(`Tiket tidak valid (${ticket.status})`);
+  }
 
   const order = await orderOfTicket(ticket);
   if (!order || order.status !== 'PAID') {
@@ -218,8 +313,10 @@ const recordCheckIn = asyncHandler(async (req, res) => {
     [ticket.id]
   );
   if (existingCheckIn) {
+    const err = new Error('Tiket sudah di-check-in');
+    err.statusCode = 409;
     res.status(409);
-    throw new Error('Tiket sudah di-check-in');
+    throw err;
   }
 
   const now = new Date().toISOString();
@@ -228,8 +325,10 @@ const recordCheckIn = asyncHandler(async (req, res) => {
   try {
     await client.query('BEGIN');
     const locked = await client.query('SELECT status FROM tickets WHERE id = $1 FOR UPDATE', [ticket.id]);
-    if (!locked.rows[0] || locked.rows[0].status === 'used') {
-      const err = new Error('Tiket sudah di-check-in'); err.statusCode = 409; throw err;
+    if (!locked.rows[0] || locked.rows[0].status !== 'active') {
+      const err = new Error('Tiket sudah di-check-in');
+      err.statusCode = 409;
+      throw err;
     }
     const inserted = await client.query(
       `INSERT INTO check_ins (id, ticket_id, event_id, actor_user_id, event_member_id, source, checked_in_at)
@@ -239,7 +338,9 @@ const recordCheckIn = asyncHandler(async (req, res) => {
       [ticket.id, ticket.event_id, user.id, memberId, now]
     );
     if (!inserted.rows[0]) {
-      const err = new Error('Tiket sudah di-check-in'); err.statusCode = 409; throw err;
+      const err = new Error('Tiket sudah di-check-in');
+      err.statusCode = 409;
+      throw err;
     }
     checkIn = inserted.rows[0];
 
@@ -278,7 +379,7 @@ const escapeCsvValue = (val) => {
 
 const listEventAttendees = asyncHandler(async (req, res) => {
   const user = req.user;
-  if (!user) {
+  if (!user || !user.id) {
     res.status(401);
     throw new Error('Authentication required');
   }
@@ -423,6 +524,36 @@ const listEventAttendees = asyncHandler(async (req, res) => {
     order_status: String(t.order_status || 'PENDING_PAYMENT').toUpperCase(),
     custom_fields: t.custom_fields || {},
     checked_in_at: t.checked_in_at || t.used_at || null,
+    `SELECT t.*,
+            a.name AS attendee_name, a.email AS attendee_email, a.phone AS attendee_phone,
+            a.order_item_id AS attendee_order_item_id,
+            tt.name AS ticket_type_name,
+            eo.id AS order_id, eo.order_number, eo.status AS payment_status
+     FROM tickets t
+     LEFT JOIN attendees a ON a.id = t.attendee_id
+     LEFT JOIN order_items oi ON oi.id = a.order_item_id
+     LEFT JOIN event_orders eo ON eo.id = oi.order_id
+     LEFT JOIN ticket_types tt ON tt.id = t.ticket_type_id
+     WHERE t.event_id = $1
+     ORDER BY (CASE WHEN eo.status = 'PAID' THEN 0 ELSE 1 END), t.purchased_at DESC`,
+    [eventId]
+  );
+
+  const attendees = rows.map((t) => ({
+    id: t.attendee_order_item_id ? t.attendee_order_item_id : t.id,
+    ticket_id: t.id,
+    ticket_code: t.ticket_code,
+    registration_number: t.order_number || t.ticket_code || `REG-${t.id.slice(0, 8)}`,
+    order_number: t.order_number || null,
+    order_id: t.order_id || null,
+    payment_status: t.payment_status || (t.status === 'used' || t.status === 'active' ? 'PAID' : 'PENDING'),
+    attendee_name: t.attendee_name,
+    attendee_email: t.attendee_email,
+    attendee_phone: t.attendee_phone,
+    ticket_type: t.ticket_type_name,
+    status: normalizeTicketStatus(t.status),
+    purchased_at: t.purchased_at,
+    used_at: t.used_at,
   }));
 
   res.json({ success: true, count: attendees.length, attendees });
@@ -693,7 +824,7 @@ const getEventOrders = asyncHandler(async (req, res) => {
 
 const listEventCheckIns = asyncHandler(async (req, res) => {
   const user = req.user;
-  if (!user) {
+  if (!user || !user.id) {
     res.status(401);
     throw new Error('Authentication required');
   }
@@ -716,6 +847,10 @@ const listEventCheckIns = asyncHandler(async (req, res) => {
 
 const syncCheckIns = asyncHandler(async (req, res) => {
   const user = req.user;
+  if (!user || !user.id) {
+    res.status(401);
+    throw new Error('Authentication required');
+  }
   const { pending } = req.body;
   const items = Array.isArray(pending) ? pending : [];
   if (items.length === 0) {
@@ -750,8 +885,6 @@ const syncCheckIns = asyncHandler(async (req, res) => {
       if (!ticket || ticket.event_id !== eventId) {
         const err = new Error('Tiket tidak ditemukan pada event ini'); err.statusCode = 404; throw err;
       }
-      // Bila scanner mengirim token, pastikan token memang milik tiket ini
-      // sehingga antrean offline tidak dapat dipakai untuk menandai tiket lain.
       if (item.token) {
         const expected = ticketTokens.hashToken(String(item.token).trim());
         if (!ticket.token_hash || !ticketTokens.safeEqual(ticket.token_hash, expected)) {
@@ -823,5 +956,9 @@ module.exports = {
   assertOrderPermission,
   exportEventAttendeesCsv,
   getEventOrders,
+  findTicketByIdentifier,
+  orderOfTicket,
+  presentScanTicket,
   normalizeTicketStatus,
+  SCAN_RESULTS,
 };

@@ -6,7 +6,12 @@ import '../../../providers/auth_provider.dart';
 import '../../../routes/app_routes.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.redirectRoute});
+
+  /// Tujuan setelah login berhasil. Dipakai deep link seperti `/invite/:token`
+  /// agar pengguna kembali ke halaman yang diminta (D1-1).
+  final String? redirectRoute;
+
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
@@ -34,7 +39,11 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(auth.error ?? 'Login gagal.')));
       return;
     }
-    Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.initial, (_) => false);
+    final redirect = widget.redirectRoute;
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      redirect != null && redirect.isNotEmpty ? redirect : AppRoutes.initial,
+      (_) => false,
+    );
   }
 
   @override

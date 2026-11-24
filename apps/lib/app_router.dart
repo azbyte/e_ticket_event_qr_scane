@@ -17,6 +17,11 @@ import 'features/admin/screens/transaction_revenue_screen.dart';
 import 'features/admin/tabs/admin_tab_controller.dart';
 import 'features/events/screens/event_detail_screen.dart';
 import 'features/events/screens/event_list_screen.dart';
+import 'features/payments/screens/payment_screen.dart';
+import 'features/public_event/screens/invitation_entry_screen.dart';
+import 'features/public_event/screens/public_event_screen.dart';
+import 'features/public_event/screens/public_registration_screen.dart';
+import 'features/registration/screens/registration_screen.dart';
 import 'features/organizer/membership/team_management_screen.dart';
 import 'features/organizer/plans/subscription_screen.dart';
 import 'features/organizer/events/screens/organizer_event_detail_screen.dart';
@@ -144,6 +149,28 @@ class AppRouter {
           page = EventDetailScreen(eventId: parts[1]);
         } else if (parts.length == 2 && parts[0] == 'tickets') {
           page = TicketDetailScreen(ticketId: parts[1]);
+        } else if (parts.length == 2 && parts[0] == 'e') {
+          // Tautan pendaftaran publik: dapat dibuka guest tanpa login (D1-1).
+          page = PublicEventScreen(eventId: parts[1]);
+        } else if (parts.length == 3 &&
+            parts[0] == 'e' &&
+            parts[2] == 'register') {
+          page = PublicRegistrationScreen(eventId: parts[1]);
+        } else if (parts.length == 4 &&
+            parts[0] == 'e' &&
+            (parts[2] == 'order' || parts[2] == 'payment')) {
+          page = PaymentScreen(orderId: parts[3]);
+        } else if (parts.length == 4 &&
+            parts[0] == 'e' &&
+            parts[2] == 'ticket') {
+          page = TicketDetailScreen(ticketId: parts[3]);
+        } else if (parts.length == 2 && parts[0] == 'invite') {
+          page = InvitationEntryScreen(token: parts[1]);
+        } else if (parts.length == 2 && parts[0] == 'registration') {
+          // Alur registrasi guest melalui tautan publik.
+          page = RegistrationScreen(eventId: parts[1]);
+        } else if (parts.length == 2 && parts[0] == 'staff') {
+          page = StaffDashboardScreen(eventId: parts[1]);
         } else if (parts.length == 4 &&
             parts[0] == 'organizer' &&
             parts[1] == 'events' &&
@@ -200,16 +227,18 @@ class AppRouter {
             path == AppRoutes.organizerDashboard ||
             path.startsWith('/organizer/');
 
-        // Public / non-auth routes
-        if (path == AppRoutes.initial ||
-            path == AppRoutes.login ||
-            path == AppRoutes.register ||
-            path == AppRoutes.accessDenied) {
+        // Public / non-auth routes (D1-1)
+        if (_isPublicPath(path)) {
           if ((path == AppRoutes.login || path == AppRoutes.register) &&
               auth.isAuthenticated) {
             return role == 'admin'
                 ? const RoleGuard(admin: true)
                 : const RoleGuard(admin: false);
+          }
+          // Undangan panitia memerlukan login; setelah login pengguna kembali
+          // ke halaman penerimaan undangan (K3).
+          if (_isInvitationPath(path) && !auth.isAuthenticated) {
+            return LoginScreen(redirectRoute: path);
           }
           return page;
         }
@@ -246,4 +275,22 @@ class AppRouter {
     'staff' => AppRoutes.staffDashboard,
     _ => AppRoutes.eventList,
   };
+
+  /// Route yang boleh diakses tanpa token (PRD §6.1, §7).
+  ///
+  /// `/registration/:eventId` ikut publik karena halaman itu adalah tujuan
+  /// tautan pendaftaran; seluruh route lain tetap memerlukan login.
+  static bool _isPublicPath(String path) {
+    if (path == AppRoutes.initial ||
+        path == AppRoutes.login ||
+        path == AppRoutes.register ||
+        path == AppRoutes.accessDenied) {
+      return true;
+    }
+    return path.startsWith('/e/') ||
+        path.startsWith('/invite/') ||
+        path.startsWith('/registration/');
+  }
+
+  static bool _isInvitationPath(String path) => path.startsWith('/invite/');
 }

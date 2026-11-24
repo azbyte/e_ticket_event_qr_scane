@@ -335,10 +335,14 @@ class _EventFormScreenState extends State<EventFormScreen> {
           children: <Widget>[
             if (_existing != null)
               OrganizerInfoBanner(
-                message:
-                    'Status event saat ini: ${_existing!.statusLabel}. '
-                    'Status moderasi hanya berubah melalui aksi pengajuan atau '
-                    'keputusan moderator (simulasi).',
+                message: AppConfig.mockMode
+                    ? 'Status event saat ini: ${_existing!.statusLabel}. '
+                          'Status moderasi hanya berubah melalui aksi pengajuan '
+                          'atau keputusan moderator (simulasi).'
+                    : 'Status event saat ini: ${_existing!.statusLabel}. '
+                          'Event tayang setelah lolos validasi server; '
+                          'perubahan penting dapat mengembalikan status ke '
+                          'draft.',
               ),
             if (_existing != null) const SizedBox(height: 16),
             _sectionTitle('A. Informasi dasar'),

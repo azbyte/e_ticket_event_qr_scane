@@ -57,8 +57,36 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Status Transaksi'), findsOneWidget);
-      expect(find.text('Pembayaran Gagal / Dibatalkan'), findsOneWidget);
+      // Status FAILED kini dibedakan dari EXPIRED/CANCELLED (D1-5 K4).
+      expect(find.text('Pembayaran Gagal'), findsOneWidget);
+      expect(find.text('Gagal (FAILED)'), findsOneWidget);
       expect(find.text('Coba Bayar Lagi'), findsOneWidget);
+    });
+
+    testWidgets('PaymentStatusScreen membedakan status expired tanpa aksi bayar ulang', (
+      tester,
+    ) async {
+      final expiredPayment = PaymentModel(
+        id: 'pay-003',
+        orderId: 'ORD-20261123-003',
+        method: 'virtual_account',
+        status: 'expired',
+        amount: 15000,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PaymentStatusScreen(
+            orderId: 'ORD-20261123-003',
+            payment: expiredPayment,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pembayaran Kedaluwarsa'), findsOneWidget);
+      expect(find.text('Kedaluwarsa (EXPIRED)'), findsOneWidget);
+      expect(find.text('Coba Bayar Lagi'), findsNothing);
     });
   });
 }

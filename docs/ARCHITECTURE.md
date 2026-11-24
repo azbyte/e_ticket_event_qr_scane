@@ -26,6 +26,27 @@ Mode demo dan API tetap terpisah. Tidak semua modul saat ini sudah memiliki
 endpoint backend; API mode harus menampilkan error, bukan memakai data mock
 sebagai fallback.
 
+### Lifecycle event dan tautan publik (Tahap 2, Developer 1)
+
+- Publikasi event tidak lagi menunggu approval Admin. `POST /api/events/:id/publish`
+  (alias `POST /api/events/:id/submit-review`) memvalidasi event + kategori tiket
+  lewat `backend/src/utils/eventValidation.js`; hasil valid menetapkan
+  `status = PUBLISHED`, `is_public = true`, `submitted_at`, dan `public_url`.
+  Hasil tidak valid mempertahankan `DRAFT`, `is_public = false`, dan menyimpan
+  alasan pada `review_note` (dikembalikan sebagai `validation_errors`).
+- `public_url` hanya terisi untuk event `PUBLISHED` (atau `APPROVED` legacy) dan
+  `is_public = true`; `APP_PUBLIC_URL` menjadi basis tautan `/e/{eventId}`.
+- Undangan panitia memakai `invite_url = {APP_PUBLIC_URL}/invite/{rawToken}`,
+  terpisah dari tautan pendaftaran publik.
+- Route Flutter `/e/:eventId`, `/e/:eventId/register`, `/e/:eventId/payment/:orderId`,
+  `/e/:eventId/ticket/:ticketId`, dan `/registration/:eventId` dapat dibuka guest;
+  `/invite/:token` memaksa login lalu kembali ke halaman undangan.
+- `attendee_fields` event berbentuk array objek
+  `{ key, label, type, required, options }` (kompatibel array string legacy) dan
+  jawaban peserta disimpan pada `attendees.custom_fields` dalam transaksi order
+  yang sama.
+
+
 ## Alur kerja
 
 1. Baca `AGENTS.md`, PRD, README dan modul terdampak. Periksa status/diff Git.
