@@ -103,6 +103,43 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
     }
   }
 
+  Future<void> _restoreEvent(EventModel event) async {
+    try {
+      await _repository.simulatePlatformModeration(
+        eventId: event.id,
+        status: OrganizerEventStatus.published,
+        note: 'Dipulihkan oleh Super Admin',
+      );
+      if (AppConfig.mockMode) {
+        await AdminAuditLogService.instance.logAction(
+          actorId: 'admin@event.com',
+          actorName: 'Super Admin',
+          action: 'EVENT_RESTORED',
+          entityType: 'EVENT',
+          entityId: event.id,
+          reason: 'Dipulihkan oleh Super Admin',
+          details: 'Memulihkan event "${event.title}" ke status tayang/published.',
+          metadata: {
+            'title': event.title,
+            'status': OrganizerEventStatus.published,
+          },
+        );
+      }
+      await _loadEvents();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Event "${event.title}" telah dipulihkan ke status tayang.')),
+        );
+      }
+    } on Exception catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Perubahan event gagal disimpan: $error')),
+        );
+      }
+    }
+  }
+
   void _showSuspendDialog(EventModel event) {
     final reasonController = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -462,6 +499,7 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
     final isPublished =
         item.status == OrganizerEventStatus.published ||
         item.status == OrganizerEventStatus.approved;
+    final isSuspended = item.status == OrganizerEventStatus.suspended;
 
     return Card(
       elevation: 2,
@@ -554,6 +592,16 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
                         ),
                         onPressed: () => _showSuspendDialog(item),
                         child: const Text('Tangguhkan'),
+                      ),
+                    ],
+                    if (isSuspended) ...[
+                      OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.green,
+                          side: const BorderSide(color: Colors.green),
+                        ),
+                        onPressed: () => _restoreEvent(item),
+                        child: const Text('Pulihkan'),
                       ),
                     ],
                   ],

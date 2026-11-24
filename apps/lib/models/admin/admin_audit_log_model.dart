@@ -27,5 +27,24 @@ class AdminAuditLogEntry {
     this.details,
     this.metadata,
   });
-}
 
+  factory AdminAuditLogEntry.fromJson(Map<String, dynamic> json) {
+    return AdminAuditLogEntry(
+      id: json['id']?.toString() ?? '',
+      timestamp: json['created_at'] != null
+          ? (DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now())
+          : DateTime.now(),
+      actorId: json['actor_id']?.toString() ?? '',
+      actorName: json['actor_name']?.toString() ?? 'System',
+      actorRole: json['actor_role']?.toString() ?? 'ADMIN',
+      action: json['action']?.toString() ?? '',
+      entityType: json['entity_type']?.toString() ?? '',
+      entityId: json['entity_id']?.toString() ?? '',
+      reason: json['reason']?.toString(),
+      details: json['details']?.toString(),
+      metadata: json['metadata'] is Map<String, dynamic>
+          ? Map<String, dynamic>.from(json['metadata'])
+          : null,
+    );
+  }
+}

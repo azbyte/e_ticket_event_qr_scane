@@ -8,6 +8,8 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
+import '../../core/config/app_config.dart';
+import '../../core/network/api_client.dart';
 import 'event_activity_service.dart';
 import 'organizer_permission.dart';
 
@@ -31,6 +33,7 @@ class OrganizerAttendee {
     this.assistedBy,
     required this.createdAt,
     this.isOfflinePending = false,
+    this.customFields = const {},
   });
 
   final String id;
@@ -51,6 +54,48 @@ class OrganizerAttendee {
   final String? assistedBy;
   final DateTime createdAt;
   final bool isOfflinePending;
+  final Map<String, dynamic> customFields;
+
+  factory OrganizerAttendee.fromJson(Map<String, dynamic> json, String eventId) {
+    final status = (json['status'] ?? 'active').toString().toLowerCase();
+    final checkedInAtStr = json['checked_in_at'] ?? json['used_at'];
+    final checkedInAt = checkedInAtStr != null
+        ? DateTime.tryParse(checkedInAtStr.toString())
+        : null;
+    final isCheckedIn =
+        status == 'used' || status == 'checked_in' || checkedInAt != null;
+
+    return OrganizerAttendee(
+      id: json['id']?.toString() ?? '',
+      eventId: eventId,
+      name: json['attendee_name']?.toString() ??
+          json['name']?.toString() ??
+          '-',
+      email: json['attendee_email']?.toString() ??
+          json['email']?.toString() ??
+          '-',
+      phone: json['attendee_phone']?.toString() ??
+          json['phone']?.toString() ??
+          '-',
+      ticketType: json['ticket_type']?.toString() ?? '-',
+      ticketCode: json['ticket_code']?.toString() ?? '-',
+      orderId: json['order_number']?.toString() ??
+          json['order_id']?.toString() ??
+          '-',
+      registrationMethod: 'SELF_SERVICE',
+      orderStatus: (json['order_status'] ?? 'confirmed').toString().toLowerCase(),
+      paymentStatus: (json['payment_status'] ?? 'paid').toString().toLowerCase(),
+      ticketStatus: isCheckedIn ? 'checked_in' : (status == 'active' ? 'valid' : status),
+      checkedIn: isCheckedIn,
+      checkedInAt: checkedInAt,
+      createdAt: json['purchased_at'] != null
+          ? (DateTime.tryParse(json['purchased_at'].toString()) ?? DateTime.now())
+          : DateTime.now(),
+      customFields: json['custom_fields'] is Map<String, dynamic>
+          ? Map<String, dynamic>.from(json['custom_fields'])
+          : const {},
+    );
+  }
 
   /// Masks email to protect sensitive participant data (e.g., ah***@example.com).
   String get maskedEmail {
@@ -309,6 +354,59 @@ class OrganizerOperationsRepository extends ChangeNotifier {
   // ---------------------------------------------------------------------------
   // ATTENDEE QUERY & FILTERING
   // ---------------------------------------------------------------------------
+
+  Future<void> refreshAttendeesFromApi(String eventId) async {
+    if (AppConfig.mockMode) return;
+    try {
+      final res = await ApiClient.instance.get('/events/$eventId/attendees');
+      final list = (res['attendees'] as List<dynamic>? ?? []);
+      final apiAttendees = list
+          .map((item) => OrganizerAttendee.fromJson(item as Map<String, dynamic>, eventId))
+          .toList();
+      _attendees.removeWhere((a) => a.eventId == eventId);
+      _attendees.addAll(apiAttendees);
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error refreshing attendees: $e');
+      }
+      rethrow;
+    }
+  }
+
+  Future<OrganizerReportMetrics> fetchEventReportFromApi(String eventId) async {
+    if (AppConfig.mockMode) {
+      return getEventReport(eventId);
+    }
+    try {
+      final res = await ApiClient.instance.get('/events/$eventId/summary');
+      final summary = res['summary'] as Map<String, dynamic>? ?? {};
+      final ticketsSold = summary['tickets_sold'] as int? ?? summary['ticketsSold'] as int? ?? 0;
+      final checkedIn = summary['checked_in'] as int? ?? summary['checkedIn'] as int? ?? 0;
+      final gross = (summary['gross_sales'] as num? ?? summary['grossSales'] as num? ?? 0).toDouble();
+      final pendingOrders = summary['pending_orders'] as int? ?? summary['pendingOrders'] as int? ?? 0;
+
+      final commission = gross * 0.05;
+      final gatewayFee = (ticketsSold + pendingOrders) * 2500.0;
+      final proceeds = gross - commission - gatewayFee;
+
+      return OrganizerReportMetrics(
+        eventId: eventId,
+        totalOrders: ticketsSold + pendingOrders,
+        totalTicketsSold: ticketsSold,
+        totalCheckedIn: checkedIn,
+        checkInRate: ticketsSold > 0 ? (checkedIn / ticketsSold) * 100 : 0.0,
+        grossSales: gross,
+        platformCommission: commission,
+        paymentGatewayFee: gatewayFee,
+        organizerProceeds: proceeds > 0 ? proceeds : 0.0,
+        packageRevenue: 0.0,
+        tierBreakdown: {},
+      );
+    } catch (_) {
+      return getEventReport(eventId);
+    }
+  }
 
   List<OrganizerAttendee> getAttendeesForEvent(
     String eventId, {

@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const { query, getOne } = require('../config/db');
 const { serializeEvent } = require('../utils/eventResponse');
 const { serializeEventSummary } = require('../utils/eventSummary');
+const { writeAuditLog } = require('../utils/auditLog');
 
 const getOwnedEvent = async (eventId, user) => {
   const event = await getOne('SELECT id, created_by, status FROM events WHERE id = $1', [eventId]);
@@ -118,8 +119,10 @@ const getEventSalesPoints = asyncHandler(async (req, res) => {
 
 const moderateEvent = asyncHandler(async (req, res) => {
   const status = String(req.body.status || '').toUpperCase();
-  const allowed = ['APPROVED', 'REVISION_REQUESTED', 'REJECTED', 'SUSPENDED'];
-  const note = typeof req.body.note === 'string' ? req.body.note.trim() : '';
+  const allowed = ['APPROVED', 'REVISION_REQUESTED', 'REJECTED', 'SUSPENDED', 'PUBLISHED'];
+  const note = typeof req.body.note === 'string'
+    ? req.body.note.trim()
+    : (typeof req.body.reason === 'string' ? req.body.reason.trim() : '');
   if (!allowed.includes(status)) {
     res.status(400);
     throw new Error('Invalid moderation decision');
@@ -136,6 +139,17 @@ const moderateEvent = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Event not found');
   }
+
+  await writeAuditLog({
+    actor: req.user,
+    action: status === 'SUSPENDED' ? 'SUSPEND_EVENT' : (status === 'PUBLISHED' || status === 'APPROVED' ? 'RESTORE_EVENT' : `MODERATE_EVENT_${status}`),
+    entityType: 'EVENT',
+    entityId: req.params.id,
+    reason: note || null,
+    details: `Moderation decision: ${status}${note ? ` - ${note}` : ''}`,
+    metadata: { status, note },
+  });
+
   // Function mengembalikan composite SETOF events; ambil ulang baris agar
   // response berbentuk objek konsisten dengan endpoint event lain.
   const updated = await getOne(

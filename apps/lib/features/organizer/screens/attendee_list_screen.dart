@@ -6,10 +6,10 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../models/event/event_model.dart';
 import '../../../services/organizer_operations/organizer_operations_repository.dart';
 import '../../../services/organizer_operations/organizer_permission.dart';
-import '../operations/assisted_registration_screen.dart';
 import '../operations/organizer_activity_log_screen.dart';
 import '../operations/organizer_attendee_detail_screen.dart';
 import '../operations/organizer_report_screen.dart';
@@ -19,12 +19,12 @@ class AttendeeListScreen extends StatefulWidget {
   const AttendeeListScreen({
     super.key,
     this.event,
-    this.eventId = 'evt-1001',
+    this.eventId,
     this.initialMembershipContext,
   });
 
   final EventModel? event;
-  final String eventId;
+  final String? eventId;
   final OrganizerMembershipContext? initialMembershipContext;
 
   @override
@@ -37,6 +37,8 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   late OrganizerMembershipContext _currentContext;
+  bool _isLoading = false;
+  String? _errorMessage;
 
   String _filterStatus = 'all'; // all, checked_in, pending, cancelled
   String _filterMethod = 'all'; // all, SELF_SERVICE, ASSISTED
@@ -45,7 +47,10 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
   @override
   void initState() {
     super.initState();
-    final targetId = widget.event?.id ?? widget.eventId;
+    final targetId = widget.event?.id ??
+        widget.eventId ??
+        widget.initialMembershipContext?.eventId ??
+        (AppConfig.mockMode ? 'evt-1001' : '');
     _currentContext =
         widget.initialMembershipContext ??
         OrganizerMembershipContext.owner(
@@ -53,6 +58,32 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
           userName: 'Penyelenggara Tech (Owner)',
           eventId: targetId,
         );
+    if (!AppConfig.mockMode && targetId.isNotEmpty && _canViewParticipants) {
+      _loadAttendees();
+    }
+  }
+
+  Future<void> _loadAttendees() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      await _repo.refreshAttendeesFromApi(_targetEventId);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -61,7 +92,11 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
     super.dispose();
   }
 
-  String get _targetEventId => widget.event?.id ?? widget.eventId;
+  String get _targetEventId =>
+      widget.event?.id ??
+      widget.eventId ??
+      widget.initialMembershipContext?.eventId ??
+      (AppConfig.mockMode ? 'evt-1001' : '');
   String get _targetEventTitle =>
       widget.event?.title ?? 'Tech Innovation Summit 2026';
   bool get _canViewParticipants =>
@@ -152,26 +187,6 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
             child: const Text('Mengerti'),
           ),
         ],
-      ),
-    );
-  }
-
-  void _openAssistedRegistration() {
-    if (!_currentContext.hasPermission(
-      OrganizerPermission.assistRegistration,
-    )) {
-      _showAccessDeniedDialog('ASSIST_REGISTRATION');
-      return;
-    }
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AssistedRegistrationScreen(
-          eventId: _targetEventId,
-          eventName: _targetEventTitle,
-          contextScope: _currentContext,
-        ),
       ),
     );
   }
@@ -338,6 +353,18 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
           ),
           body: Column(
             children: [
+              if (_isLoading) const LinearProgressIndicator(),
+              if (_errorMessage != null)
+                MaterialBanner(
+                  content: Text('Gagal memuat peserta: $_errorMessage'),
+                  leading: const Icon(Icons.warning, color: Colors.amber),
+                  actions: [
+                    TextButton(
+                      onPressed: _loadAttendees,
+                      child: const Text('Coba Lagi'),
+                    ),
+                  ],
+                ),
               // Role/Context switcher bar (for prototype demonstration)
               Container(
                 color: Theme.of(context).colorScheme.surfaceContainerHighest
@@ -399,16 +426,7 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      ActionChip(
-                        avatar: const Icon(
-                          Icons.app_registration,
-                          size: 18,
-                          color: Colors.indigo,
-                        ),
-                        label: const Text('Registrasi Dibantu'),
-                        onPressed: _openAssistedRegistration,
-                      ),
-                      const SizedBox(width: 8),
+                      // Tombol Registrasi Dibantu (non-MVP) disembunyikan dari navigasi
                       ActionChip(
                         avatar: const Icon(
                           Icons.qr_code_scanner,

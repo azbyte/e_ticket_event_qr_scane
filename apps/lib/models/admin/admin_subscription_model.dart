@@ -64,6 +64,25 @@ class AdminSubscriptionModel {
     this.paymentHistory = const [],
   });
 
+  factory AdminSubscriptionModel.fromJson(Map<String, dynamic> json) {
+    return AdminSubscriptionModel(
+      id: json['id']?.toString() ?? '',
+      organizerId: json['organizerId']?.toString() ?? json['organizer_id']?.toString() ?? '',
+      organizerName: json['organizerName']?.toString() ?? json['organizer_name']?.toString() ?? 'Organizer',
+      organizerEmail: json['organizerEmail']?.toString() ?? json['organizer_email']?.toString() ?? '',
+      planId: json['planId']?.toString() ?? json['plan_id']?.toString() ?? '',
+      planName: json['planName']?.toString() ?? json['plan_name']?.toString() ?? '',
+      status: json['status']?.toString().toUpperCase() ?? 'ACTIVE',
+      startDate: DateTime.tryParse(json['startDate']?.toString() ?? json['start_date']?.toString() ?? '') ?? DateTime.now(),
+      endDate: DateTime.tryParse(json['endDate']?.toString() ?? json['end_date']?.toString() ?? '') ?? DateTime.now().add(const Duration(days: 30)),
+      autoRenew: json['autoRenew'] as bool? ?? json['auto_renew'] as bool? ?? true,
+      lastPaymentAmount: (json['lastPaymentAmount'] ?? json['last_payment_amount'] ?? 0).toDouble(),
+      lastPaymentDate: DateTime.tryParse(json['lastPaymentDate']?.toString() ?? json['last_payment_date']?.toString() ?? '') ?? DateTime.now(),
+      changeHistory: const [],
+      paymentHistory: const [],
+    );
+  }
+
   bool get isActive => status == 'ACTIVE';
   bool get isSuspended => status == 'SUSPENDED';
   bool get isExpired => status == 'EXPIRED';
