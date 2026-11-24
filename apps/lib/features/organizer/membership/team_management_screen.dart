@@ -5,6 +5,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/validators/input_validator.dart';
 import '../../../routes/app_routes.dart';
@@ -15,8 +16,8 @@ import '../shell/organizer_shell.dart';
 class TeamManagementScreen extends StatefulWidget {
   const TeamManagementScreen({
     super.key,
-    this.eventId = 'evt-1001',
-    this.eventTitle = 'Tech Innovation Summit 2026',
+    this.eventId = '',
+    this.eventTitle = 'Event',
   });
 
   final String eventId;
@@ -123,7 +124,9 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
                         ?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  ...OrganizerPermission.values.map((perm) {
+                  ...OrganizerPermission.values
+                      .where((p) => p != OrganizerPermission.assistRegistration)
+                      .map((perm) {
                     final isChecked = selectedPermissions.contains(perm);
                     return CheckboxListTile(
                       dense: true,
@@ -181,11 +184,26 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
                       SnackBar(
                         content: Text(
                           inviteUrl != null && inviteUrl.isNotEmpty
-                              ? 'Undangan terkirim ke $email. Tautan: $inviteUrl'
+                              ? 'Undangan terkirim ke $email.'
                               : 'Undangan dibuat untuk $email (berlaku 7 hari).',
                         ),
+                        action: (inviteUrl != null && inviteUrl.isNotEmpty)
+                            ? SnackBarAction(
+                                label: 'Salin Tautan',
+                                textColor: Colors.white,
+                                onPressed: () {
+                                  Clipboard.setData(ClipboardData(text: inviteUrl));
+                                  messenger.showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Tautan undangan disalin ke clipboard!'),
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                },
+                              )
+                            : null,
                         backgroundColor: Colors.green.shade800,
-                        duration: const Duration(seconds: 6),
+                        duration: const Duration(seconds: 8),
                       ),
                     );
                     await _loadMembers();
@@ -228,7 +246,9 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
                   style: const TextStyle(fontSize: 12),
                 ),
                 const SizedBox(height: 12),
-                ...OrganizerPermission.values.map((perm) {
+                ...OrganizerPermission.values
+                    .where((p) => p != OrganizerPermission.assistRegistration)
+                    .map((perm) {
                   final isChecked = tempPermissions.contains(perm);
                   return CheckboxListTile(
                     dense: true,

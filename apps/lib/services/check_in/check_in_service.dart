@@ -37,9 +37,6 @@ class CheckInService {
     ),
   ];
 
-  // Offline queue for check-ins stored locally before sync
-  static final List<CheckInModel> _offlineQueue = [];
-
   // Mock attendee database for check-in verification
   static final List<Map<String, dynamic>> _mockAttendees = [
     {
@@ -106,8 +103,7 @@ class CheckInService {
   }) async {
     if (AppConfig.mockMode) {
       await Future<void>.delayed(const Duration(milliseconds: 300));
-      final all = [..._mockCheckIns, ..._offlineQueue];
-      return all
+      return _mockCheckIns
           .where((c) => c.eventId == eventId || eventId.isEmpty)
           .map((c) => c.toJson())
           .toList();
@@ -166,22 +162,16 @@ class CheckInService {
         staffId: staffId,
         staffName: staffName,
         checkedInAt: DateTime.now(),
-        synced: !isOffline,
-        syncStatus: isOffline ? 'pending' : 'synced',
+        synced: true,
+        syncStatus: 'synced',
       );
 
-      if (isOffline) {
-        _offlineQueue.add(checkInRecord);
-      } else {
-        _mockCheckIns.insert(0, checkInRecord);
-      }
+      _mockCheckIns.insert(0, checkInRecord);
 
       return {
         'success': true,
-        'status': isOffline ? 'queued_offline' : 'checked_in',
-        'message': isOffline
-            ? 'Check-in disimpan ke antrean offline lokal.'
-            : 'Check-in berhasil dicatat.',
+        'status': 'checked_in',
+        'message': 'Check-in berhasil dicatat.',
         'check_in': checkInRecord.toJson(),
         'attendee': attendeeIndex != -1 ? _mockAttendees[attendeeIndex] : null,
       };
@@ -194,38 +184,9 @@ class CheckInService {
     });
   }
 
-  /// Submits pending offline check-ins when network is available.
-  Future<int> syncPendingCheckIns() async {
-    if (AppConfig.mockMode) {
-      await Future<void>.delayed(const Duration(milliseconds: 600));
-      final count = _offlineQueue.length;
-      if (count > 0) {
-        for (final item in _offlineQueue) {
-          final syncedItem = CheckInModel(
-            id: item.id,
-            ticketId: item.ticketId,
-            eventId: item.eventId,
-            staffId: item.staffId,
-            staffName: item.staffName,
-            checkedInAt: item.checkedInAt,
-            synced: true,
-            syncStatus: 'synced',
-          );
-          _mockCheckIns.insert(0, syncedItem);
-        }
-        _offlineQueue.clear();
-      }
-      return count;
-    }
+  /// Pada alur MVP, seluruh check-in diproses langsung secara online.
+  Future<int> syncPendingCheckIns() async => 0;
 
-    // Backend endpoint placeholder
-    final result = await _api.post('/check-ins/sync', body: {
-      'pending': _offlineQueue.map((c) => c.toJson()).toList(),
-    });
-    _offlineQueue.clear();
-    return (result['synced_count'] as int?) ?? 0;
-  }
-
-  /// Returns count of pending offline check-in records.
-  int get pendingOfflineCount => _offlineQueue.length;
+  /// Returns count of pending offline check-in records (selalu 0 pada MVP).
+  int get pendingOfflineCount => 0;
 }

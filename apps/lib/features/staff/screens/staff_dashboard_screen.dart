@@ -17,15 +17,17 @@ class StaffDashboardScreen extends StatefulWidget {
   const StaffDashboardScreen({
     super.key,
     this.checkInProvider,
-    this.staffName = 'Budi Santoso',
-    this.assignedEventTitle = 'Tech Innovation Summit 2026',
-    this.eventId = 'evt-1001',
+    this.staffName,
+    this.assignedEventTitle,
+    this.eventId,
+    this.assignedEvents,
   });
 
   final CheckInProvider? checkInProvider;
-  final String staffName;
-  final String assignedEventTitle;
-  final String eventId;
+  final String? staffName;
+  final String? assignedEventTitle;
+  final String? eventId;
+  final List<EventMemberModel>? assignedEvents;
 
   @override
   State<StaffDashboardScreen> createState() => _StaffDashboardScreenState();
@@ -42,7 +44,24 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _loadStaffAssignments();
+    if (widget.assignedEvents != null) {
+      _assignedEvents = List.from(widget.assignedEvents!);
+      _isLoading = false;
+      if (widget.eventId != null && widget.eventId!.isNotEmpty) {
+        for (final assignment in _assignedEvents) {
+          if (assignment.eventId == widget.eventId) {
+            _selectedAssignment = assignment;
+            break;
+          }
+        }
+      }
+      _selectedAssignment ??=
+          _assignedEvents.isEmpty ? null : _assignedEvents.first;
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _loadStaffAssignments();
+      });
+    }
   }
 
   Future<void> _loadStaffAssignments() async {
@@ -60,10 +79,12 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
             );
       if (!mounted) return;
       EventMemberModel? selected;
-      for (final assignment in assignments) {
-        if (assignment.eventId == widget.eventId) {
-          selected = assignment;
-          break;
+      if (widget.eventId != null && widget.eventId!.isNotEmpty) {
+        for (final assignment in assignments) {
+          if (assignment.eventId == widget.eventId) {
+            selected = assignment;
+            break;
+          }
         }
       }
       setState(() {
@@ -90,7 +111,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.read<AuthProvider>();
-    final displayName = auth.user?.name ?? widget.staffName;
+    final displayName = auth.user?.name ?? widget.staffName ?? 'Staf Event';
 
     return Scaffold(
       appBar: AppBar(
