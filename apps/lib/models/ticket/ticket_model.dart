@@ -28,8 +28,11 @@ class TicketModel {
     this.checkedInByStaffId,
   });
 
-  bool get isValid => status == 'valid';
-  bool get isCheckedIn => status == 'checked_in';
+  bool get isValid => status == 'valid' || status == 'active';
+  bool get isCheckedIn => status == 'checked_in' || status == 'used';
+  bool get isPending => status == 'pending';
+  bool get isCancelled => status == 'cancelled';
+  bool get isRevoked => status == 'revoked';
 
   factory TicketModel.fromJson(Map<String, dynamic> json) {
     return TicketModel(

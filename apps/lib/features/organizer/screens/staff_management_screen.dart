@@ -11,8 +11,8 @@ import '../membership/team_management_screen.dart';
 class StaffManagementScreen extends StatelessWidget {
   const StaffManagementScreen({
     super.key,
-    this.eventId = 'evt-1001',
-    this.eventName = 'Tech Innovation Summit 2026',
+    this.eventId = '',
+    this.eventName = 'Event',
     this.organizerProvider,
   });
 
