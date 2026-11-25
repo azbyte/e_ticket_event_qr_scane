@@ -236,9 +236,25 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Setiap perubahan komisi akan dicatat ke dalam audit log dan tidak berlaku surut untuk transaksi yang sudah terjadi.',
-                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.blue.shade200),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.info_outline, size: 18, color: Colors.blue),
+                                  SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Sesuai keputusan produk C-01: Komisi platform (5%) dan biaya layanan tetap (Rp 5.000) bersifat tetap (read-only).',
+                                      style: TextStyle(fontSize: 12, color: Colors.blueGrey),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 12),
                             Row(
@@ -246,12 +262,14 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                                 Expanded(
                                   child: TextFormField(
                                     controller: _commCtrl,
+                                    readOnly: true,
                                     keyboardType: TextInputType.number,
                                     decoration: const InputDecoration(
-                                      labelText: 'Komisi Tiket (%) *',
+                                      labelText: 'Komisi Tiket (%) [Read-Only]',
                                       suffixText: '%',
                                       border: OutlineInputBorder(),
                                       isDense: true,
+                                      filled: true,
                                     ),
                                     validator: (v) => (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
                                   ),
@@ -260,12 +278,14 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                                 Expanded(
                                   child: TextFormField(
                                     controller: _fixedFeeCtrl,
+                                    readOnly: true,
                                     keyboardType: TextInputType.number,
                                     decoration: const InputDecoration(
-                                      labelText: 'Biaya Layanan Tetap (Rp)',
+                                      labelText: 'Biaya Layanan Tetap [Read-Only]',
                                       prefixText: 'Rp ',
                                       border: OutlineInputBorder(),
                                       isDense: true,
+                                      filled: true,
                                     ),
                                   ),
                                 ),

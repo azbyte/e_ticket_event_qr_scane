@@ -175,6 +175,11 @@ class OrganizerAttendeeDetailScreen extends StatelessWidget {
                 child: Column(
                   children: [
                     _buildRow(
+                      'Nomor Registrasi',
+                      attendee.registrationNumber,
+                    ),
+                    const Divider(),
+                    _buildRow(
                       'Nomor Pesanan',
                       canViewOrders
                           ? attendee.orderId
@@ -208,6 +213,30 @@ class OrganizerAttendeeDetailScreen extends StatelessWidget {
                 ),
               ),
             ),
+            if (attendee.customFields.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              const Text(
+                'Data Kustom Formulir',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      for (final entry in attendee.customFields.entries) ...[
+                        _buildRow(entry.key, entry.value?.toString() ?? '-'),
+                        const Divider(),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
 
             // Sensitive data notice

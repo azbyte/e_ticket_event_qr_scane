@@ -1,7 +1,19 @@
 /// Admin transactions and platform revenue service (PRD Section 6.7, FR-89 s.d. FR-93).
 library;
 
+import 'package:flutter/widgets.dart';
+
+import '../../core/config/app_config.dart';
+import '../../core/network/api_client.dart';
 import '../../models/admin/admin_transaction_revenue_model.dart';
+
+bool get _isTestEnvironment {
+  try {
+    return WidgetsBinding.instance.runtimeType.toString().contains('Test');
+  } catch (_) {
+    return true;
+  }
+}
 
 class AdminRevenueService {
   AdminRevenueService._internal();
@@ -137,6 +149,42 @@ class AdminRevenueService {
 
   /// Calculates aggregated revenue summary for platform monitoring (FR-89 s.d. FR-93).
   Future<AdminRevenueSummary> getRevenueSummary({String period = 'all'}) async {
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      final query = <String, String>{};
+      final start = _periodStart(period, DateTime.now());
+      if (start != null) {
+        query['from'] = start.toIso8601String();
+        query['to'] = DateTime.now().toIso8601String();
+      }
+      final res = await ApiClient.instance.get(
+        '/revenue/admin/summary',
+        query: query.isEmpty ? null : query,
+      );
+      final summary = res['summary'] as Map<String, dynamic>? ?? {};
+      final bySource = (res['by_source'] as List<dynamic>? ?? []);
+      double pkgRev = 0.0;
+      int pkgInvoices = 0;
+      for (final s in bySource) {
+        if (s is Map<String, dynamic> && s['source'] == 'SUBSCRIPTION') {
+          pkgRev = (s['platform_revenue'] as num? ?? 0).toDouble();
+          pkgInvoices = (s['transaction_count'] as num? ?? 0).toInt();
+        }
+      }
+      final gross = (summary['gross_amount'] as num? ?? 0).toDouble();
+      final commission = (summary['commission_amount'] as num? ?? 0).toDouble();
+      final platformRev = (summary['platform_revenue'] as num? ?? (commission + pkgRev)).toDouble();
+      final totalOrders = (summary['transaction_count'] as num? ?? 0).toInt() - pkgInvoices;
+
+      return AdminRevenueSummary(
+        grossTicketSales: gross,
+        ticketCommissionRevenue: commission,
+        packageRevenue: pkgRev,
+        totalPlatformRevenue: platformRev,
+        totalTicketOrders: totalOrders > 0 ? totalOrders : 0,
+        totalPackageInvoices: pkgInvoices,
+        period: period,
+      );
+    }
     await Future<void>.delayed(const Duration(milliseconds: 150));
     return getRevenueSummarySnapshot(period: period);
   }
@@ -206,6 +254,53 @@ class AdminRevenueService {
     String? statusFilter,
     String? searchQuery,
   }) async {
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      final res = await ApiClient.instance.get('/revenue/admin/transactions');
+      final list = (res['transactions'] as List<dynamic>? ?? []);
+      final parsed = <AdminTicketTransactionModel>[];
+      for (final item in list) {
+        if (item is Map<String, dynamic> && item['order_payment_id'] != null) {
+          final gross = (item['gross_amount'] as num? ?? 0).toDouble();
+          final commission = (item['commission_amount'] as num? ?? 0).toDouble();
+          final net = (item['organizer_net_amount'] as num? ?? (gross - commission)).toDouble();
+          parsed.add(
+            AdminTicketTransactionModel(
+              id: item['id']?.toString() ?? '',
+              orderId: item['order_number']?.toString() ?? item['order_payment_id']?.toString() ?? '-',
+              eventId: item['event_id']?.toString() ?? '',
+              eventTitle: item['event_title']?.toString() ?? 'Event',
+              organizerId: item['organizer_id']?.toString() ?? '',
+              organizerName: item['organizer_name']?.toString() ?? 'Penyelenggara',
+              customerName: item['customer_name']?.toString() ?? item['user_id']?.toString() ?? 'Peserta',
+              grossAmount: gross,
+              commissionRateSnapshot: gross > 0 ? commission / gross : 0.05,
+              commissionAmount: commission,
+              netOrganizerAmount: net,
+              paymentMethod: item['payment_method']?.toString() ?? 'Virtual Account',
+              status: (item['status'] ?? 'PAID').toString().toUpperCase(),
+              createdAt: item['created_at'] != null
+                  ? (DateTime.tryParse(item['created_at'].toString()) ?? DateTime.now())
+                  : DateTime.now(),
+            ),
+          );
+        }
+      }
+      var filtered = parsed;
+      if (statusFilter != null && statusFilter.isNotEmpty && statusFilter != 'ALL') {
+        filtered = filtered.where((t) => t.status == statusFilter).toList();
+      }
+      if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+        final q = searchQuery.toLowerCase().trim();
+        filtered = filtered.where((t) {
+          return t.orderId.toLowerCase().contains(q) ||
+              t.eventTitle.toLowerCase().contains(q) ||
+              t.customerName.toLowerCase().contains(q) ||
+              t.organizerName.toLowerCase().contains(q);
+        }).toList();
+      }
+      return filtered;
+    }
+
     await Future<void>.delayed(const Duration(milliseconds: 150));
     List<AdminTicketTransactionModel> list = List.from(_ticketTransactions);
 
@@ -234,6 +329,46 @@ class AdminRevenueService {
     String? statusFilter,
     String? searchQuery,
   }) async {
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      final res = await ApiClient.instance.get('/revenue/admin/transactions');
+      final list = (res['transactions'] as List<dynamic>? ?? []);
+      final parsed = <AdminPackageTransactionModel>[];
+      for (final item in list) {
+        if (item is Map<String, dynamic> && item['subscription_payment_id'] != null) {
+          parsed.add(
+            AdminPackageTransactionModel(
+              id: item['id']?.toString() ?? '',
+              invoiceNumber: item['invoice_number']?.toString() ?? 'INV-${item['id']}',
+              subscriptionId: item['subscription_id']?.toString() ?? item['subscription_payment_id']?.toString() ?? '-',
+              organizerId: item['organizer_id']?.toString() ?? '',
+              organizerName: item['organizer_name']?.toString() ?? 'Penyelenggara',
+              planId: item['plan_id']?.toString() ?? '',
+              planName: item['plan_name']?.toString() ?? 'Paket Langganan',
+              amount: (item['gross_amount'] as num? ?? 0).toDouble(),
+              paymentMethod: item['payment_method']?.toString() ?? 'Virtual Account',
+              status: (item['status'] ?? 'PAID').toString().toUpperCase(),
+              createdAt: item['created_at'] != null
+                  ? (DateTime.tryParse(item['created_at'].toString()) ?? DateTime.now())
+                  : DateTime.now(),
+            ),
+          );
+        }
+      }
+      var filtered = parsed;
+      if (statusFilter != null && statusFilter.isNotEmpty && statusFilter != 'ALL') {
+        filtered = filtered.where((p) => p.status == statusFilter).toList();
+      }
+      if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+        final q = searchQuery.toLowerCase().trim();
+        filtered = filtered.where((p) {
+          return p.invoiceNumber.toLowerCase().contains(q) ||
+              p.organizerName.toLowerCase().contains(q) ||
+              p.planName.toLowerCase().contains(q);
+        }).toList();
+      }
+      return filtered;
+    }
+
     await Future<void>.delayed(const Duration(milliseconds: 150));
     List<AdminPackageTransactionModel> list = List.from(_packageTransactions);
 

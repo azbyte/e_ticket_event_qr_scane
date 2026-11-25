@@ -33,8 +33,8 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
   List<EventModel> _events = const <EventModel>[];
   bool _isLoading = true;
   String? _loadError;
-  // Admin sebaiknya langsung melihat event yang membutuhkan tindak lanjut;
-  // publikasi tetap otomatis dan tidak menunggu persetujuan Admin.
+  // Admin memantau status moderasi platform; publikasi tetap otomatis
+  // dan tidak menunggu persetujuan manual Admin (C-02, FR-12, FR-16, FR-86).
   String _filter = OrganizerEventStatus.pendingReview;
   final TextEditingController _searchController = TextEditingController();
 
@@ -103,12 +103,13 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
     }
   }
 
-  Future<void> _restoreEvent(EventModel event) async {
+  Future<void> _restoreEvent(EventModel event, [String? note]) async {
+    final reasonNote = note ?? 'Dipulihkan oleh Super Admin';
     try {
       await _repository.simulatePlatformModeration(
         eventId: event.id,
         status: OrganizerEventStatus.published,
-        note: 'Dipulihkan oleh Super Admin',
+        note: reasonNote,
       );
       if (AppConfig.mockMode) {
         await AdminAuditLogService.instance.logAction(
@@ -117,7 +118,7 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
           action: 'EVENT_RESTORED',
           entityType: 'EVENT',
           entityId: event.id,
-          reason: 'Dipulihkan oleh Super Admin',
+          reason: reasonNote,
           details: 'Memulihkan event "${event.title}" ke status tayang/published.',
           metadata: {
             'title': event.title,
@@ -138,6 +139,68 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
         );
       }
     }
+  }
+
+  void _showRestoreDialog(EventModel event) {
+    final reasonController = TextEditingController(text: 'Dipulihkan oleh Super Admin');
+    final formKey = GlobalKey<FormState>();
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle_outline, color: Colors.green),
+            SizedBox(width: 8),
+            Text('Pulihkan Event?'),
+          ],
+        ),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Event yang dipulihkan akan kembali tayang dan menerima pesanan tiket.',
+                style: TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: reasonController,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Alasan Pemulihan Event *',
+                  hintText: 'Cth: Klarifikasi selesai / dokumen legalitas telah diverifikasi',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().length < 5) {
+                    return 'Alasan pemulihan wajib diisi minimal 5 karakter.';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.green),
+            onPressed: () async {
+              if (!formKey.currentState!.validate()) return;
+              Navigator.pop(ctx);
+              await _restoreEvent(event, reasonController.text.trim());
+            },
+            child: const Text('Pulihkan Event'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showSuspendDialog(EventModel event) {
@@ -178,8 +241,8 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
                   border: OutlineInputBorder(),
                 ),
                 validator: (val) {
-                  if (val == null || val.trim().isEmpty) {
-                    return 'Alasan penangguhan wajib diisi.';
+                  if (val == null || val.trim().length < 5) {
+                    return 'Alasan penangguhan wajib diisi minimal 5 karakter.';
                   }
                   return null;
                 },
@@ -415,14 +478,6 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
                 ),
                 const SizedBox(width: 8),
                 ChoiceChip(
-                  label: const Text('Ditolak'),
-                  selected: _filter == OrganizerEventStatus.rejected,
-                  onSelected: (_) => setState(
-                    () => _filter = OrganizerEventStatus.rejected,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ChoiceChip(
                   label: const Text('Disetujui/Tayang'),
                   selected: _filter == OrganizerEventStatus.published,
                   onSelected: (_) =>
@@ -434,6 +489,13 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
                   selected: _filter == OrganizerEventStatus.suspended,
                   onSelected: (_) =>
                       setState(() => _filter = OrganizerEventStatus.suspended),
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('Ditolak'),
+                  selected: _filter == OrganizerEventStatus.rejected,
+                  onSelected: (_) =>
+                      setState(() => _filter = OrganizerEventStatus.rejected),
                 ),
                 const SizedBox(width: 8),
                 ChoiceChip(
@@ -600,7 +662,7 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
                           foregroundColor: Colors.green,
                           side: const BorderSide(color: Colors.green),
                         ),
-                        onPressed: () => _restoreEvent(item),
+                        onPressed: () => _showRestoreDialog(item),
                         child: const Text('Pulihkan'),
                       ),
                     ],

@@ -35,6 +35,7 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
   DateTimeRange? _selectedDateRange;
   OrganizerReportMetrics? _apiReport;
   bool _isLoadingReport = false;
+  String? _reportError;
 
   @override
   void initState() {
@@ -45,13 +46,19 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
   }
 
   Future<void> _loadReport() async {
-    setState(() => _isLoadingReport = true);
+    setState(() {
+      _isLoadingReport = true;
+      _reportError = null;
+    });
     try {
       final rep = await _repo.fetchEventReportFromApi(widget.eventId);
       if (mounted) {
         setState(() => _apiReport = rep);
       }
-    } catch (_) {
+    } catch (e) {
+      if (mounted) {
+        setState(() => _reportError = e.toString());
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoadingReport = false);
@@ -67,7 +74,7 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
     return 'Rp $str';
   }
 
-  void _handleExport() {
+  Future<void> _handleExport() async {
     if (!widget.contextScope.hasPermission(
       OrganizerPermission.exportParticipants,
     )) {
@@ -83,10 +90,11 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
     }
 
     try {
-      final csvData = _repo.exportAttendeesCsv(
+      final csvData = await _repo.exportAttendeesCsvFromApi(
         widget.eventId,
         widget.contextScope,
       );
+      if (!mounted) return;
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -96,10 +104,11 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Data operasional event "${widget.eventName}" berhasil dikompilasi ke format CSV (Simulasi Offline).',
+                'Data operasional event "${widget.eventName}" berhasil dikompilasi ke format CSV dari server.',
               ),
               const SizedBox(height: 12),
               Container(
+                width: double.infinity,
                 padding: const EdgeInsets.all(8),
                 color: Colors.grey.shade100,
                 child: Text(
@@ -112,12 +121,13 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
           actions: [
             FilledButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Unduh File (Simulasi)'),
+              child: const Text('Tutup'),
             ),
           ],
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Gagal mengekspor: $e'),
@@ -187,22 +197,63 @@ class _OrganizerReportScreenState extends State<OrganizerReportScreen> {
       );
     }
 
-    final report = _apiReport ??
-        _repo.getEventReport(
-          widget.eventId,
-          ticketType: _selectedTierFilter == 'Semua' ? null : _selectedTierFilter,
-          from: _selectedDateRange?.start,
-          through: _selectedDateRange == null
-              ? null
-              : DateTime(
-                  _selectedDateRange!.end.year,
-                  _selectedDateRange!.end.month,
-                  _selectedDateRange!.end.day,
-                  23,
-                  59,
-                  59,
+    if (_reportError != null && _apiReport == null && !AppConfig.mockMode) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Laporan Event')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 48, color: Colors.amber),
+                const SizedBox(height: 12),
+                Text(
+                  'Gagal memuat laporan event: $_reportError',
+                  textAlign: TextAlign.center,
                 ),
-        );
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: _loadReport,
+                  child: const Text('Coba Lagi'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final report = _apiReport ??
+        (AppConfig.mockMode
+            ? _repo.getEventReport(
+                widget.eventId,
+                ticketType: _selectedTierFilter == 'Semua' ? null : _selectedTierFilter,
+                from: _selectedDateRange?.start,
+                through: _selectedDateRange == null
+                    ? null
+                    : DateTime(
+                        _selectedDateRange!.end.year,
+                        _selectedDateRange!.end.month,
+                        _selectedDateRange!.end.day,
+                        23,
+                        59,
+                        59,
+                      ),
+              )
+            : const OrganizerReportMetrics(
+                eventId: '',
+                totalOrders: 0,
+                totalTicketsSold: 0,
+                totalCheckedIn: 0,
+                checkInRate: 0.0,
+                grossSales: 0.0,
+                platformCommission: 0.0,
+                paymentGatewayFee: 0.0,
+                organizerProceeds: 0.0,
+                packageRevenue: 0.0,
+                tierBreakdown: {},
+              ));
 
     return Scaffold(
       appBar: AppBar(

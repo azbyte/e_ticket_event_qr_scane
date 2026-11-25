@@ -8,6 +8,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../routes/app_routes.dart';
 import '../../../services/organizer_shell/organizer_shell_service.dart';
@@ -43,7 +44,11 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
       _error = null;
     });
     try {
-      final m = await _shellService.getDashboardMetrics('org-001');
+      final auth = context.read<AuthProvider>();
+      final userId = AppConfig.mockMode
+          ? 'org-001'
+          : (auth.user?.id ?? '');
+      final m = await _shellService.getDashboardMetrics(userId);
       if (!mounted) return;
       setState(() => _metrics = m);
     } on Exception catch (error) {

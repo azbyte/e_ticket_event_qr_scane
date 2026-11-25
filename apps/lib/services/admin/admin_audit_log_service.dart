@@ -138,8 +138,8 @@ class AdminAuditLogService {
           }).toList();
         }
         return entries;
-      } catch (_) {
-        // Fallback to local list on failure
+      } catch (e) {
+        rethrow;
       }
     }
 

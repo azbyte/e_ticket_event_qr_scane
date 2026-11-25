@@ -186,11 +186,17 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
     ),
   ];
 
+  String? _errorMessage;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _accounts = List.from(_mockAccounts);
+    if (AppConfig.mockMode || _isTestEnvironment) {
+      _accounts = List.from(_mockAccounts);
+    } else {
+      _accounts = [];
+    }
     _loadAccounts();
   }
 
@@ -203,10 +209,13 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
       }
       return;
     }
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     try {
       final response = await ApiClient().get('/admin/accounts');
-      final list = response['data'] as List<dynamic>?;
+      final list = (response['accounts'] ?? response['data']) as List<dynamic>?;
       if (list != null && mounted) {
         setState(() {
           _accounts = list
@@ -215,11 +224,10 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
               .toList();
         });
       }
-    } catch (_) {
-      // Fallback to mock on error so UI stays resilient
+    } catch (e) {
       if (mounted) {
         setState(() {
-          _accounts = List.from(_mockAccounts);
+          _errorMessage = e.toString();
         });
       }
     } finally {
@@ -501,6 +509,17 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
       ),
       body: Column(
         children: [
+          if (_errorMessage != null)
+            MaterialBanner(
+              content: Text('Gagal memuat akun dari server: $_errorMessage'),
+              leading: const Icon(Icons.warning, color: Colors.amber),
+              actions: [
+                TextButton(
+                  onPressed: _loadAccounts,
+                  child: const Text('Coba Lagi'),
+                ),
+              ],
+            ),
           // Search & Filter Row
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
