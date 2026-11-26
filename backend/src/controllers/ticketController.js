@@ -4,6 +4,7 @@ const { getAuthorizedOrder } = require('./orderController');
 const { assertScanPermission, normalizeTicketStatus, commitCheckIn } = require('./checkInController');
 const tokens = require('../services/ticketTokenService');
 const emailService = require('../services/emailService');
+const emailQueue = require('../services/emailQueue');
 const ticketDesignService = require('../services/ticketDesignService');
 const logger = require('../utils/logger');
 
@@ -39,11 +40,25 @@ const mapTicket = (row) => ({
  * `attendee_name`/`attendee_email`/`order_id`, sedangkan kolom legacy menyimpan
  * `active`/`used` dan tidak memiliki `order_id`. Normalisasi dilakukan di layer
  * presentasi tanpa mengubah nilai di database.
+ *
+ * `event_title`/`ticket_type_name`/`event_date`/`event_location` ditambahkan
+ * sebagai field datar agar aplikasi menampilkan nama event yang benar (bukan
+ * UUID). Nilainya berasal dari JOIN `events`/`ticket_types` pada query tiket.
  */
-const presentTicketForClient = async (row, { includeToken = false } = {}) => ({
-  ...(await tokens.presentTicket(mapTicket(row), { includeToken })),
-  status: normalizeTicketStatus(row.status),
-});
+const presentTicketForClient = async (row, { includeToken = false } = {}) => {
+  const presented = await tokens.presentTicket(mapTicket(row), { includeToken });
+  const eventTitle = row.events_title ?? row.event_title ?? null;
+  return {
+    ...presented,
+    status: normalizeTicketStatus(row.status),
+    ticket_code: row.ticket_code ?? null,
+    event_title: eventTitle,
+    ticket_type_name: row.ticket_type_name ?? null,
+    event_date: row.events_event_date ?? row.event_date ?? null,
+    event_location: row.events_location ?? row.location ?? null,
+    event_online_url: row.events_online_url ?? row.online_url ?? null,
+  };
+};
 
 const belongsToOrder = async (ticket, order) => {
   if (!order || !ticket.attendee_id) return false;
@@ -57,10 +72,12 @@ const belongsToOrder = async (ticket, order) => {
 const resolveAccess = async (req, ticket) => {
   if (req.user?.role === 'admin') return { allowed: true, owner: false };
   if (req.user && ticket.user_id === req.user.id) return { allowed: true, owner: true };
-  // order_id dari query diutamakan; bila tidak ada, pakai order milik tiket
-  // (dipakai jalur unduh PDF agar tautannya bisa dipakai langsung).
-  const orderIdFromQuery = typeof req.query.order_id === 'string' ? req.query.order_id : null;
-  const orderId = orderIdFromQuery || ticket.order_id || null;
+  // order_id dapat dikirim lewat query (GET) atau body (POST kirim ulang email);
+  // bila tidak ada, pakai order milik tiket (dipakai jalur unduh PDF).
+  const orderIdFromRequest = typeof req.query.order_id === 'string'
+    ? req.query.order_id
+    : (typeof req.body?.order_id === 'string' ? req.body.order_id : null);
+  const orderId = orderIdFromRequest || ticket.order_id || null;
   if (orderId) {
     const order = await getAuthorizedOrder(orderId, req.user, req.get('X-Order-Access-Token'));
     if (await belongsToOrder(ticket, order)) return { allowed: true, owner: true };
@@ -78,19 +95,21 @@ const getMyTickets = asyncHandler(async (req, res) => {
     rows = await query(
       `SELECT ${EVENT_SELECT},
               a.name AS attendee_name, a.email AS attendee_email, a.phone AS attendee_phone,
-              oi.order_id AS order_id
+              oi.order_id AS order_id, tt.name AS ticket_type_name
        FROM tickets t JOIN events e ON e.id=t.event_id
        JOIN attendees a ON a.id=t.attendee_id JOIN order_items oi ON oi.id=a.order_item_id
+       LEFT JOIN ticket_types tt ON tt.id=t.ticket_type_id
        WHERE oi.order_id=$1 ORDER BY t.purchased_at DESC`, [orderId]
     );
   } else {
     rows = await query(
       `SELECT ${EVENT_SELECT},
               a.name AS attendee_name, a.email AS attendee_email, a.phone AS attendee_phone,
-              oi.order_id AS order_id
+              oi.order_id AS order_id, tt.name AS ticket_type_name
        FROM tickets t JOIN events e ON e.id=t.event_id
        LEFT JOIN attendees a ON a.id=t.attendee_id
        LEFT JOIN order_items oi ON oi.id=a.order_item_id
+       LEFT JOIN ticket_types tt ON tt.id=t.ticket_type_id
        WHERE t.user_id=$1 ORDER BY t.purchased_at DESC`, [req.user.id]
     );
   }
@@ -103,10 +122,11 @@ const getTicketById = asyncHandler(async (req, res) => {
   const ticket = await getOne(
     `SELECT ${EVENT_SELECT},
             a.name AS attendee_name, a.email AS attendee_email, a.phone AS attendee_phone,
-            oi.order_id AS order_id
+            oi.order_id AS order_id, tt.name AS ticket_type_name
      FROM tickets t JOIN events e ON e.id=t.event_id
      LEFT JOIN attendees a ON a.id=t.attendee_id
      LEFT JOIN order_items oi ON oi.id=a.order_item_id
+     LEFT JOIN ticket_types tt ON tt.id=t.ticket_type_id
      WHERE t.id=$1`,
     [req.params.id]
   );
@@ -114,7 +134,30 @@ const getTicketById = asyncHandler(async (req, res) => {
   const access = await resolveAccess(req, ticket);
   if (!access.allowed) { res.status(404); throw new Error('Ticket not found'); }
   const presented = await presentTicketForClient(ticket, { includeToken: access.owner });
-  res.json({ success: true, ticket: presented, data: presented });
+  // Status email nyata untuk pemilik/admin (dipakai tombol "Kirim ulang email").
+  let emailDelivery = null;
+  if (access.owner) {
+    const delivery = await emailService.emailDeliveryStatusForTicket(ticket.id);
+    if (delivery) {
+      const sending = delivery.status === 'PENDING' && emailQueue.isSending(ticket.id);
+      emailDelivery = {
+        recipient: delivery.recipient,
+        // `SENDING` hanya dipakai saat pekerjaan benar-benar sedang berjalan;
+        // status tersimpan tetap PENDING sampai transport menerima pesan.
+        status: sending ? 'SENDING' : delivery.status,
+        sending,
+        attempt_count: delivery.attempt_count,
+        sent_at: delivery.sent_at,
+        reason: delivery.last_error || null,
+      };
+    }
+  }
+  res.json({
+    success: true,
+    ticket: presented,
+    data: presented,
+    email_delivery: emailDelivery,
+  });
 });
 
 const verifyTicket = asyncHandler(async (req, res) => {
@@ -180,17 +223,36 @@ const getTicketPdf = asyncHandler(async (req, res) => {
   res.status(200).send(pdf);
 });
 
+/**
+ * Tautan pengiriman ulang e-ticket.
+ *
+ * Tidak menggunakan `force`: pengiriman yang sudah `SENT` tidak diulang, jadi
+ * tombol/kirim ulang tidak pernah menghasilkan email atau tiket ganda.
+ * Respons menyatakan status sebenarnya; `success` tetap true karena operasi
+ * permintaan berhasil diproses, `delivered` menunjukkan hasil email nyata.
+ */
 const resendTicketEmail = asyncHandler(async (req, res) => {
   const ticket = await getOne('SELECT * FROM tickets WHERE id=$1', [req.params.id]);
   if (!ticket) { res.status(404); throw new Error('Ticket not found'); }
   const access = await resolveAccess(req, ticket);
   if (!access.allowed) { res.status(404); throw new Error('Ticket not found'); }
-  const result = await emailService.sendTicketEmail(ticket.id, { force: true });
+  const result = await emailService.sendTicketEmail(ticket.id);
+  const delivery = result.delivery || await emailService.emailDeliveryStatusForTicket(ticket.id);
+  const alreadySent = result.reason === 'already_sent';
   res.json({
     success: true,
     delivered: result.status === 'SENT',
+    already_sent: alreadySent,
     delivery_status: result.status,
-    reason: result.reason || result.delivery?.last_error || null,
+    reason: result.reason || delivery?.last_error || null,
+    delivery: delivery
+      ? {
+        recipient: delivery.recipient,
+        status: delivery.status,
+        attempt_count: delivery.attempt_count,
+        sent_at: delivery.sent_at,
+      }
+      : null,
   });
 });
 

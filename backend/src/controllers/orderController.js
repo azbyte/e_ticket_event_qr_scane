@@ -8,6 +8,7 @@ const {
   splitCustomFieldAnswers,
 } = require('../utils/eventValidation');
 const { ensureOrderTokenHashes } = require('../services/ticketTokenService');
+const emailQueue = require('../services/emailQueue');
 const logger = require('../utils/logger');
 
 const ORDER_BASE_SELECT = `
@@ -331,12 +332,28 @@ const createOrder = asyncHandler(async (req, res) => {
   if (!order) throw new Error('Created order could not be loaded');
 
   // Tiket gratis langsung terbit dengan status PAID, sehingga token QR-nya
-  // harus tersedia tanpa membuka halaman tiket lebih dulu (K3 D1-5).
+  // harus tersedia tanpa membuka halaman tiket lebih dulu (K3 D1-5). E-ticket
+  // juga harus segera dikirim ke email peserta karena order gratis tidak
+  // melewati alur pembayaran (PRD: tiket terbit + terkirim setelah daftar).
+  //
+  // Pengiriman email DIJADWALKAN (bukan ditunggu): respons pendaftaran tidak
+  // boleh bergantung pada kecepatan/ketersediaan SMTP. Status yang dikembalikan
+  // adalah keadaan sebenarnya (QUEUED/NOT_CONFIGURED), bukan klaim terkirim.
+  let emailResults = [];
   if (String(order.status).toUpperCase() === 'PAID') {
     try {
       await ensureOrderTokenHashes(order.id);
     } catch (error) {
       logger.error('ticket_token_backfill_failed', {
+        orderId: order.id,
+        error: error.message,
+      });
+    }
+    try {
+      // Idempoten: tiket yang sudah SENT tidak dijadwalkan ulang.
+      emailResults = await emailQueue.enqueueOrder(order.id);
+    } catch (error) {
+      logger.error('ticket_email_dispatch_failed', {
         orderId: order.id,
         error: error.message,
       });
@@ -348,6 +365,8 @@ const createOrder = asyncHandler(async (req, res) => {
     order: serializeOrder(order),
     order_access_token: tokenMatches ? accessToken : null,
     ...(tokenMatches ? {} : { idempotent_replay: true }),
+    // Status pengiriman email yang sebenarnya (bukan simulasi).
+    email_delivery: emailQueue.summarize(emailResults),
   });
 });
 const getOrder = asyncHandler(async (req, res) => {

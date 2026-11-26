@@ -5,8 +5,20 @@ library;
 
 import '../../core/config/app_config.dart';
 import '../../core/services/order_access_token_store.dart';
+import '../../models/payment/email_delivery_model.dart';
 import '../api/api_service.dart';
 import '../mock/mock_attendee_repository.dart';
+
+/// Hasil simulasi pembayaran: data pembayaran + status pengiriman email nyata.
+class PaymentSimulationResult {
+  const PaymentSimulationResult({
+    required this.payment,
+    this.emailDelivery = const EmailDeliverySummary(),
+  });
+
+  final Map<String, dynamic> payment;
+  final EmailDeliverySummary emailDelivery;
+}
 
 class PaymentService {
   PaymentService({ApiService? api, OrderAccessTokenStore? orderTokens})
@@ -18,7 +30,7 @@ class PaymentService {
   final MockAttendeeRepository _mockRepo = MockAttendeeRepository.instance;
 
   /// Simulates payment for MVP.
-  Future<Map<String, dynamic>> simulatePayment({
+  Future<PaymentSimulationResult> simulatePayment({
     required String orderId,
     required String virtualAccountNumber,
     bool simulateSuccess = true,
@@ -30,7 +42,7 @@ class PaymentService {
         virtualAccountNumber: virtualAccountNumber,
         simulateSuccess: simulateSuccess,
       );
-      return payment.toJson();
+      return PaymentSimulationResult(payment: payment.toJson());
     }
 
     final accessToken = await _orderTokens.read(orderId);
@@ -45,7 +57,10 @@ class PaymentService {
     if (payment == null) {
       throw const FormatException('Respons API tidak berisi data pembayaran.');
     }
-    return payment;
+    return PaymentSimulationResult(
+      payment: payment,
+      emailDelivery: EmailDeliverySummary.fromJson(result['email_delivery']),
+    );
   }
 
   Future<Map<String, dynamic>> getPayment(String orderId) async {

@@ -109,7 +109,7 @@ void main() {
           simulateSuccess: true,
         );
 
-        expect(paymentResult['status'], AppConstants.paymentStatusPaid);
+        expect(paymentResult.payment['status'], AppConstants.paymentStatusPaid);
 
         // 3. Verifikasi order terupdate menjadi paid
         final updatedOrder = await orderService.getOrder(orderId);

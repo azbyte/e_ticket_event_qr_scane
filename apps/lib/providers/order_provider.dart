@@ -4,6 +4,7 @@ library;
 import 'package:flutter/foundation.dart';
 
 import '../models/order/order_model.dart';
+import '../models/payment/email_delivery_model.dart';
 import '../services/order/order_service.dart';
 
 class OrderProvider extends ChangeNotifier {
@@ -16,11 +17,15 @@ class OrderProvider extends ChangeNotifier {
 
   List<OrderModel> _orders = [];
   OrderModel? _selectedOrder;
+  EmailDeliverySummary _emailDelivery = const EmailDeliverySummary();
   bool _isLoading = false;
   String? _error;
 
   List<OrderModel> get orders => _orders;
   OrderModel? get selectedOrder => _selectedOrder;
+
+  /// Status pengiriman email e-ticket dari checkout terakhir (nyata).
+  EmailDeliverySummary get emailDelivery => _emailDelivery;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
@@ -86,12 +91,14 @@ class OrderProvider extends ChangeNotifier {
 
       final data = await _orderService.createOrder(payload);
       final newOrder = OrderModel.fromJson(data);
+      _emailDelivery = EmailDeliverySummary.fromJson(data['email_delivery']);
       _orders.insert(0, newOrder);
       _selectedOrder = newOrder;
       notifyListeners();
       return newOrder;
     } catch (e) {
       _error = e.toString();
+      _emailDelivery = const EmailDeliverySummary();
       return null;
     } finally {
       _setLoading(false);

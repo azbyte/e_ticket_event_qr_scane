@@ -27,6 +27,7 @@ class TicketDesignPanel extends StatefulWidget {
     super.key,
     required this.eventId,
     required this.ticketTypes,
+    this.initialTicketTypeId,
     this.service,
     this.picker,
     this.onOpenTemplate,
@@ -34,6 +35,9 @@ class TicketDesignPanel extends StatefulWidget {
 
   final String eventId;
   final List<TicketTypeModel> ticketTypes;
+
+  /// Scope kategori tiket awal saat panel dibuka (opsional).
+  final String? initialTicketTypeId;
 
   /// Dapat diganti pada test agar tidak memanggil HTTP.
   final TicketDesignService? service;
@@ -60,9 +64,13 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
   String? _selectedTicketTypeId;
   TicketQrPlacement _qr = TicketDesignModel.defaultQr;
 
+  /// Orientasi yang dipilih Organizer tetapi belum disimpan ke backend.
+  TicketOrientation? _draftOrientation;
+
   @override
   void initState() {
     super.initState();
+    _selectedTicketTypeId = widget.initialTicketTypeId;
     _load();
   }
 
@@ -76,6 +84,16 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
       if (!mounted) return;
       setState(() {
         _state = state;
+        _draftOrientation = null;
+        final effective = state.orientationFor(_selectedTicketTypeId);
+        // Posisi QR mengikuti orientasi desain aktif, bukan default landscape.
+        final design = _selectedTicketTypeId == null
+            ? state.eventDesign
+            : state.ticketTypeDesigns[_selectedTicketTypeId];
+        _qr = design?.hasUploadedFile == true &&
+                design!.orientation == effective
+            ? design.qr
+            : TicketDesignModel.defaultQrFor(effective);
         _loading = false;
       });
     } on TicketDesignException catch (error) {
@@ -92,6 +110,10 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
   TicketDesignModel? get _currentDesign => _selectedTicketTypeId == null
       ? _state.eventDesign
       : _state.ticketTypeDesigns[_selectedTicketTypeId];
+
+  /// Orientasi yang sedang dipilih/ditampilkan untuk scope aktif.
+  TicketOrientation get _orientation =>
+      _draftOrientation ?? _state.orientationFor(_selectedTicketTypeId);
 
   void _showMessage(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -117,6 +139,39 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
     return null;
   }
 
+  /// Pilih orientasi. Menyimpan ke backend hanya saat penyelenggara menekan
+  /// "Simpan orientasi"; pilihan langsung mengubah template & default QR.
+  void _selectOrientation(TicketOrientation orientation) {
+    setState(() {
+      _draftOrientation = orientation;
+      _qr = TicketDesignModel.defaultQrFor(orientation);
+    });
+  }
+
+  Future<void> _saveOrientation() async {
+    final orientation = _orientation;
+    setState(() => _busy = true);
+    try {
+      await _service.saveOrientation(
+        eventId: widget.eventId,
+        orientation: orientation,
+        scope: _scope,
+        ticketTypeId: _selectedTicketTypeId,
+      );
+      await _load();
+      if (!mounted) return;
+      _showMessage(
+        'Orientasi ${orientation.label} disimpan dan dipakai saat tiket '
+        'diterbitkan.',
+      );
+    } on TicketDesignException catch (error) {
+      if (!mounted) return;
+      _showMessage(error.message, isError: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _pickAndUpload() async {
     final picked = await _picker.pickImage(source: ImageSource.gallery);
     if (picked == null) return;
@@ -137,6 +192,7 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
         contentType: contentType,
         scope: _scope,
         ticketTypeId: _selectedTicketTypeId,
+        orientation: _orientation,
         qr: _qr,
       );
       await _load();
@@ -174,7 +230,10 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
   }
 
   Future<void> _openTemplate(String format) async {
-    final url = TicketDesignService.templateUrl(format);
+    final url = TicketDesignService.templateUrl(
+      format,
+      orientation: _orientation,
+    );
     final opened = await (widget.onOpenTemplate?.call(url) ??
         launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication));
     if (!opened && mounted) {
@@ -255,8 +314,22 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
               ],
               onChanged: _busy
                   ? null
-                  : (value) => setState(() => _selectedTicketTypeId = value),
+                  : (value) => setState(() {
+                      _selectedTicketTypeId = value;
+                      _draftOrientation = null;
+                      final effective = _state.orientationFor(value);
+                      final design = value == null
+                          ? _state.eventDesign
+                          : _state.ticketTypeDesigns[value];
+                      _qr =
+                          design?.hasUploadedFile == true &&
+                              design!.orientation == effective
+                          ? design.qr
+                          : TicketDesignModel.defaultQrFor(effective);
+                    }),
             ),
+            const SizedBox(height: 12),
+            _buildOrientationSelector(),
             const SizedBox(height: 12),
             _buildPreview(_currentDesign),
             const SizedBox(height: 12),
@@ -282,7 +355,7 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
                   icon: const Icon(Icons.image_outlined, size: 18),
                   label: const Text('Template PNG'),
                 ),
-                if (_currentDesign != null)
+                if (_currentDesign?.hasUploadedFile == true)
                   TextButton.icon(
                     key: const Key('ticket-design-remove'),
                     onPressed: _busy ? null : _removeDesign,
@@ -297,10 +370,117 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
     );
   }
 
+  /// Pemilih orientasi kanvas tiket (landscape / portrait).
+  ///
+  /// Orientasi harus dipilih SEBELUM mengunggah desain karena rasio file
+  /// mengikuti kanvas; template PDF/PNG yang diunduh juga mengikuti pilihan ini.
+  Widget _buildOrientationSelector() {
+    final orientation = _orientation;
+    final saved = _state.orientationFor(_selectedTicketTypeId);
+    final pending = _draftOrientation != null && _draftOrientation != saved;
+    return Container(
+      key: const Key('ticket-design-orientation'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text(
+            'Orientasi tiket',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 2),
+          const Text(
+            'Pilih orientasi sebelum mengunggah desain. Template dan tiket PDF '
+            'peserta akan mengikuti orientasi ini.',
+            style: TextStyle(fontSize: 11.5, color: Colors.black54),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              for (final option in TicketOrientation.values)
+                ChoiceChip(
+                  key: Key('ticket-design-orientation-${option.value}'),
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Icon(
+                        option.isPortrait
+                            ? Icons.crop_portrait
+                            : Icons.crop_landscape,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(option.label),
+                    ],
+                  ),
+                  selected: orientation == option,
+                  onSelected: _busy
+                      ? null
+                      : (_) => _selectOrientation(option),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            orientation.isPortrait
+                ? 'Rasio desain portrait: 1 : 1.6 (contoh 440 x 704 px). '
+                      'Desain horizontal akan ditolak agar tidak terpotong.'
+                : 'Rasio desain landscape: 2.5 : 1 (contoh 1080 x 432 px). '
+                      'Desain vertikal akan ditolak agar tidak terpotong.',
+            style: const TextStyle(fontSize: 11.5, color: Colors.black54),
+          ),
+          if (pending) ...<Widget>[
+            const SizedBox(height: 10),
+            Row(
+              children: <Widget>[
+                FilledButton.icon(
+                  key: const Key('ticket-design-orientation-save'),
+                  onPressed: _busy ? null : _saveOrientation,
+                  icon: const Icon(Icons.save_outlined, size: 18),
+                  label: const Text('Simpan orientasi'),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: _busy
+                      ? null
+                      : () => setState(() {
+                          _draftOrientation = null;
+                          _qr = TicketDesignModel.defaultQrFor(saved);
+                        }),
+                  child: const Text('Batal'),
+                ),
+              ],
+            ),
+          ] else
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Orientasi tersimpan: ${saved.label}',
+                key: const Key('ticket-design-orientation-saved'),
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  color: Colors.black45,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPreview(TicketDesignModel? design) {
-    final imageUrl = design == null
+    final imageUrl = design == null || !design.hasUploadedFile
         ? null
         : (design.url ?? AppConfig.mediaUrl(design.filePath));
+    final orientation = _orientation;
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
@@ -311,41 +491,100 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          if (imageUrl == null || imageUrl.isEmpty)
-            Row(
-              children: <Widget>[
-                Icon(
-                  Icons.image_not_supported_outlined,
-                  size: 18,
-                  color: Colors.grey.shade500,
-                ),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'Belum ada desain unggahan — tiket memakai desain default.',
-                    style: TextStyle(fontSize: 12, color: Colors.black54),
+          // Kanvas pratinjau memakai rasio orientasi terpilih, sehingga
+          // penyelenggara melihat proporsi tiket yang sebenarnya.
+          AspectRatio(
+            aspectRatio: orientation.widthToHeightRatio,
+            child: Container(
+              key: const Key('ticket-design-canvas'),
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: <Widget>[
+                  if (imageUrl != null && imageUrl.isNotEmpty)
+                    Image.network(
+                      imageUrl,
+                      key: const Key('ticket-design-preview'),
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stack) => const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Text(
+                            'Pratinjau desain tidak dapat dimuat.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Text(
+                          'Belum ada desain unggahan — tiket memakai desain '
+                          'default ${orientation.isPortrait ? 'portrait' : 'landscape'}.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ),
+                    ),
+                  // Penanda area QR: posisi fraksi 0..1 dari kanvas.
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final side =
+                          _qr.size * constraints.maxHeight;
+                      return Stack(
+                        children: <Widget>[
+                          Positioned(
+                            key: const Key('ticket-design-qr-marker'),
+                            left: _qr.x * constraints.maxWidth,
+                            top: _qr.y * constraints.maxHeight,
+                            child: Container(
+                              width: side,
+                              height: side,
+                              decoration: BoxDecoration(
+                                color: Colors.indigo.withValues(alpha: 0.08),
+                                border: Border.all(
+                                  color: AppTheme.primaryColor,
+                                  width: 1.4,
+                                ),
+                              ),
+                              alignment: Alignment.center,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(2),
+                                  child: Text(
+                                    'AREA QR',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.primaryColor,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
-                ),
-              ],
-            )
-          else
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: Image.network(
-                imageUrl,
-                key: const Key('ticket-design-preview'),
-                height: 120,
-                width: double.infinity,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stack) => const Padding(
-                  padding: EdgeInsets.all(8),
-                  child: Text(
-                    'Pratinjau desain tidak dapat dimuat.',
-                    style: TextStyle(fontSize: 12, color: Colors.black54),
-                  ),
-                ),
+                ],
               ),
             ),
+          ),
           const SizedBox(height: 10),
           Text(
             'Posisi QR: kiri ${(_qr.x * 100).round()}%, '
@@ -384,9 +623,10 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
                 ? null
                 : (value) => setState(() => _qr = _qr.copyWith(size: value)),
           ),
-          if (design != null)
+          if (design != null && design.hasUploadedFile)
             Text(
-              'Desain aktif: ${design.contentType.replaceFirst('image/', '').toUpperCase()}',
+              'Desain aktif: ${design.contentType.replaceFirst('image/', '').toUpperCase()}'
+              '${design.width != null && design.height != null ? ' (${design.width}x${design.height} px)' : ''}',
               style: const TextStyle(fontSize: 11, color: Colors.black45),
             ),
         ],

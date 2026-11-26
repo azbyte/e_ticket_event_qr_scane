@@ -320,7 +320,12 @@ const updateEvent = asyncHandler(async (req, res) => {
   if (req.body.contact_info !== undefined) { add('contact_info', String(req.body.contact_info || '').trim()); }
   if (req.body.organizer_name !== undefined) { add('organizer_name', String(req.body.organizer_name || '').trim()); }
   if (req.body.public_info !== undefined) { add('public_info', req.body.public_info || null); }
-  if (req.body.attendee_fields !== undefined) { add('attendee_fields', JSON.stringify(req.body.attendee_fields)); }
+  if (req.body.attendee_fields !== undefined) {
+    // Selalu simpan konfigurasi bertipe dan pastikan `email` (penerima tiket)
+    // ikut tersimpan sebagai field wajib, walau payload tidak menyertakannya.
+    const normalizedFields = normalizeAttendeeFields(req.body.attendee_fields).fields;
+    add('attendee_fields', JSON.stringify(normalizedFields));
+  }
   if (req.body.category !== undefined) {
     const cat = await getCategory(req.body.category);
     add('category_id', cat.id);

@@ -14,6 +14,7 @@ import '../../../../providers/event_provider.dart';
 import '../../../../services/organizer_events/organizer_event_contract.dart';
 import '../../../../services/organizer_events/organizer_event_validators.dart';
 import '../widgets/organizer_feedback_view.dart';
+import 'ticket_design_screen.dart';
 
 class OrganizerTicketTypeFormScreen extends StatefulWidget {
   const OrganizerTicketTypeFormScreen({
@@ -329,6 +330,8 @@ class _OrganizerTicketTypeFormScreenState
               value: _isActive,
               onChanged: (value) => setState(() => _isActive = value),
             ),
+            const SizedBox(height: 8),
+            _buildDesignEntry(),
             const SizedBox(height: 16),
             FilledButton(
               key: const Key('ticket-save-button'),
@@ -344,6 +347,78 @@ class _OrganizerTicketTypeFormScreenState
 
           ],
         ),
+      ),
+    );
+  }
+  /// Pintasan ke pengaturan desain & orientasi tiket untuk kategori ini.
+  ///
+  /// Orientasi harus dipilih sebelum mengunggah desain karena template PDF/PNG
+  /// dan tiket peserta mengikuti orientasi tersebut. Kategori baru belum punya
+  /// id, sehingga pintasan hanya ditampilkan saat mengubah kategori.
+  Widget _buildDesignEntry() {
+    final initial = widget.initial;
+    if (initial == null) {
+      return Container(
+        key: const Key('ticket-type-design-hint'),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: const Row(
+          children: <Widget>[
+            Icon(Icons.brush_outlined, size: 18, color: Colors.black45),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Desain dan orientasi tiket dapat diatur setelah kategori '
+                'tersimpan, melalui menu "Atur desain tiket".',
+                style: TextStyle(fontSize: 11.5, color: Colors.black54),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return Container(
+      key: const Key('ticket-type-design-entry'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.indigo.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.indigo.shade100),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text(
+            'Desain & orientasi tiket',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 2),
+          const Text(
+            'Pilih orientasi landscape/portrait, unduh template, lalu unggah '
+            'desain khusus kategori ini.',
+            style: TextStyle(fontSize: 11.5, color: Colors.black54),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            key: const Key('ticket-type-design-open'),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => TicketDesignScreen(
+                  eventId: widget.eventId,
+                  eventTitle: widget.provider.selectedEvent?.title ?? '',
+                  ticketTypes: widget.existingTypes,
+                  initialTicketTypeId: initial.id,
+                ),
+              ),
+            ),
+            icon: const Icon(Icons.tune, size: 18),
+            label: const Text('Atur desain & orientasi'),
+          ),
+        ],
       ),
     );
   }

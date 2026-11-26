@@ -18,6 +18,7 @@ const revenueController = require('../controllers/revenueController');
 const reportController = require('../controllers/reportController');
 const notificationController = require('../controllers/notificationController');
 const emailService = require('../services/emailService');
+const emailQueue = require('../services/emailQueue');
 
 /**
  * Domain konsol Admin + katalog paket, langganan, pendapatan, laporan
@@ -46,13 +47,17 @@ adminRouter.get('/subscriptions', subscriptionController.listAdminSubscriptions)
 // Kirim ulang email tiket yang tertunda. Sebelumnya didaftarkan langsung di
 // `app.js`; sekarang berada di domainnya sendiri dengan gate Admin yang sama.
 adminRouter.post('/email/retry', asyncHandler(async (req, res) => {
-  const results = await emailService.retryPendingDeliveries(Math.min(Number(req.body.limit) || 20, 100));
+  const limit = Math.min(Number(req.body.limit) || 20, 100);
+  // Dijadwalkan di antrean: Admin tidak menunggu SMTP, dan status yang
+  // dilaporkan adalah keadaan sebenarnya (QUEUED/NOT_CONFIGURED).
+  const results = await emailQueue.retryPending(limit);
+  const smtp = emailService.smtpStatus();
   res.json({
     success: true,
-    attempted: results.length,
-    sent: results.filter((item) => item.status === 'SENT').length,
-    pending: results.filter((item) => item.status === 'NOT_CONFIGURED').length,
-    failed: results.filter((item) => item.status === 'FAILED').length,
+    queued: results.filter((item) => item.status === 'QUEUED').length,
+    not_configured: results.filter((item) => item.status === 'NOT_CONFIGURED').length,
+    transport: smtp.mode,
+    reason: smtp.reason,
     results,
   });
 }));

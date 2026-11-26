@@ -37,9 +37,16 @@ class TicketDesignService {
   };
 
   /// URL template PDF/PNG (generik, dapat dibuka tanpa login).
-  static String templateUrl(String format) {
+  ///
+  /// Template mengikuti [orientation] yang dipilih Organizer agar acuan ukuran
+  /// dan penanda area QR sesuai tiket yang akan dihasilkan.
+  static String templateUrl(
+    String format, {
+    TicketOrientation orientation = TicketOrientation.landscape,
+  }) {
     final normalized = format.toLowerCase() == 'png' ? 'png' : 'pdf';
-    return '${AppConfig.apiOrigin}/api/ticket-design-template?format=$normalized';
+    return '${AppConfig.apiOrigin}/api/ticket-design-template'
+        '?format=$normalized&orientation=${orientation.value}';
   }
 
   Future<TicketDesignState> load(String eventId) async {
@@ -55,6 +62,42 @@ class TicketDesignService {
     }
   }
 
+  /// Simpan orientasi saja (sebelum/ tanpa mengunggah file desain).
+  ///
+  /// [scope] `event` (default untuk seluruh kategori) atau `ticket_type`
+  /// (khusus satu kategori tiket).
+  Future<TicketDesignModel> saveOrientation({
+    required String eventId,
+    required TicketOrientation orientation,
+    String scope = 'event',
+    String? ticketTypeId,
+  }) async {
+    if (scope == 'ticket_type' &&
+        (ticketTypeId == null || ticketTypeId.isEmpty)) {
+      throw const TicketDesignException(
+        'Pilih kategori tiket untuk desain khusus kategori.',
+      );
+    }
+    try {
+      final response = await _api.put(
+        '/events/$eventId/ticket-design',
+        body: <String, dynamic>{
+          'scope': scope,
+          'ticket_type_id': ?ticketTypeId,
+          'orientation_only': true,
+          'orientation': orientation.value,
+        },
+      );
+      final design = response['design'];
+      if (design is! Map) {
+        throw const TicketDesignException('Respons desain tiket tidak valid.');
+      }
+      return TicketDesignModel.fromJson(Map<String, dynamic>.from(design));
+    } on AppException catch (error) {
+      throw TicketDesignException(error.message);
+    }
+  }
+
   /// Unggah desain. [scope] `event` (default event) atau `ticket_type`.
   Future<TicketDesignModel> upload({
     required String eventId,
@@ -62,8 +105,9 @@ class TicketDesignService {
     required String contentType,
     String scope = 'event',
     String? ticketTypeId,
-    TicketQrPlacement qr = TicketDesignModel.defaultQr,
-    TicketInfoPlacement info = TicketDesignModel.defaultInfo,
+    TicketOrientation orientation = TicketOrientation.landscape,
+    TicketQrPlacement? qr,
+    TicketInfoPlacement? info,
   }) async {
     if (!allowedContentTypes.contains(contentType)) {
       throw const TicketDesignException('Format desain harus PNG atau JPEG.');
@@ -89,8 +133,10 @@ class TicketDesignService {
           'ticket_type_id': ?ticketTypeId,
           'content_type': contentType,
           'image_base64': base64Encode(bytes),
-          'qr': qr.toJson(),
-          'info': info.toJson(),
+          'orientation': orientation.value,
+          'qr': (qr ?? TicketDesignModel.defaultQrFor(orientation)).toJson(),
+          'info':
+              (info ?? TicketDesignModel.defaultInfoFor(orientation)).toJson(),
         },
       );
       final design = response['design'];

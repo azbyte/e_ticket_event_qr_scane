@@ -43,6 +43,56 @@ const DEFAULT_INFO = Object.freeze({
   color: '#111111',
 });
 
+/**
+ * Orientasi desain tiket.
+ *
+ * - `landscape`: kanvas horizontal (rasio 2.5:1).
+ * - `portrait` : kanvas vertikal (rasio 1:1.6).
+ *
+ * Orientasi menentukan ukuran halaman PDF, rasio template, dan area penempatan
+ * QR bawaan. Desain kustom yang diunggah WAJIB mengikuti rasio orientasi yang
+ * dipilih agar tidak dipotong/diregangkan saat dirender.
+ */
+const ORIENTATIONS = Object.freeze(['landscape', 'portrait']);
+const DEFAULT_ORIENTATION = 'landscape';
+
+/** Rasio kanvas (lebar:tinggi) per orientasi + batas toleransi validasi. */
+const ORIENTATION_SPEC = Object.freeze({
+  landscape: Object.freeze({ width: 720, height: 288, ratio: 720 / 288, minRatio: 1.8 }),
+  portrait: Object.freeze({ width: 440, height: 704, ratio: 440 / 704, maxRatio: 0.95 }),
+});
+
+/** QR default per orientasi: di kanan bawah area informasi. */
+const DEFAULT_QR_BY_ORIENTATION = Object.freeze({
+  landscape: DEFAULT_QR,
+  portrait: Object.freeze({ x: 0.32, y: 0.66, size: 0.28 }),
+});
+
+const DEFAULT_INFO_BY_ORIENTATION = Object.freeze({
+  landscape: DEFAULT_INFO,
+  portrait: Object.freeze({
+    x: 0.08, y: 0.16, width: 0.84, height: 0.42, color: '#111111',
+  }),
+});
+
+/** Normalisasi nilai orientasi dari request/DB; null bila tidak valid. */
+const normalizeOrientation = (value) => {
+  const raw = String(value ?? '').trim().toLowerCase();
+  return ORIENTATIONS.includes(raw) ? raw : null;
+};
+
+const orientationOrDefault = (value) => normalizeOrientation(value) || DEFAULT_ORIENTATION;
+
+/**
+ * Orientasi dari objek desain mentah (tanpa mensyaratkan file desain ada).
+ * Dipakai saat Organizer menyimpan orientasi lebih dulu, sebelum mengunggah
+ * desain.
+ */
+const designOrientationOf = (raw) =>
+  (raw && typeof raw === 'object' && !Array.isArray(raw))
+    ? normalizeOrientation(raw.orientation)
+    : null;
+
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 const isFiniteNumber = (value) =>
   typeof value === 'number' && Number.isFinite(value);
@@ -60,6 +110,9 @@ const normalizeDesign = (raw) => {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const filePath = typeof raw.file_path === 'string' ? raw.file_path.trim() : '';
   if (!filePath.startsWith(`${DESIGN_URL_PREFIX}/`)) return null;
+  const orientation = orientationOrDefault(raw.orientation);
+  const defaultQr = DEFAULT_QR_BY_ORIENTATION[orientation];
+  const defaultInfo = DEFAULT_INFO_BY_ORIENTATION[orientation];
   const qrRaw = raw.qr && typeof raw.qr === 'object' ? raw.qr : {};
   const infoRaw = raw.info && typeof raw.info === 'object' ? raw.info : {};
   return {
@@ -69,20 +122,23 @@ const normalizeDesign = (raw) => {
     content_type: ALLOWED_CONTENT_TYPES[raw.content_type]
       ? raw.content_type
       : 'image/png',
+    orientation,
+    width: isFiniteNumber(raw.width) && raw.width > 0 ? Math.round(raw.width) : null,
+    height: isFiniteNumber(raw.height) && raw.height > 0 ? Math.round(raw.height) : null,
     qr: {
-      x: clamp(parseFraction(qrRaw.x, DEFAULT_QR.x), 0, 0.95),
-      y: clamp(parseFraction(qrRaw.y, DEFAULT_QR.y), 0, 0.95),
-      size: clamp(parseFraction(qrRaw.size, DEFAULT_QR.size), 0.15, 0.9),
+      x: clamp(parseFraction(qrRaw.x, defaultQr.x), 0, 0.95),
+      y: clamp(parseFraction(qrRaw.y, defaultQr.y), 0, 0.95),
+      size: clamp(parseFraction(qrRaw.size, defaultQr.size), 0.15, 0.9),
     },
     info: {
-      x: clamp(parseFraction(infoRaw.x, DEFAULT_INFO.x), 0, 0.95),
-      y: clamp(parseFraction(infoRaw.y, DEFAULT_INFO.y), 0, 0.95),
-      width: clamp(parseFraction(infoRaw.width, DEFAULT_INFO.width), 0.1, 0.95),
-      height: clamp(parseFraction(infoRaw.height, DEFAULT_INFO.height), 0.1, 0.95),
+      x: clamp(parseFraction(infoRaw.x, defaultInfo.x), 0, 0.95),
+      y: clamp(parseFraction(infoRaw.y, defaultInfo.y), 0, 0.95),
+      width: clamp(parseFraction(infoRaw.width, defaultInfo.width), 0.1, 0.95),
+      height: clamp(parseFraction(infoRaw.height, defaultInfo.height), 0.1, 0.95),
       color:
         typeof infoRaw.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(infoRaw.color)
           ? infoRaw.color
-          : DEFAULT_INFO.color,
+          : defaultInfo.color,
     },
     updated_at: typeof raw.updated_at === 'string' ? raw.updated_at : null,
   };
@@ -97,6 +153,14 @@ const validateUploadPayload = (body) => {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return { errors: ['Payload desain tiket tidak valid.'], value: null };
   }
+
+  const orientation = normalizeOrientation(body.orientation) || null;
+  if (!orientation) {
+    errors.push('Orientasi desain tiket harus "landscape" atau "portrait".');
+  }
+  const spec = ORIENTATION_SPEC[orientation || DEFAULT_ORIENTATION];
+  const defaultQr = DEFAULT_QR_BY_ORIENTATION[orientation || DEFAULT_ORIENTATION];
+  const defaultInfo = DEFAULT_INFO_BY_ORIENTATION[orientation || DEFAULT_ORIENTATION];
 
   const contentType = String(body.content_type || '').toLowerCase().trim();
   if (!ALLOWED_CONTENT_TYPES[contentType]) {
@@ -125,13 +189,33 @@ const validateUploadPayload = (body) => {
     if (!matchesSignature(buffer, contentType)) {
       errors.push('Isi file tidak sesuai dengan format PNG/JPEG yang diklaim.');
     }
+    // Validasi orientasi: rasio gambar harus sesuai kanvas orientasi yang
+    // dipilih supaya hasil PDF tidak dipotong/diregangkan.
+    const size = readImageSize(buffer);
+    if (!size || !(size.width > 0) || !(size.height > 0)) {
+      errors.push('Dimensi file desain tiket tidak dapat dibaca.');
+    } else {
+      const ratio = size.width / size.height;
+      const fits = orientation === 'portrait'
+        ? ratio <= spec.maxRatio
+        : ratio >= spec.minRatio;
+      if (!fits) {
+        errors.push(
+          orientation === 'portrait'
+            ? 'Desain tidak sesuai orientasi portrait. Unggah gambar vertikal '
+              + '(rasio tinggi:lebar 1.6:1, mis. 440x704 px).'
+            : 'Desain tidak sesuai orientasi landscape. Unggah gambar horizontal '
+              + '(rasio lebar:tinggi 2.5:1, mis. 1080x432 px).'
+        );
+      }
+    }
   }
 
   const qrRaw = body.qr && typeof body.qr === 'object' ? body.qr : {};
   const qr = {
-    x: parseFraction(qrRaw.x, DEFAULT_QR.x),
-    y: parseFraction(qrRaw.y, DEFAULT_QR.y),
-    size: parseFraction(qrRaw.size, DEFAULT_QR.size),
+    x: parseFraction(qrRaw.x, defaultQr.x),
+    y: parseFraction(qrRaw.y, defaultQr.y),
+    size: parseFraction(qrRaw.size, defaultQr.size),
   };
   if (qr.x < 0 || qr.x > 0.95) errors.push('Posisi X QR harus 0-95%.');
   if (qr.y < 0 || qr.y > 0.95) errors.push('Posisi Y QR harus 0-95%.');
@@ -141,19 +225,29 @@ const validateUploadPayload = (body) => {
 
   const infoRaw = body.info && typeof body.info === 'object' ? body.info : {};
   const info = {
-    x: clamp(parseFraction(infoRaw.x, DEFAULT_INFO.x), 0, 0.95),
-    y: clamp(parseFraction(infoRaw.y, DEFAULT_INFO.y), 0, 0.95),
-    width: clamp(parseFraction(infoRaw.width, DEFAULT_INFO.width), 0.1, 0.95),
-    height: clamp(parseFraction(infoRaw.height, DEFAULT_INFO.height), 0.1, 0.95),
+    x: clamp(parseFraction(infoRaw.x, defaultInfo.x), 0, 0.95),
+    y: clamp(parseFraction(infoRaw.y, defaultInfo.y), 0, 0.95),
+    width: clamp(parseFraction(infoRaw.width, defaultInfo.width), 0.1, 0.95),
+    height: clamp(parseFraction(infoRaw.height, defaultInfo.height), 0.1, 0.95),
     color:
       typeof infoRaw.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(infoRaw.color)
         ? infoRaw.color
-        : DEFAULT_INFO.color,
+        : defaultInfo.color,
   };
+
+  const imageSize = buffer ? readImageSize(buffer) : null;
 
   return {
     errors,
-    value: errors.length > 0 ? null : { contentType, buffer, qr, info },
+    value: errors.length > 0 ? null : {
+      contentType,
+      buffer,
+      orientation: orientation || DEFAULT_ORIENTATION,
+      width: imageSize?.width ?? null,
+      height: imageSize?.height ?? null,
+      qr,
+      info,
+    },
   };
 };
 
@@ -208,22 +302,34 @@ const removeDesignFile = async (filePath) => {
   }
 };
 
-/** Path template PNG bawaan sistem (null bila belum digenerate). */
-const templatePathFor = (format) => {
+/** Path template PNG bawaan sistem per orientasi (null bila belum digenerate). */
+const templatePathFor = (format, orientation) => {
   const normalized = String(format || '').toLowerCase();
   if (normalized === 'png') {
+    const candidate = path.join(
+      TEMPLATE_DIR,
+      `ticket-template-${orientationOrDefault(orientation)}.png`,
+    );
+    if (fs.existsSync(candidate)) return candidate;
+    // Fallback template lama (landscape) agar tautan lama tetap berfungsi.
     return fs.existsSync(TEMPLATE_PNG) ? TEMPLATE_PNG : null;
   }
   return null; // PDF dirender dinamis agar konsisten dengan layout QR default.
 };
 
-/** Ukuran kanvas PDF berdasarkan rasio gambar desain. */
-const pageSizeFor = (imageSize) => {
-  const width = 720;
-  const ratio = imageSize && imageSize.width > 0 && imageSize.height > 0
-    ? imageSize.height / imageSize.width
-    : 0.4;
-  const height = clamp(width * ratio, 200, 520);
+/**
+ * Ukuran kanvas PDF tiket.
+ *
+ * Bila ada gambar desain, halaman mengikuti rasio gambar apa adanya (tanpa
+ * crop / regangan). Bila tidak ada desain, dipakai ukuran kanvas orientasi.
+ */
+const pageSizeFor = (imageSize, orientation) => {
+  const spec = ORIENTATION_SPEC[orientationOrDefault(orientation)];
+  const hasImage = imageSize && imageSize.width > 0 && imageSize.height > 0;
+  if (!hasImage) return { width: spec.width, height: spec.height };
+  // Skala seragam: lebar tetap, tinggi mengikuti rasio asli gambar.
+  const width = spec.width;
+  const height = Math.round(width * (imageSize.height / imageSize.width));
   return { width, height };
 };
 
@@ -270,23 +376,37 @@ const formatDate = (value) => {
 
 /**
  * Gambar layout tiket default (dipakai saat Organizer tidak mengunggah desain
- * dan sebagai dasar template PDF).
+ * dan sebagai dasar template PDF). Mengikuti orientasi yang dipilih.
  */
-const drawDefaultLayout = (doc, { width, height }, { placeholder = false } = {}) => {
+const drawDefaultLayout = (doc, { width, height }, { placeholder = false, orientation } = {}) => {
+  const normalized = orientationOrDefault(orientation);
+  const defaultInfo = DEFAULT_INFO_BY_ORIENTATION[normalized];
+  const defaultQr = DEFAULT_QR_BY_ORIENTATION[normalized];
+
   doc.rect(0, 0, width, height).fill('#ffffff');
-  doc.rect(0, 0, width * 0.3, height).fill('#1e3a8a');
-  doc.rect(width * 0.3, 0, width * 0.7, height * 0.12).fill('#eef2ff');
+  if (normalized === 'portrait') {
+    // Header penuh di atas, area informasi di tengah, QR di bawah.
+    doc.rect(0, 0, width, height * 0.11).fill('#1e3a8a');
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(18)
+      .text('E-TICKET', width * 0.08, height * 0.035, { width: width * 0.6 });
+    doc.fillColor('#c7d2fe').font('Helvetica').fontSize(8)
+      .text('E-Ticket Event Platform', width * 0.08, height * 0.075, {
+        width: width * 0.6,
+      });
+  } else {
+    doc.rect(0, 0, width * 0.3, height).fill('#1e3a8a');
+    doc.rect(width * 0.3, 0, width * 0.7, height * 0.12).fill('#eef2ff');
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(16)
+      .text('E-TICKET', width * 0.04, height * 0.12, { width: width * 0.22 });
+    doc.fillColor('#c7d2fe').font('Helvetica').fontSize(9)
+      .text('E-Ticket Event Platform', width * 0.04, height * 0.22, {
+        width: width * 0.22,
+      });
+  }
 
-  doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(16)
-    .text('E-TICKET', width * 0.04, height * 0.12, { width: width * 0.22 });
-  doc.fillColor('#c7d2fe').font('Helvetica').fontSize(9)
-    .text('E-Ticket Event Platform', width * 0.04, height * 0.22, {
-      width: width * 0.22,
-    });
-
-  const infoX = width * DEFAULT_INFO.x;
-  const infoY = height * DEFAULT_INFO.y;
-  const infoWidth = width * DEFAULT_INFO.width;
+  const infoX = width * defaultInfo.x;
+  const infoY = height * defaultInfo.y;
+  const infoWidth = width * defaultInfo.width;
   doc.fillColor('#111111').font('Helvetica-Bold').fontSize(15)
     .text('Nama Event', infoX, infoY, { width: infoWidth, ellipsis: true });
   doc.fillColor('#374151').font('Helvetica').fontSize(10)
@@ -296,12 +416,12 @@ const drawDefaultLayout = (doc, { width, height }, { placeholder = false } = {})
     .text('Kode tiket', infoX, infoY + 76, { width: infoWidth });
 
   const qrSize = Math.min(
-    DEFAULT_QR.size * height,
-    (1 - DEFAULT_QR.x) * width,
-    (1 - DEFAULT_QR.y) * height,
+    defaultQr.size * height,
+    (1 - defaultQr.x) * width,
+    (1 - defaultQr.y) * height,
   );
-  const qrX = DEFAULT_QR.x * width;
-  const qrY = DEFAULT_QR.y * height;
+  const qrX = defaultQr.x * width;
+  const qrY = defaultQr.y * height;
   doc.rect(qrX, qrY, qrSize, qrSize).lineWidth(1).strokeColor('#9ca3af').stroke();
   if (placeholder) {
     doc.fillColor('#6b7280').font('Helvetica').fontSize(8)
@@ -312,10 +432,10 @@ const drawDefaultLayout = (doc, { width, height }, { placeholder = false } = {})
   }
 };
 
-/** Render template PDF (ukuran & penanda posisi QR). */
-const buildTemplatePdf = async ({ title = 'Template Desain Tiket' } = {}) => {
-  const width = 720;
-  const height = 288;
+/** Render template PDF (ukuran & penanda posisi QR) sesuai orientasi. */
+const buildTemplatePdf = async ({ title = 'Template Desain Tiket', orientation } = {}) => {
+  const normalized = orientationOrDefault(orientation);
+  const { width, height } = ORIENTATION_SPEC[normalized];
   const doc = new PDFDocument({ size: [width, height], margin: 0 });
   const chunks = [];
   doc.on('data', (chunk) => chunks.push(chunk));
@@ -323,10 +443,12 @@ const buildTemplatePdf = async ({ title = 'Template Desain Tiket' } = {}) => {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
   });
-  drawDefaultLayout(doc, { width, height }, { placeholder: true });
+  drawDefaultLayout(doc, { width, height }, { placeholder: true, orientation: normalized });
+  const label = `${title} (${normalized === 'portrait' ? 'Portrait' : 'Landscape'})`;
   doc.fillColor('#1e3a8a').font('Helvetica-Bold').fontSize(8)
-    .text(String(title || ''), width * 0.05, height * 0.86, {
+    .text(label, width * 0.05, height * 0.9, {
       width: width * 0.9,
+      align: 'left',
     });
   doc.end();
   return done;
@@ -336,21 +458,37 @@ const buildTemplatePdf = async ({ title = 'Template Desain Tiket' } = {}) => {
  * Render tiket final (PDF) memakai desain terpilih.
  *
  * Prioritas desain: kategori tiket -> desain default event -> layout default
- * sistem. QR selalu ditanam pada posisi yang ditentukan desain tersebut.
+ * sistem. Orientasi diambil dari desain yang menang, lalu dari default event,
+ * lalu dari parameter `orientation`. QR selalu ditanam pada posisi yang
+ * ditentukan desain tersebut, dan gambar desain digambar dengan skala seragam
+ * sehingga proporsinya tidak berubah.
  *
  * @param {object} ticket baris tiket lengkap (lihat [loadTicketForPdf])
  * @returns {Promise<Buffer>}
  */
 const buildTicketPdf = async (ticket) => {
-  const design = normalizeDesign(ticket.ticket_type_design) ||
-    normalizeDesign(ticket.event_ticket_design);
+  const typeDesign = normalizeDesign(ticket.ticket_type_design);
+  const eventDesign = normalizeDesign(ticket.event_ticket_design);
+  const design = typeDesign || eventDesign;
+  // Urutan orientasi: kolom kategori tiket -> kolom event -> JSON desain ->
+  // default sistem. Kolom dibaca lebih dulu karena orientasi tetap tersimpan
+  // walau Organizer belum mengunggah file desain; nilai NULL berarti
+  // "belum diatur" sehingga mewarisi level di atasnya.
+  const orientation = orientationOrDefault(
+    ticket.ticket_type_orientation
+      || ticket.event_ticket_orientation
+      || designOrientationOf(ticket.ticket_type_design)
+      || designOrientationOf(ticket.event_ticket_design)
+      || design?.orientation
+      || ticket.orientation,
+  );
   const absoluteDesignPath = design ? designAbsolutePath(design) : null;
   const hasDesignFile = Boolean(
     absoluteDesignPath && fs.existsSync(absoluteDesignPath),
   );
   const designBuffer = hasDesignFile ? await fsp.readFile(absoluteDesignPath) : null;
   const imageSize = designBuffer ? readImageSize(designBuffer) : null;
-  const { width, height } = pageSizeFor(imageSize);
+  const { width, height } = pageSizeFor(imageSize, orientation);
 
   const doc = new PDFDocument({ size: [width, height], margin: 0 });
   const chunks = [];
@@ -361,13 +499,15 @@ const buildTicketPdf = async (ticket) => {
   });
 
   if (designBuffer) {
+    // Skala seragam: gambar mengisi kanvas tanpa distorsi (rasio halaman =
+    // rasio gambar).
     doc.image(designBuffer, 0, 0, { width, height });
   } else {
-    drawDefaultLayout(doc, { width, height });
+    drawDefaultLayout(doc, { width, height }, { orientation });
   }
 
-  const qr = design ? design.qr : DEFAULT_QR;
-  const info = design ? design.info : DEFAULT_INFO;
+  const qr = design ? design.qr : DEFAULT_QR_BY_ORIENTATION[orientation];
+  const info = design ? design.info : DEFAULT_INFO_BY_ORIENTATION[orientation];
   const qrSize = Math.min(
     qr.size * height,
     (1 - qr.x) * width,
@@ -391,18 +531,23 @@ const buildTicketPdf = async (ticket) => {
   const infoX = info.x * width;
   const infoY = info.y * height;
   const infoWidth = Math.max(80, info.width * width);
+  // Nama event WAJIB teks asli dari database; tidak pernah diganti "Event"
+  // atau placeholder lain kecuali datanya benar-benar kosong.
+  const eventTitle = String(ticket.event_title ?? '').trim();
+  const attendeeName = String(ticket.attendee_name ?? '').trim();
+  const ticketTypeName = String(ticket.ticket_type_name ?? '').trim();
   doc.fillColor(info.color).font('Helvetica-Bold').fontSize(14)
-    .text(String(ticket.event_title || 'Event'), infoX, infoY, {
+    .text(eventTitle || 'Nama event tidak tersedia', infoX, infoY, {
       width: infoWidth,
       height: 34,
       ellipsis: true,
     });
   doc.font('Helvetica').fontSize(10)
-    .text(String(ticket.attendee_name || 'Peserta'), infoX, infoY + 36, {
+    .text(attendeeName || 'Nama peserta tidak tersedia', infoX, infoY + 36, {
       width: infoWidth,
       ellipsis: true,
     })
-    .text(String(ticket.ticket_type_name || 'Kategori tiket'), infoX, infoY + 52, {
+    .text(ticketTypeName || 'Kategori tidak tersedia', infoX, infoY + 52, {
       width: infoWidth,
       ellipsis: true,
     })
@@ -433,9 +578,11 @@ const loadTicketForPdf = (ticketId) => getOne(
           t.purchased_at, t.issued_at, t.qr_code_data,
           a.name AS attendee_name, a.email AS attendee_email,
           tt.name AS ticket_type_name, tt.ticket_design AS ticket_type_design,
+          tt.ticket_design_orientation AS ticket_type_orientation,
           e.title AS event_title, e.event_date, e.end_date_time,
           e.location, e.online_url, e.organizer_name,
           e.ticket_design AS event_ticket_design,
+          e.ticket_design_orientation AS event_ticket_orientation,
           eo.order_number
      FROM tickets t
      JOIN events e ON e.id = t.event_id
@@ -452,8 +599,16 @@ module.exports = {
   MAX_UPLOAD_BYTES,
   DEFAULT_QR,
   DEFAULT_INFO,
+  ORIENTATIONS,
+  DEFAULT_ORIENTATION,
+  ORIENTATION_SPEC,
+  DEFAULT_QR_BY_ORIENTATION,
+  DEFAULT_INFO_BY_ORIENTATION,
   STORAGE_ROOT,
   DESIGN_URL_PREFIX,
+  normalizeOrientation,
+  orientationOrDefault,
+  designOrientationOf,
   normalizeDesign,
   validateUploadPayload,
   saveDesignImage,

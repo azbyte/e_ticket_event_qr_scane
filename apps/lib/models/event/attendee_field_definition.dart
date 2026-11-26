@@ -102,6 +102,44 @@ class AttendeeFieldDefinition {
   static List<AttendeeFieldDefinition> listFromKeys(Iterable<String> keys) =>
       keys.map(AttendeeFieldDefinition.fromKey).toList(growable: false);
 
+  /// Pastikan `name` dan `email` selalu ada, wajib, dan bertipe teks.
+  ///
+  /// `email` adalah alamat penerima e-ticket sehingga tidak boleh hilang atau
+  /// dijadikan opsional. Field dinamis lain dipertahankan apa adanya (urutan,
+  /// tipe, opsi) agar konfigurasi Organizer tidak berubah.
+  static List<AttendeeFieldDefinition> ensureRequiredFields(
+    Iterable<AttendeeFieldDefinition> fields,
+  ) {
+    final result = <AttendeeFieldDefinition>[];
+    for (final field in fields) {
+      if (_alwaysRequired.contains(field.key)) {
+        result.add(
+          AttendeeFieldDefinition(
+            key: field.key,
+            label: field.label.trim().isEmpty
+                ? _defaultLabels[field.key] ?? field.key
+                : field.label,
+            type: typeText,
+            required: true,
+          ),
+        );
+      } else {
+        result.add(field);
+      }
+    }
+    if (!result.any((field) => field.key == 'name')) {
+      result.insert(0, AttendeeFieldDefinition.fromKey('name'));
+    }
+    if (!result.any((field) => field.key == 'email')) {
+      final nameIndex = result.indexWhere((field) => field.key == 'name');
+      result.insert(
+        nameIndex >= 0 ? nameIndex + 1 : result.length,
+        AttendeeFieldDefinition.fromKey('email'),
+      );
+    }
+    return List<AttendeeFieldDefinition>.unmodifiable(result);
+  }
+
   Map<String, dynamic> toJson() => <String, dynamic>{
     'key': key,
     'label': label,

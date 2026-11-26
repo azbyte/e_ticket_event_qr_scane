@@ -3,6 +3,8 @@ require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
 const app = require('./src/app');
 const { bootstrapConfiguredAccounts } = require('./src/services/adminBootstrapService');
+const emailService = require('./src/services/emailService');
+const emailQueue = require('./src/services/emailQueue');
 
 const PORT = process.env.PORT || 5000;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -114,6 +116,16 @@ const startServer = async () => {
 
   console.log('Server running on http://' + HOST + ':' + PORT);
   console.log('Environment: ' + (process.env.NODE_ENV || 'development'));
+
+  // Status email (tanpa kredensial): jelas apakah tiket dapat dikirim atau
+  // hanya tersedia di aplikasi. Tidak ada nilai rahasia yang dicetak.
+  const smtp = emailService.smtpStatus();
+  console.log(
+    'Email e-ticket: mode=' + smtp.mode +
+    (smtp.missing.length > 0 ? ' | belum diisi: ' + smtp.missing.join(', ') : '') +
+    (smtp.reason ? ' | ' + smtp.reason : ''),
+  );
+  emailQueue.startRetryWorker();
 
   // Error setelah server hidup tetap harus terlihat dan memberi exit code.
   server.on('error', (error) => {

@@ -3,7 +3,7 @@ const { query, getOne } = require('../config/db');
 const { getAuthorizedOrder, loadOrderById, hashAccessToken } = require('./orderController');
 const { serializePayment } = require('../utils/orderResponse');
 const { ensureOrderTokenHashes } = require('../services/ticketTokenService');
-const emailService = require('../services/emailService');
+const emailQueue = require('../services/emailQueue');
 const { notify } = require('../services/notificationService');
 const config = require('../config/env');
 const logger = require('../utils/logger');
@@ -83,7 +83,9 @@ const simulatePayment = asyncHandler(async (req, res) => {
       logger.error('ticket_token_backfill_failed', { orderId, error: error.message });
     }
     try {
-      emailResults = await emailService.sendOrderTicketEmails(orderId);
+      // Dijadwalkan, bukan ditunggu: respons pembayaran tidak boleh menunggu
+      // SMTP. Tiket sudah terbit pada transaksi pembayaran di database.
+      emailResults = await emailQueue.enqueueOrder(orderId);
     } catch (error) {
       logger.error('ticket_email_dispatch_failed', { orderId, error: error.message });
     }
@@ -117,11 +119,9 @@ const simulatePayment = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     payment: serializePayment(payment),
-    email_delivery: {
-      configured: emailService.transportMode() !== 'disabled',
-      transport: emailService.transportMode(),
-      results: emailResults.map((item) => ({ ticket_id: item.ticketId, status: item.status })),
-    },
+    // `delivered` hanya true bila seluruh tiket order sudah benar-benar
+    // terkirim; `queued` berarti pengiriman masih diproses di latar.
+    email_delivery: emailQueue.summarize(emailResults),
   });
 });
 

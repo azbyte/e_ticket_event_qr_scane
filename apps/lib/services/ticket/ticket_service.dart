@@ -61,6 +61,40 @@ class TicketService {
           ? null
           : {'X-Order-Access-Token': accessToken},
     );
-    return Map<String, dynamic>.from(result['ticket'] as Map);
+    final ticket = Map<String, dynamic>.from(result['ticket'] as Map);
+    // Sertakan status email bila backend mengirimkannya (pemilik/admin).
+    if (result['email_delivery'] != null) {
+      ticket['email_delivery'] = result['email_delivery'];
+    }
+    return ticket;
+  }
+
+  /// Kirim ulang e-ticket ke email peserta.
+  ///
+  /// Backend tidak mengirim ganda: bila tiket sudah `SENT`, hasilnya
+  /// `SKIPPED/already_sent` dan tidak ada email baru.
+  Future<Map<String, dynamic>> resendTicketEmail(
+    String ticketId, {
+    String? orderId,
+  }) async {
+    if (AppConfig.mockMode) {
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      return <String, dynamic>{
+        'delivered': false,
+        'delivery_status': 'NOT_CONFIGURED',
+        'reason': 'Mode demo tidak mengirim email sungguhan.',
+      };
+    }
+
+    final accessToken = orderId == null
+        ? null
+        : await _orderTokens.read(orderId);
+    return _api.post(
+      '/tickets/$ticketId/email',
+      body: orderId == null ? null : {'order_id': orderId},
+      headers: accessToken == null
+          ? null
+          : {'X-Order-Access-Token': accessToken},
+    );
   }
 }

@@ -216,7 +216,10 @@ class _PublicRegistrationScreenState extends State<PublicRegistrationScreen> {
     if (order.isPaid || order.grandTotal <= 0) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
-          builder: (_) => TicketListScreen(orderId: order.id),
+          builder: (_) => TicketListScreen(
+            orderId: order.id,
+            emailDelivery: _orderProvider.emailDelivery,
+          ),
         ),
       );
       return;

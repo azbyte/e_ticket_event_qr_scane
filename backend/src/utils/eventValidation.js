@@ -26,6 +26,18 @@ const LEGACY_ATTENDEE_FIELD_KEYS = Object.freeze([
 /** Field yang wajib ada dan selalu required (kolom `attendees.name/email`). */
 const REQUIRED_ATTENDEE_FIELD_KEYS = Object.freeze(['name', 'email']);
 
+/**
+ * Field yang tidak boleh dihapus maupun diubah menjadi opsional.
+ *
+ * `email` adalah alamat penerima e-ticket, sehingga konfigurasi formulir tidak
+ * boleh menghilangkannya: bila Organizer tidak menyertakannya, field ini
+ * ditambahkan otomatis dan selalu `required`.
+ */
+const LOCKED_ATTENDEE_FIELD_KEYS = Object.freeze(['name', 'email']);
+
+/** Format email yang dipakai backend (sama dengan validasi order). */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /** Field yang disimpan sebagai kolom, bukan ke `attendees.custom_fields`. */
 const ATTENDEE_COLUMN_KEYS = Object.freeze(['name', 'email', 'phone']);
 
@@ -83,10 +95,13 @@ const normalizeAttendeeField = (raw) => {
   if (!/^[a-z][a-z0-9_]{0,39}$/.test(key)) {
     return { error: `Kunci field peserta tidak valid: ${key || '(kosong)'}` };
   }
-  const type = toTrimmedString(raw.type).toLowerCase() || 'text';
-  if (!ATTENDEE_FIELD_TYPES.includes(type)) {
-    return { error: `Tipe field peserta "${type}" tidak didukung (${key})` };
+  const rawType = toTrimmedString(raw.type).toLowerCase() || 'text';
+  if (!ATTENDEE_FIELD_TYPES.includes(rawType)) {
+    return { error: `Tipe field peserta "${rawType}" tidak didukung (${key})` };
   }
+  // `email` adalah alamat penerima tiket: tipenya dikunci sebagai teks dan
+  // selalu wajib, walau payload mencoba mengubahnya menjadi opsional/tipe lain.
+  const type = key === 'email' ? 'text' : rawType;
   const options = Array.isArray(raw.options)
     ? raw.options.map((option) => toTrimmedString(option)).filter(Boolean)
     : [];
@@ -98,7 +113,7 @@ const normalizeAttendeeField = (raw) => {
       key,
       label: toTrimmedString(raw.label) || DEFAULT_ATTENDEE_LABELS[key] || key,
       type,
-      required: REQUIRED_ATTENDEE_FIELD_KEYS.includes(key)
+      required: LOCKED_ATTENDEE_FIELD_KEYS.includes(key)
         ? true
         : raw.required === true,
       options: type === 'select' ? [...new Set(options)] : [],
@@ -107,11 +122,43 @@ const normalizeAttendeeField = (raw) => {
 };
 
 /**
+ * Pastikan `name` dan `email` selalu ada serta `email` selalu wajib & bertipe
+ * teks. Dipakai oleh normalisasi konfigurasi event dan serialisasi response.
+ *
+ * Field lain dipertahankan apa adanya (urutan, tipe, opsi) sehingga field
+ * dinamis milik Organizer tidak berubah.
+ */
+const ensureLockedAttendeeFields = (fields) => {
+  const list = Array.isArray(fields) ? fields.filter(isPlainObject) : [];
+  const normalized = list.map((field) => {
+    if (!LOCKED_ATTENDEE_FIELD_KEYS.includes(field.key)) return field;
+    return {
+      ...field,
+      type: field.key === 'email' ? 'text' : field.type,
+      required: true,
+    };
+  });
+  if (!normalized.some((field) => field.key === 'email')) {
+    const nameIndex = normalized.findIndex((field) => field.key === 'name');
+    normalized.splice(
+      nameIndex >= 0 ? nameIndex + 1 : normalized.length,
+      0,
+      defaultAttendeeField('email'),
+    );
+  }
+  if (!normalized.some((field) => field.key === 'name')) {
+    normalized.unshift(defaultAttendeeField('name'));
+  }
+  return normalized;
+};
+
+/**
  * Normalisasi `attendee_fields` event menjadi array objek bertipe.
  *
  * Kompatibel mundur dengan array string legacy (`['name','email','phone']`).
  * `null`/`undefined` dianggap konfigurasi default (nama + email) agar event
- * lama tetap dapat menerima order.
+ * lama tetap dapat menerima order. `email` selalu ditambahkan bila tidak ada
+ * karena email adalah media pengiriman e-ticket.
  */
 const normalizeAttendeeFields = (rawFields) => {
   if (rawFields === null || rawFields === undefined) {
@@ -137,7 +184,16 @@ const normalizeAttendeeFields = (rawFields) => {
   if (!byKey.has('name')) {
     errors.push('Field "name" wajib ada pada data peserta');
   }
-  return { fields: [...byKey.values()], errors };
+  const fields = [...byKey.values()];
+  if (!byKey.has('email')) {
+    const nameIndex = fields.findIndex((field) => field.key === 'name');
+    fields.splice(
+      nameIndex >= 0 ? nameIndex + 1 : fields.length,
+      0,
+      defaultAttendeeField('email'),
+    );
+  }
+  return { fields: ensureLockedAttendeeFields(fields), errors };
 };
 
 /** Daftar alasan bila konfigurasi `attendee_fields` tidak valid. */
@@ -326,6 +382,14 @@ const validateAttendeeAnswers = (fields, answers = {}) => {
   for (const field of definitions) {
     const raw = values[field.key];
     const required = field.required === true;
+    // Email adalah alamat penerima e-ticket: formatnya selalu divalidasi di
+    // server, bukan hanya mengandalkan tipe field yang diatur Organizer.
+    if (field.key === 'email' && raw !== undefined && raw !== null) {
+      const email = toTrimmedString(raw);
+      if (email && !EMAIL_PATTERN.test(email)) {
+        errors.push(`"${field.label}" harus berupa alamat email yang valid`);
+      }
+    }
     switch (field.type) {
       case 'checkbox': {
         const checked = raw === true || raw === 'true';
@@ -405,9 +469,12 @@ module.exports = {
   ATTENDEE_FIELD_TYPES,
   LEGACY_ATTENDEE_FIELD_KEYS,
   REQUIRED_ATTENDEE_FIELD_KEYS,
+  LOCKED_ATTENDEE_FIELD_KEYS,
+  EMAIL_PATTERN,
   ATTENDEE_COLUMN_KEYS,
   VALID_EVENT_FORMATS,
   normalizeAttendeeFields,
+  ensureLockedAttendeeFields,
   validateAttendeeFields,
   validateEventForPublish,
   resolvePublishTransition,

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:e_ticket_event_qr_scane/features/public_event/screens/public_registration_screen.dart';
+import 'package:e_ticket_event_qr_scane/models/event/attendee_field_definition.dart';
 import 'package:e_ticket_event_qr_scane/models/event/event_model.dart';
 import 'package:e_ticket_event_qr_scane/models/event/ticket_type_model.dart';
 import 'package:e_ticket_event_qr_scane/providers/order_provider.dart';
@@ -78,6 +79,42 @@ PublicEventData buildData({List<TicketTypeModel>? ticketTypes}) =>
       event: buildEvent(),
       ticketTypes: ticketTypes ?? <TicketTypeModel>[buildTicketType()],
     );
+
+/// Event yang konfigurasi field-nya TIDAK memuat email (data lama / payload
+/// Organizer yang mencoba menghapusnya). Form publik tetap wajib menampilkan
+/// email karena tiket dikirim ke alamat tersebut.
+PublicEventData buildDataWithoutEmail() => PublicEventData(
+  event: EventModel(
+    id: 'evt-pub-1',
+    organizerId: 'org-1',
+    title: 'Festival Publik 2026',
+    description: 'Acara musik terbuka untuk umum.',
+    startDateTime: DateTime(2026, 12, 1, 18),
+    endDateTime: DateTime(2026, 12, 1, 22),
+    location: 'Stadion Utama',
+    eventType: 'offline',
+    category: 'Musik',
+    organizerName: 'Komunitas Musik',
+    contactInfo: 'halo@festival.test',
+    attendeeFields: const <String>['name'],
+    attendeeFieldDefinitions: const <AttendeeFieldDefinition>[
+      AttendeeFieldDefinition(
+        key: 'name',
+        label: 'Nama lengkap',
+        required: true,
+      ),
+      AttendeeFieldDefinition(
+        key: 'shirt_size',
+        label: 'Ukuran kaos',
+        type: AttendeeFieldDefinition.typeSelect,
+        options: <String>['M', 'L'],
+      ),
+    ],
+    status: 'published',
+    isPublic: true,
+  ),
+  ticketTypes: <TicketTypeModel>[buildTicketType()],
+);
 
 Widget wrap(Widget child) => MaterialApp(home: child);
 
@@ -291,5 +328,67 @@ void main() {
       find.text('Pilih satu kategori tiket terlebih dahulu.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets(
+    'event tanpa field email tetap menampilkan email wajib + field dinamis',
+    (tester) async {
+      useTallViewport(tester);
+      await tester.pumpWidget(
+        wrap(
+          PublicRegistrationScreen(
+            eventId: 'evt-pub-1',
+            service: _FakePublicEventService((_) async => buildDataWithoutEmail()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Email ditambahkan otomatis dan wajib, field dinamis tetap ada.
+      expect(
+        find.byKey(const Key('public-registration-field-email')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('public-registration-field-shirt_size')),
+        findsOneWidget,
+      );
+      expect(find.text('Email *'), findsOneWidget);
+    },
+  );
+
+  testWidgets('format email tidak valid ditolak di frontend', (tester) async {
+    useTallViewport(tester);
+    final orderService = _RecordingOrderService((_) => orderJson());
+    await tester.pumpWidget(
+      wrap(
+        PublicRegistrationScreen(
+          eventId: 'evt-pub-1',
+          service: _FakePublicEventService((_) async => buildData()),
+          orderProvider: OrderProvider(orderService),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('public-registration-ticket-tt-1')));
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const Key('public-registration-field-name')),
+      'Budi Santoso',
+    );
+    await tester.enterText(
+      find.byKey(const Key('public-registration-field-email')),
+      'bukan-email',
+    );
+    await tester.ensureVisible(
+      find.byKey(const Key('public-registration-submit')),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('public-registration-submit')));
+    await tester.pump();
+
+    expect(find.text('Format email tidak valid.'), findsOneWidget);
+    expect(orderService.lastPayload, isNull);
   });
 }

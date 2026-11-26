@@ -266,16 +266,14 @@ class OrganizerEventDraft {
   /// menolak konfigurasi tanpa keduanya (keduanya kolom wajib `attendees`).
   /// Field legacy lain (mis. `phone`, `organization`) tetap dipertahankan.
   List<AttendeeFieldDefinition> get resolvedAttendeeFieldDefinitions {
-    if (attendeeFieldDefinitions.isNotEmpty) return attendeeFieldDefinitions;
+    if (attendeeFieldDefinitions.isNotEmpty) {
+      return AttendeeFieldDefinition.ensureRequiredFields(
+        attendeeFieldDefinitions,
+      );
+    }
     final fromLegacy = AttendeeFieldDefinition.listFromKeys(attendeeFields);
     if (fromLegacy.isEmpty) return OrganizerAttendeeDefaults.definitions;
-    final merged = <AttendeeFieldDefinition>[...fromLegacy];
-    for (final required in OrganizerAttendeeDefaults.definitions) {
-      if (!merged.any((field) => field.key == required.key)) {
-        merged.add(required);
-      }
-    }
-    return merged;
+    return AttendeeFieldDefinition.ensureRequiredFields(fromLegacy);
   }
 
   /// Membuat draft dari event tersimpan (mode edit).

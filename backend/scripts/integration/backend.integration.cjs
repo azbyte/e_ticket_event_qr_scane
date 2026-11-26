@@ -347,13 +347,19 @@ const assertDbDenied = async (client, sql) => {
       assert(db.rows[0].token_hash === expected, 'database token_hash mismatch');
       assert(!String(db.rows[0].qr_code_data || '').includes(ticket.token), 'raw bearer token persisted in qr_code_data');
       assert(simulated.body.email_delivery.results.length === 1, 'email delivery result absent');
-      assert(simulated.body.email_delivery.results[0].status === 'SENT',
-        `SMTP json transport should report local acceptance (${JSON.stringify(simulated.body.email_delivery)})`);
+      // Transport json TIDAK mengirim email keluar; status harus jujur (QUEUED/
+      // PENDING/NOT_SENT), bukan SENT.
+      assert(simulated.body.email_delivery.delivered === false,
+        `json transport must not claim delivery (${JSON.stringify(simulated.body.email_delivery)})`);
+      assert(['QUEUED', 'PENDING', 'NOT_SENT_TEST_TRANSPORT'].includes(
+        simulated.body.email_delivery.results[0].status,
+      ), `unexpected email status (${JSON.stringify(simulated.body.email_delivery)})`);
       const deliveryRow = await pool.query(
         'SELECT status::text FROM ticket_email_deliveries WHERE ticket_id=$1',
         [ticket.id],
       );
-      assert(deliveryRow.rows[0].status === 'SENT', 'local JSON transport status not persisted');
+      assert(['PENDING', 'FAILED'].includes(deliveryRow.rows[0].status),
+        'json transport must not persist SENT');
     });
 
     await runTest('QR validate/check-in owner scope and single-use', async () => {

@@ -3,15 +3,20 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_utils.dart' as app_date;
+import '../../../models/payment/email_delivery_model.dart';
 import '../../../providers/ticket_provider.dart';
 import '../../events/screens/event_list_screen.dart';
 import 'ticket_detail_screen.dart';
 
 /// Ticket list screen (attendee ticket repository) — PRD section 3.1 #11.
 class TicketListScreen extends StatefulWidget {
-  const TicketListScreen({super.key, this.orderId});
+  const TicketListScreen({super.key, this.orderId, this.emailDelivery});
 
   final String? orderId;
+
+  /// Status pengiriman email dari respons pendaftaran/pembayaran (opsional).
+  /// Ditampilkan apa adanya agar peserta tahu apakah PDF sudah terkirim.
+  final EmailDeliverySummary? emailDelivery;
 
   @override
   State<TicketListScreen> createState() => _TicketListScreenState();
@@ -70,6 +75,51 @@ class _TicketListScreenState extends State<TicketListScreen> {
     );
   }
 
+  /// Banner status email e-ticket setelah pendaftaran/pembayaran.
+  Widget _buildEmailBanner(EmailDeliverySummary delivery) {
+    final ok = delivery.delivered;
+    final pending = delivery.isSending;
+    final accent = ok
+        ? Colors.green
+        : pending
+        ? Colors.blue
+        : Colors.orange;
+    return Container(
+      key: const Key('ticket-list-email-status'),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: accent.shade50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accent.shade200),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(
+            ok
+                ? Icons.mark_email_read
+                : pending
+                ? Icons.schedule_send_outlined
+                : Icons.mail_outline,
+            color: accent.shade700,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              delivery.message,
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.4,
+                color: accent.shade800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -116,6 +166,7 @@ class _TicketListScreenState extends State<TicketListScreen> {
           }
 
           final tickets = _ticketProvider.tickets;
+          final emailDelivery = widget.emailDelivery;
 
           if (tickets.isEmpty) {
             return Center(
@@ -168,10 +219,13 @@ class _TicketListScreenState extends State<TicketListScreen> {
             onRefresh: _loadTickets,
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
-              itemCount: tickets.length,
+              itemCount: tickets.length + (emailDelivery == null ? 0 : 1),
               separatorBuilder: (_, _) => const SizedBox(height: 14),
               itemBuilder: (context, index) {
-                final ticket = tickets[index];
+                if (emailDelivery != null && index == 0) {
+                  return _buildEmailBanner(emailDelivery);
+                }
+                final ticket = tickets[index - (emailDelivery == null ? 0 : 1)];
 
                 return Card(
                   elevation: 2,
@@ -234,10 +288,27 @@ class _TicketListScreenState extends State<TicketListScreen> {
                               ),
                               const Divider(height: 20),
                               Text(
-                                'Peserta: ${ticket.attendeeName}',
+                                ticket.displayEventTitle,
+                                key: Key('ticket-list-event-${ticket.id}'),
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 15,
+                                  fontSize: 15.5,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Kategori: ${ticket.displayTicketType}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Peserta: ${ticket.attendeeName}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
                                 ),
                               ),
                               const SizedBox(height: 4),
