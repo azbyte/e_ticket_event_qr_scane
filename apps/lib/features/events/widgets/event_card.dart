@@ -41,8 +41,8 @@ class EventCard extends StatelessWidget {
                 Container(
                   height: 140,
                   width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.indigo.shade100,
+                  decoration: const BoxDecoration(
+                    color: AppTheme.warmLightGray,
                   ),
                   child: event.posterUrl != null && event.posterUrl!.isNotEmpty
                       ? Image.network(
@@ -131,14 +131,14 @@ class EventCard extends StatelessWidget {
                   // Date row
                   Row(
                     children: [
-                      const Icon(Icons.calendar_today_outlined, size: 15, color: Colors.indigo),
+                      const Icon(Icons.calendar_today_outlined, size: 15, color: AppTheme.primaryColor),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           app_date.DateUtils.formatDateTime(event.startDateTime),
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 13,
-                            color: Colors.grey.shade700,
+                            color: AppTheme.slateGray,
                           ),
                         ),
                       ),
@@ -148,16 +148,16 @@ class EventCard extends StatelessWidget {
                   // Location row
                   Row(
                     children: [
-                      const Icon(Icons.location_on_outlined, size: 16, color: Colors.pink),
+                      const Icon(Icons.location_on_outlined, size: 16, color: AppTheme.primaryDarkColor),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           event.location ?? (event.eventType == 'online' ? 'Live Online Event' : 'Lokasi diumumkan'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 13,
-                            color: Colors.grey.shade700,
+                            color: AppTheme.slateGray,
                           ),
                         ),
                       ),
@@ -208,9 +208,9 @@ class EventCard extends StatelessWidget {
 
   Widget _buildBannerFallback() {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.indigo.shade400, Colors.deepPurple.shade300],
+          colors: [AppTheme.secondaryColor, AppTheme.primaryColor],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

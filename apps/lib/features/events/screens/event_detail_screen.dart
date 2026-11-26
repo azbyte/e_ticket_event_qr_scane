@@ -217,7 +217,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             // Date Card
                             _buildInfoTile(
                               icon: Icons.calendar_today,
-                              iconColor: Colors.indigo,
+                              iconColor: AppTheme.primaryColor,
                               title: 'Waktu Pelaksanaan',
                               subtitle:
                                   '${app_date.DateUtils.formatDateTime(event.startDateTime)} - ${app_date.DateUtils.formatDateTime(event.endDateTime)}',
@@ -227,7 +227,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             // Location Card
                             _buildInfoTile(
                               icon: Icons.location_on,
-                              iconColor: Colors.pink,
+                              iconColor: AppTheme.primaryDarkColor,
                               title: 'Lokasi / Platform',
                               subtitle:
                                   event.location ??
@@ -241,7 +241,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                 event.contactInfo!.isNotEmpty)
                               _buildInfoTile(
                                 icon: Icons.contact_support_outlined,
-                                iconColor: Colors.teal,
+                                iconColor: AppTheme.successColor,
                                 title: 'Kontak Penyelenggara',
                                 subtitle: event.contactInfo!,
                               ),
@@ -546,9 +546,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
   Widget _buildHeaderFallback() {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.indigo.shade600, Colors.deepPurple.shade800],
+          colors: [AppTheme.secondaryColor, AppTheme.primaryColor],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

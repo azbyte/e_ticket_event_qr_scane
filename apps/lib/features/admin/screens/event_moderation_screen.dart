@@ -360,7 +360,7 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'URL Publik: ${event.publicUrl}',
-                  style: const TextStyle(color: Colors.blue, fontSize: 12),
+                  style: const TextStyle(color: Color(0xFFC94426), fontSize: 12),
                 ),
               ],
               if (event.reviewNote != null && event.reviewNote!.isNotEmpty) ...[

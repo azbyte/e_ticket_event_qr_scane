@@ -385,9 +385,9 @@ class _OrganizerTicketTypeFormScreenState
       key: const Key('ticket-type-design-entry'),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.indigo.shade50,
+        color: AppTheme.softTerracottaBg,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.indigo.shade100),
+        border: Border.all(color: AppTheme.subtleGray),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

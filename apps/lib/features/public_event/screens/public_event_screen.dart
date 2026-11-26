@@ -187,7 +187,7 @@ class _PublicEventScreenState extends State<PublicEventScreen> {
                   background: Colors.grey.shade200,
                 ),
                 if (event.organizerName != null)
-                  _badge(event.organizerName!, Colors.teal.shade700),
+                  _badge(event.organizerName!, AppTheme.successColor),
               ],
             ),
             const SizedBox(height: 12),
@@ -202,7 +202,7 @@ class _PublicEventScreenState extends State<PublicEventScreen> {
             const SizedBox(height: 16),
             _infoTile(
               icon: Icons.calendar_today,
-              color: Colors.indigo,
+              color: AppTheme.primaryColor,
               title: 'Waktu pelaksanaan',
               subtitle:
                   '${core.DateUtils.formatDateTime(event.startDateTime)} - '
@@ -211,7 +211,7 @@ class _PublicEventScreenState extends State<PublicEventScreen> {
             const SizedBox(height: 10),
             _infoTile(
               icon: Icons.location_on,
-              color: Colors.pink,
+              color: AppTheme.primaryDarkColor,
               title: 'Lokasi / platform',
               subtitle:
                   event.location ??
@@ -223,7 +223,7 @@ class _PublicEventScreenState extends State<PublicEventScreen> {
               const SizedBox(height: 10),
               _infoTile(
                 icon: Icons.contact_support_outlined,
-                color: Colors.teal,
+                color: AppTheme.successColor,
                 title: 'Kontak penyelenggara',
                 subtitle: event.contactInfo!,
               ),
@@ -320,9 +320,9 @@ class _PublicEventScreenState extends State<PublicEventScreen> {
   }
 
   Widget _heroFallback() => Container(
-    decoration: BoxDecoration(
+    decoration: const BoxDecoration(
       gradient: LinearGradient(
-        colors: [Colors.indigo.shade600, Colors.deepPurple.shade800],
+        colors: [AppTheme.secondaryColor, AppTheme.primaryColor],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),

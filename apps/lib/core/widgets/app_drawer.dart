@@ -27,34 +27,38 @@ class AppDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Drawer(
+      backgroundColor: AppTheme.pureWhite,
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          DrawerHeader(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          const DrawerHeader(
+            decoration: BoxDecoration(
+              color: AppTheme.secondaryColor,
+              border: Border(
+                bottom: BorderSide(color: AppTheme.primaryColor, width: 3),
               ),
             ),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Icon(Icons.qr_code_scanner, color: Colors.white, size: 40),
-                SizedBox(height: 8),
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: AppTheme.primaryColor,
+                  child: Icon(Icons.qr_code_scanner, color: Colors.white, size: 24),
+                ),
+                SizedBox(height: 10),
                 Text(
                   'E-Ticket QR Scanner',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 20,
+                    fontSize: 19,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
                   'Platform Manajemen & Tiket Acara',
-                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                  style: TextStyle(color: AppTheme.ashGray, fontSize: 12.5),
                 ),
               ],
             ),
@@ -63,7 +67,7 @@ class AppDrawer extends StatelessWidget {
           // PESERTA SECTION
           _buildSectionHeader('PESERTA / ATTENDEE'),
           ListTile(
-            leading: const Icon(Icons.home_outlined),
+            leading: const Icon(Icons.home_outlined, color: AppTheme.primaryColor),
             title: const Text('Beranda'),
             onTap: () {
               Navigator.of(context).pop();
@@ -73,75 +77,75 @@ class AppDrawer extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.event_outlined),
+            leading: const Icon(Icons.event_outlined, color: AppTheme.primaryColor),
             title: const Text('Jelajahi Event'),
             onTap: () => _navigateTo(context, const EventListScreen()),
           ),
           ListTile(
-            leading: const Icon(Icons.confirmation_number_outlined),
+            leading: const Icon(Icons.confirmation_number_outlined, color: AppTheme.primaryColor),
             title: const Text('Tiket Saya'),
             onTap: () => _navigateTo(context, const TicketListScreen()),
           ),
           ListTile(
-            leading: const Icon(Icons.receipt_long_outlined),
+            leading: const Icon(Icons.receipt_long_outlined, color: AppTheme.primaryColor),
             title: const Text('Riwayat Pesanan'),
             onTap: () => _navigateTo(context, const OrderListScreen()),
           ),
           ListTile(
-            leading: const Icon(Icons.help_outline),
+            leading: const Icon(Icons.help_outline, color: AppTheme.primaryColor),
             title: const Text('Lapor Kendala'),
             onTap: () => _navigateTo(context, const ReportFormScreen()),
           ),
 
-          const Divider(),
+          const Divider(color: AppTheme.subtleGray),
 
           // PENYELENGGARA SECTION
           _buildSectionHeader('PENYELENGGARA / ORGANIZER'),
           ListTile(
-            leading: const Icon(Icons.business_center_outlined, color: Colors.blue),
+            leading: const Icon(Icons.business_center_outlined, color: AppTheme.primaryColor),
             title: const Text('Portal Penyelenggara'),
             subtitle: const Text('Dashboard, Event, Peserta & Staf'),
             onTap: () => _navigateTo(context, const OrganizerTabController()),
           ),
 
-          const Divider(),
+          const Divider(color: AppTheme.subtleGray),
 
           // STAF CHECK-IN SECTION
           _buildSectionHeader('STAF EVENT / CHECK-IN'),
           ListTile(
-            leading: const Icon(Icons.qr_code_scanner, color: Colors.green),
+            leading: const Icon(Icons.qr_code_scanner, color: AppTheme.successColor),
             title: const Text('Portal Staf & Scanner'),
             subtitle: const Text('Scan QR & Riwayat Check-In'),
             onTap: () => _navigateTo(context, const StaffDashboardScreen()),
           ),
 
-          const Divider(),
+          const Divider(color: AppTheme.subtleGray),
 
           // ADMIN SECTION
           _buildSectionHeader('ADMINISTRATOR PLATFORM'),
           ListTile(
-            leading: const Icon(Icons.admin_panel_settings_outlined, color: Colors.deepPurple),
+            leading: const Icon(Icons.admin_panel_settings_outlined, color: AppTheme.secondaryColor),
             title: const Text('Portal Admin'),
             subtitle: const Text('Moderasi Event & Laporan Kendala'),
             onTap: () => _navigateTo(context, const AdminTabController()),
           ),
 
-          const Divider(),
+          const Divider(color: AppTheme.subtleGray),
 
           // AKUN & NOTIFIKASI
           _buildSectionHeader('AKUN & NOTIFIKASI'),
           ListTile(
-            leading: const Icon(Icons.notifications_outlined),
+            leading: const Icon(Icons.notifications_outlined, color: AppTheme.slateGray),
             title: const Text('Notifikasi'),
             onTap: () => _navigateTo(context, const NotificationListScreen()),
           ),
           ListTile(
-            leading: const Icon(Icons.login),
+            leading: const Icon(Icons.login, color: AppTheme.slateGray),
             title: const Text('Masuk (Login)'),
             onTap: () => _navigateTo(context, const LoginScreen()),
           ),
           ListTile(
-            leading: const Icon(Icons.person_add_outlined),
+            leading: const Icon(Icons.person_add_outlined, color: AppTheme.slateGray),
             title: const Text('Daftar Akun Baru'),
             onTap: () => _navigateTo(context, const RegisterScreen()),
           ),

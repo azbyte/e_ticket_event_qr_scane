@@ -296,18 +296,18 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: Colors.blue.shade50,
+                                color: const Color(0xFFEAEAEA),
                                 borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.blue.shade200),
+                                border: Border.all(color: const Color(0xFFE2E2E2)),
                               ),
                               child: const Row(
                                 children: [
-                                  Icon(Icons.info_outline, size: 18, color: Colors.blue),
+                                  Icon(Icons.info_outline, size: 18, color: Color(0xFFC94426)),
                                   SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
                                       'Sesuai keputusan produk C-01: Komisi platform (5%) dan biaya layanan tetap (Rp 5.000) bersifat tetap (read-only).',
-                                      style: TextStyle(fontSize: 12, color: Colors.blueGrey),
+                                      style: TextStyle(fontSize: 12, color: Color(0xFF181818)),
                                     ),
                                   ),
                                 ],

@@ -176,11 +176,13 @@ class _CheckInScreenState extends State<CheckInScreen> {
                                     children: [
                                       CircleAvatar(
                                         backgroundColor: isCheckedIn
-                                            ? Colors.green.shade100
-                                            : Colors.blue.shade100,
+                                            ? const Color(0xFFE8F5EE)
+                                            : const Color(0xFFFDF3F1),
                                         child: Icon(
                                           isCheckedIn ? Icons.check : Icons.person_outline,
-                                          color: isCheckedIn ? Colors.green.shade800 : Colors.blue.shade800,
+                                          color: isCheckedIn
+                                              ? const Color(0xFF2E8B57)
+                                              : const Color(0xFFC94426),
                                         ),
                                       ),
                                       const SizedBox(width: 12),

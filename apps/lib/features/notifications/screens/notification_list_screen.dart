@@ -46,15 +46,15 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
   Color _getColorForType(String? type) {
     switch (type) {
       case 'event_approved':
-        return Colors.green;
+        return const Color(0xFF2E8B57);
       case 'report_update':
-        return Colors.indigo;
+        return const Color(0xFFC94426);
       case 'check_in_sync':
-        return Colors.teal;
+        return const Color(0xFF2E8B57);
       case 'staff_invite':
-        return Colors.deepPurple;
+        return const Color(0xFFA8351C);
       default:
-        return Colors.blue;
+        return const Color(0xFF1E1E1E);
     }
   }
 
@@ -114,12 +114,14 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
                           final isRead = item['is_read'] == true;
 
                           return Card(
-                            elevation: isRead ? 0 : 2,
-                            color: isRead ? Colors.grey.shade50 : Colors.white,
+                            elevation: 0,
+                            color: isRead ? const Color(0xFFF6F6F6) : const Color(0xFFFFFFFF),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                               side: BorderSide(
-                                color: isRead ? Colors.grey.shade200 : Colors.blue.shade100,
+                                color: isRead
+                                    ? const Color(0xFFE2E2E2)
+                                    : const Color(0xFFC94426).withValues(alpha: 0.4),
                               ),
                             ),
                             child: InkWell(
@@ -164,7 +166,7 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
                                                   width: 8,
                                                   height: 8,
                                                   decoration: const BoxDecoration(
-                                                    color: Colors.blue,
+                                                    color: Color(0xFFC94426),
                                                     shape: BoxShape.circle,
                                                   ),
                                                 ),

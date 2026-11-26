@@ -528,15 +528,15 @@ class _PackageManagementScreenState extends State<PackageManagementScreen> {
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(
-                                          color: Colors.blue.shade50,
+                                          color: const Color(0xFFFDF3F1),
                                           borderRadius: BorderRadius.circular(6),
                                         ),
                                         child: Text(
                                           '${pkg.activeSubscribersCount} Organizer Aktif',
-                                          style: TextStyle(
+                                          style: const TextStyle(
                                             fontSize: 11,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.blue.shade900,
+                                            color: Color(0xFFC94426),
                                           ),
                                         ),
                                       ),
@@ -614,7 +614,7 @@ class _PackageManagementScreenState extends State<PackageManagementScreen> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: Colors.indigo.shade700),
+        Icon(icon, size: 14, color: const Color(0xFFC94426)),
         const SizedBox(width: 4),
         Text(text, style: const TextStyle(fontSize: 12)),
       ],

@@ -271,7 +271,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.indigo.shade50,
+                                color: AppTheme.softTerracottaBg,
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: const Text(

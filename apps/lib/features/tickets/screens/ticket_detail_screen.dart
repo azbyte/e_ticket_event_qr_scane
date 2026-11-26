@@ -494,9 +494,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.indigo.shade50,
+                    color: AppTheme.softTerracottaBg,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.indigo.shade100),
+                    border: Border.all(color: AppTheme.subtleGray),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,

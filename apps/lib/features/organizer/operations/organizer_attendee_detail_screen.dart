@@ -129,17 +129,17 @@ class OrganizerAttendeeDetailScreen extends StatelessWidget {
                       'Status Tiket',
                       attendee.ticketStatus.toUpperCase(),
                       valueColor: attendee.ticketStatus == 'valid'
-                          ? Colors.green
+                          ? const Color(0xFF2E8B57)
                           : attendee.ticketStatus == 'checked_in'
-                          ? Colors.blue
-                          : Colors.red,
+                          ? const Color(0xFFC94426)
+                          : const Color(0xFFE03E3E),
                     ),
                     const Divider(),
                     _buildRow(
                       'Status Check-in',
                       attendee.checkedIn ? 'SUDAH CHECK-IN' : 'BELUM CHECK-IN',
                       valueColor: attendee.checkedIn
-                          ? Colors.blue
+                          ? const Color(0xFF2E8B57)
                           : Colors.orange,
                     ),
                     if (attendee.checkedIn) ...[
@@ -192,8 +192,8 @@ class OrganizerAttendeeDetailScreen extends StatelessWidget {
                           ? 'DIBANTU PANITIA (ASSISTED)'
                           : 'MANDIRI (SELF-SERVICE)',
                       valueColor: attendee.registrationMethod == 'ASSISTED'
-                          ? Colors.purple
-                          : Colors.indigo,
+                          ? const Color(0xFFA8351C)
+                          : const Color(0xFFC94426),
                     ),
                     if (attendee.assistedBy != null) ...[
                       const Divider(),

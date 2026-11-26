@@ -122,7 +122,7 @@ class _TransactionRevenueScreenState extends State<TransactionRevenueScreen>
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
-                  const Icon(Icons.date_range, color: Colors.indigo),
+                  const Icon(Icons.date_range, color: Color(0xFFC94426)),
                   const SizedBox(width: 10),
                   const Text('Periode Analisis:', style: TextStyle(fontWeight: FontWeight.bold)),
                   const Spacer(),
@@ -151,8 +151,11 @@ class _TransactionRevenueScreenState extends State<TransactionRevenueScreen>
 
           // Total Platform Revenue Main Banner (FR-90)
           Card(
-            color: Colors.indigo.shade900,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            color: const Color(0xFF1E1E1E),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: const Color(0xFFC94426).withValues(alpha: 0.45)),
+            ),
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
