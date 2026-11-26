@@ -31,6 +31,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
   List<FeeChangeHistoryEntry> _feeHistory = [];
   bool _isLoading = true;
   bool _isSaving = false;
+  String? _loadError;
 
   @override
   void initState() {
@@ -51,22 +52,34 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
   }
 
   Future<void> _loadSettings() async {
-    setState(() => _isLoading = true);
-    final settings = await _settingsService.getSettings();
-    final history = await _settingsService.getFeeHistory();
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    try {
+      final settings = await _settingsService.getSettings();
+      final history = await _settingsService.getFeeHistory();
 
-    _nameCtrl = TextEditingController(text: settings.platformName);
-    _emailCtrl = TextEditingController(text: settings.contactEmail);
-    _phoneCtrl = TextEditingController(text: settings.contactPhone);
-    _commCtrl = TextEditingController(text: settings.ticketCommissionRate.toString());
-    _fixedFeeCtrl = TextEditingController(text: settings.fixedServiceFee.toInt().toString());
-    _timeoutCtrl = TextEditingController(text: settings.orderPaymentTimeoutMinutes.toString());
-    _refundCtrl = TextEditingController(text: settings.refundPolicySummary);
+      _nameCtrl = TextEditingController(text: settings.platformName);
+      _emailCtrl = TextEditingController(text: settings.contactEmail);
+      _phoneCtrl = TextEditingController(text: settings.contactPhone);
+      _commCtrl = TextEditingController(text: settings.ticketCommissionRate.toString());
+      _fixedFeeCtrl = TextEditingController(text: settings.fixedServiceFee.toInt().toString());
+      _timeoutCtrl = TextEditingController(text: settings.orderPaymentTimeoutMinutes.toString());
+      _refundCtrl = TextEditingController(text: settings.refundPolicySummary);
 
-    if (mounted) {
+      if (!mounted) return;
       setState(() {
         _currentSettings = settings;
         _feeHistory = history;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = error is FormatException
+            ? error.message
+            : 'Gagal memuat pengaturan dari database.';
         _isLoading = false;
       });
     }
@@ -144,12 +157,27 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
       refundPolicySummary: _refundCtrl.text.trim(),
     );
 
-    await _settingsService.updateSettings(
-      updated,
-      actorId: auth.user?.id ?? 'usr-admin-01',
-      actorName: auth.user?.name ?? 'Super Admin',
-      reason: feeChangeReason,
-    );
+    try {
+      await _settingsService.updateSettings(
+        updated,
+        actorId: auth.user?.id ?? '',
+        actorName: auth.user?.name ?? 'Admin Platform',
+        reason: feeChangeReason,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            error is FormatException
+                ? error.message
+                : 'Gagal menyimpan pengaturan ke database. Periksa koneksi backend.',
+          ),
+        ),
+      );
+      return;
+    }
 
     if (mounted) {
       setState(() => _isSaving = false);
@@ -175,7 +203,36 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
+          : _loadError != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.cloud_off, size: 40, color: Colors.redAccent),
+                        const SizedBox(height: 12),
+                        Text(
+                          _loadError!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.redAccent),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Pastikan backend berjalan dan terhubung ke database.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        ),
+                        const SizedBox(height: 12),
+                        FilledButton.tonal(
+                          onPressed: _loadSettings,
+                          child: const Text('Muat ulang'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Form(
                 key: _formKey,
@@ -363,7 +420,9 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                               '${h.reason}\nOleh: ${h.actorName} • ${h.timestamp.day}/${h.timestamp.month}/${h.timestamp.year}',
                               style: const TextStyle(fontSize: 11),
                             ),
-                            trailing: Text('Rp ${h.newFixedFee.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            trailing: h.newFixedFee > 0
+                                ? Text('Rp ${h.newFixedFee.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold))
+                                : null,
                           ),
                         ),
                       ),

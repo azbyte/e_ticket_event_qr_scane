@@ -610,7 +610,8 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final item = accounts[index];
-        final isSelf = item.id == currentUserId || item.email == 'admin@event.com';
+        // Identitas diri ditentukan oleh ID sesi; bukan dari email contoh.
+        final isSelf = currentUserId != null && item.id == currentUserId;
 
         return Card(
           elevation: 1.5,

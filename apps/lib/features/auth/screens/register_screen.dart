@@ -22,13 +22,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
     final auth = context.read<AuthProvider>();
-    final success = await auth.register(name: _name.text, email: _email.text, password: _password.text);
+    final success = await auth.register(
+      name: _name.text,
+      email: _email.text.trim(),
+      password: _password.text,
+    );
     if (!mounted) return;
     if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(auth.error ?? 'Pendaftaran gagal.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(auth.error ?? 'Pendaftaran gagal.')),
+      );
       return;
     }
+    // Akun Organizer berhasil dibuat: beri konfirmasi lalu arahkan ke halaman
+    // yang sesuai dengan role yang dikembalikan server (AuthGate / dashboard).
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Akun penyelenggara berhasil dibuat.')),
+    );
     Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.initial, (_) => false);
   }
 
@@ -41,17 +53,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const Text('Buat akun penyelenggara event. Hak Admin hanya dapat diberikan oleh administrator platform.'),
               const SizedBox(height: 20),
               TextFormField(controller: _name, decoration: const InputDecoration(labelText: 'Nama lengkap'),
+                textInputAction: TextInputAction.next,
                 validator: (value) => InputValidator.required(value, field: 'Nama')),
               const SizedBox(height: 14),
               TextFormField(controller: _email, keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(labelText: 'Email'), validator: InputValidator.email),
               const SizedBox(height: 14),
               TextFormField(controller: _password, obscureText: true,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _submit(),
                 decoration: const InputDecoration(labelText: 'Kata sandi'), validator: InputValidator.password),
               const SizedBox(height: 20),
-              Consumer<AuthProvider>(builder: (_, auth, _) => FilledButton(
-                onPressed: auth.isLoading ? null : _submit,
-                child: auth.isLoading ? const CircularProgressIndicator() : const Text('Daftar'),
+              Consumer<AuthProvider>(builder: (_, auth, _) => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (auth.error != null) ...[
+                    Text(auth.error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                    const SizedBox(height: 12),
+                  ],
+                  FilledButton(
+                    onPressed: auth.isLoading ? null : _submit,
+                    child: auth.isLoading ? const CircularProgressIndicator() : const Text('Daftar'),
+                  ),
+                ],
               )),
               TextButton(onPressed: () => Navigator.pop(context), child: const Text('Sudah punya akun? Masuk')),
             ])),

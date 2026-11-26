@@ -10,17 +10,48 @@ const listAccounts = asyncHandler(async (req, res) => {
      FROM profiles ${where ? `WHERE ${where}` : ''} ORDER BY created_at DESC`,
     params
   );
-  res.json({ success: true, count: rows.length, accounts: rows });
+  // `is_active` adalah bentuk kanonik yang dipakai klien Flutter
+  // (`account_management_screen.dart`); `disabled_at` tetap dikirim agar klien
+  // lama dan audit tetap kompatibel.
+  const accounts = rows.map((row) => ({ ...row, is_active: !row.disabled_at }));
+  res.json({ success: true, count: accounts.length, accounts });
 });
 
+/**
+ * Ubah status akun. Menerima tiga bentuk payload:
+ * - `{ is_active: boolean }` — dipakai aplikasi Flutter (kanonik)
+ * - `{ disabled: boolean }` — bentuk lama
+ * - `{ status: 'ACTIVE' | 'SUSPENDED' }` — bentuk eksplisit
+ * Tanpa salah satunya permintaan ditolak agar status tidak berubah diam-diam.
+ */
 const updateAccountStatus = asyncHandler(async (req, res) => {
   if (req.params.id === req.user.id) {
     res.status(400);
     throw new Error('Administrators cannot disable their own account');
   }
 
-  const isDisabling = Boolean(req.body.disabled);
-  const reason = typeof req.body.reason === 'string' ? req.body.reason.trim() : '';
+  const body = req.body || {};
+  let isDisabling;
+  if (typeof body.is_active === 'boolean') {
+    isDisabling = !body.is_active;
+  } else if (typeof body.disabled === 'boolean') {
+    isDisabling = body.disabled;
+  } else if (typeof body.status === 'string') {
+    const normalized = body.status.trim().toUpperCase();
+    if (['SUSPENDED', 'DISABLED', 'INACTIVE'].includes(normalized)) {
+      isDisabling = true;
+    } else if (['ACTIVE', 'ENABLED'].includes(normalized)) {
+      isDisabling = false;
+    } else {
+      res.status(400);
+      throw new Error('Status akun tidak dikenal; gunakan ACTIVE atau SUSPENDED');
+    }
+  } else {
+    res.status(400);
+    throw new Error('Sertakan is_active (boolean), disabled (boolean), atau status akun');
+  }
+
+  const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
 
   if (isDisabling && reason.length < 5) {
     res.status(400);
@@ -51,7 +82,7 @@ const updateAccountStatus = asyncHandler(async (req, res) => {
     metadata: { userId: user.id, email: user.email, role: user.role },
   });
 
-  res.json({ success: true, user });
+  res.json({ success: true, user: { ...user, is_active: !user.disabled_at } });
 });
 
 module.exports = { listAccounts, updateAccountStatus };

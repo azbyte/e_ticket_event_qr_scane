@@ -24,7 +24,17 @@ class MyApp extends StatelessWidget {
           title: AppConfig.appName,
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
-          initialRoute: AppRoutes.initial,
+          // Sengaja tidak memakai `initialRoute: '/'`: nilai itu memaksa route
+          // awal selalu `/` sehingga deep link `/e/{eventId}` (tautan
+          // pendaftaran publik) dan `/invite/{token}` diabaikan browser.
+          // Tanpa `initialRoute`, MaterialApp memakai `defaultRouteName` dari
+          // platform (path URL di web) lalu meneruskannya ke [AppRouter].
+          onGenerateInitialRoutes:
+              (String initialRouteName) => <Route<dynamic>>[
+                    AppRouter.generateRoute(
+                      RouteSettings(name: initialRouteName),
+                    ),
+                  ],
           routes: {
             AppRoutes.initial: (_) => const AuthGate(),
             AppRoutes.login: (_) => const LoginScreen(),

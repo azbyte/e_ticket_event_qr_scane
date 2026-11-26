@@ -54,6 +54,67 @@
 - **Dampak data lama:** order yang dibuat sebelum perubahan tidak memiliki `custom_fields`; tetap valid karena kolom nullable. Tidak ada backfill otomatis.
 - **Test yang disarankan:** create order dengan field wajib kosong (ditolak), field select di luar opsi (ditolak), jawaban tersimpan dan terbaca kembali, rollback saat penyimpanan gagal.
 
+## DP-05 — rekonsiliasi SQL legacy (`backend/prisma/legacy-migrations/`) ke riwayat Prisma
+
+- **Dasar:** kebersihan/kejelasan sumber kebenaran migration. `AGENTS.md` dan
+  `docs/DATABASE.md` menetapkan `backend/prisma/migrations/` sebagai riwayat
+  migration aktif, sedangkan SQL legacy (dulu `backend/supabase/migrations/`,
+  sekarang `backend/prisma/legacy-migrations/`) dipertahankan untuk
+  riwayat/fungsi tertentu. Tujuannya menghindari dua lokasi migration yang
+  membingungkan operator.
+- **Bukti read-only (26 November 2026):** `npx prisma migrate status` → 9
+  migration ditemukan, `Database schema is up to date!`. `_prisma_migrations`
+  berisi 9 baris; file legacy `202611040001_role_access_and_event_members.sql`
+  **tidak** tercatat di sana. Objek legacy yang sudah tercakup migration Prisma:
+  kolom `profiles.username`, `profiles.disabled_at`, `password_hash` nullable,
+  tabel `revoked_tokens` + `revoked_tokens_expires_at_idx`, tabel `event_members`,
+  `events_created_by_idx`, `event_members_user_id_idx`, serta RLS deny-by-default
+  dengan 0 policy (migration `20261118000200_rls_and_supabase_grants`) yang
+  setara/lebih ketat daripada policy `using (false)` versi legacy.
+- **Celah nyata (hanya ada di file legacy):** unique index
+  `profiles_username_lower_unique` pada `lower(username) WHERE username IS NOT NULL`.
+  Index ini **tidak** didefinisikan di schema.prisma maupun 9 migration Prisma,
+  dan hasil pemeriksaan `pg_indexes` menunjukkan index tersebut **tidak ada** di
+  database saat ini. Konsekuensinya username hanya unik secara case-sensitive
+  (`profiles_email_key` hanya untuk email), sehingga `Admin` dan `admin` dapat
+  hidup berdampingan.
+- **Proposal:** (1) pindahkan celah tersebut ke migration Prisma baru
+  (mis. `20261126000000_reconcile_legacy_username_uniqueness`) yang hanya berisi
+  index residual tersebut, atau (2) putuskan secara tertulis bahwa username
+  case-sensitive sudah memadai dan index legacy tidak diperlukan. Setelah
+  keputusan (1) diterapkan dan diverifikasi, arsipkan file legacy (pindah ke
+  `task/archive/` atau hapus) sehingga hanya `backend/prisma/migrations/` yang
+  menjadi riwayat migration.
+- **Status relokasi (26 November 2026):** atas instruksi pemilik proyek, file
+  legacy sudah **dipindahkan** dari `backend/supabase/migrations/` ke
+  `backend/prisma/legacy-migrations/` (isi tidak diubah, riwayat Git
+  dipertahankan lewat `git mv`), sehingga hanya ada satu folder database yaitu
+  `backend/prisma/`. Folder `backend/supabase/` dihapus. Penempatan itu sengaja
+  **di luar** `backend/prisma/migrations/` karena Prisma memperlakukan setiap
+  subfolder di sana sebagai migration: probe Prisma 6.19 menunjukkan folder
+  `migrations/legacy/` terbaca sebagai migration `legacy` yang belum diterapkan
+  (`migrate status` exit 1, `migrate deploy` akan menjalankannya), sedangkan file
+  `.sql` lepas diabaikan. Verifikasi setelah relokasi: `prisma migrate status`
+  tetap `9 migrations found` + `Database schema is up to date!`.
+  **Celah `profiles_username_lower_unique` masih terbuka** dan tetap menunggu
+  keputusan pada proposal ini.
+- **Larangan teknis:** jangan menghapus/menulis ulang 9 direktori migration
+  Prisma yang sudah diterapkan — checksum di `_prisma_migrations` akan membuat
+  `prisma migrate status`/`deploy` melaporkan migration hilang. Rekonsiliasi
+  dilakukan dengan **menambah** migration baru, bukan menggabungkan riwayat lama.
+- **Prasyarat index unik:** sebelum `CREATE UNIQUE INDEX`, periksa duplikat
+  `lower(username)` pada data aktual; bila ada, selesaikan penamaan ulang
+  terlebih dahulu. Buat index dengan `CREATE UNIQUE INDEX CONCURRENTLY` bila
+  tabel sudah besar dan downtime tidak diizinkan.
+- **Test/validasi yang disyaratkan:** `prisma migrate deploy` + `prisma migrate
+  status` pada database disposable, `node scripts/audit-db.js`, registrasi
+  Organizer dengan username yang hanya berbeda kapitalisasi (harus 409/400,
+  bukan membuat baris baru), login Admin/Organizer tetap 200, serta `npm test`.
+- **Owner:** hanya penanggung jawab FINISHING setelah gate dibuka; Developer 1–3
+  tidak mengimplementasikan. File legacy (`backend/prisma/legacy-migrations/**`)
+  tercatat **beku** pada `task/TAHAP_3/FILE_OWNERSHIP.md`, sehingga
+  pemindahan/penghapusan lebih lanjut memerlukan keputusan pemilik proyek.
+
 ## Proses review FINISHING yang disyaratkan
 
 Untuk setiap proposal di atas, sebelum perubahan: pemilik produk mengesahkan acceptance terkait; maintainer menetapkan penanggung jawab FINISHING; gate FINISHING dibuka; proposal, data impact, baseline dan file scope disetujui; disposable DB/no secrets tersedia; reviewer serta forward/rollback plan dicatat. Sampai terpenuhi, status tetap **BLOCKED / PROPOSAL ONLY**.

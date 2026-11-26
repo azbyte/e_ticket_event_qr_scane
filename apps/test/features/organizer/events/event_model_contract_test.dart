@@ -67,7 +67,18 @@ void main() {
     test('tanpa attendee_fields tidak melempar exception', () {
       final event = EventModel.fromJson(baseJson());
       expect(event.attendeeFields, isEmpty);
-      expect(event.resolvedAttendeeFields, isEmpty);
+      // Pembaruan Tahap 3 (D1-04): server menolak event tanpa field `name` dan
+      // `email` karena keduanya kolom wajib tabel `attendees`. Fallback model
+      // kini menyertakan keduanya agar form publik dan form Organizer tetap
+      // dapat merender dan menyimpan event lama tanpa konfigurasi field.
+      expect(
+        event.resolvedAttendeeFields.map((field) => field.key),
+        containsAll(<String>['name', 'email']),
+      );
+      expect(
+        event.resolvedAttendeeFields.every((field) => field.required),
+        isTrue,
+      );
     });
   });
 

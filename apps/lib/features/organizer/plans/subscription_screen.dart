@@ -125,9 +125,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                       final changed = await _service.changePlan(plan.id);
                       if (!mounted) return;
                       if (!changed) {
+                        // Paket belum tersedia: arahkan pengguna dengan jujur.
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Paket demo tidak ditemukan.'),
+                            content: Text('Paket tidak ditemukan.'),
                           ),
                         );
                         return;
@@ -135,7 +136,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            'Paket demo dialihkan ke ${plan.name}. Tidak ada penagihan.',
+                            'Paket dialihkan ke ${plan.name}. Tidak ada penagihan.',
                           ),
                           backgroundColor: Colors.green.shade800,
                         ),
@@ -194,7 +195,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     if (_plans.isEmpty) {
       return const OrganizerEmptyView(
         title: 'Paket belum tersedia',
-        description: 'Belum ada paket demo yang dapat ditampilkan.',
+        description: 'Belum ada paket yang dapat ditampilkan.',
       );
     }
     return SingleChildScrollView(

@@ -22,6 +22,7 @@ class AppRoutes {
   static const String ticketList = '/tickets';
   static const String ticketDetail = '/tickets/:id';
   static const String organizerDashboard = '/organizer';
+  static const String organizerScan = '/organizer/scan';
   static const String organizerProfile = '/organizer/profile';
   static const String profileEdit = '/profile/edit';
   static const String adminProfile = '/admin/profile';
@@ -30,6 +31,8 @@ class AppRoutes {
   static const String organizerEventDetail = '/organizer/events/:id';
   static const String organizerEventForm = '/organizer/events/:id/edit';
   static const String organizerAttendees = '/organizer/events/:id/attendees';
+  static const String organizerOrders = '/organizer/events/:id/orders';
+  static const String organizerEventScanner = '/organizer/events/:id/scanner';
   static const String organizerStaff = '/organizer/events/:id/staff';
   static const String staffDashboard = '/staff';
   static const String staffScanner = '/staff/scanner';
@@ -87,4 +90,19 @@ class AppRoutes {
   static String invitationAcceptPath(String token) => '/invite/$token';
 
   static String staffWorkspacePath(String eventId) => '/staff/$eventId';
+
+  static String organizerEventAttendeesPath(String eventId) =>
+      '/organizer/events/$eventId/attendees';
+
+  static String organizerEventOrdersPath(String eventId) =>
+      '/organizer/events/$eventId/orders';
+
+  static String organizerEventScannerPath(String eventId) =>
+      '/organizer/events/$eventId/scanner';
+
+  static String organizerEventStaffPath(String eventId) =>
+      '/organizer/events/$eventId/staff';
+
+  static String organizerEventEditPath(String eventId) =>
+      '/organizer/events/$eventId/edit';
 }

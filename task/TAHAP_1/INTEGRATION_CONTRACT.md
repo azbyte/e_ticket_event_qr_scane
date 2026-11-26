@@ -20,7 +20,7 @@ FINISHING dan dilaporkan sebagai proposal, bukan alasan memblokir seluruh task.
 Stack tetap Flutter Provider/`http`/secure-storage dan backend Express 4 CommonJS,
 PostgreSQL via `pg`. `backend/prisma/schema.prisma` adalah sumber schema yang
 ditetapkan dan migration Prisma berada di `backend/prisma/migrations/`;
-`backend/supabase/migrations/` merupakan SQL legacy yang dipertahankan untuk
+`backend/prisma/legacy-migrations/` merupakan SQL legacy yang dipertahankan untuk
 fungsi/riwayat tertentu, bukan pengganti baseline Prisma. Fungsi/status legacy
 harus direkonsiliasi sebelum dijalankan; jangan hapus atau jalankan tanpa
 persetujuan FINISHING. Ownership ada di `FILE_OWNERSHIP.md`; path lain dilarang.

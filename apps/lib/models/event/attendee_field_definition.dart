@@ -113,3 +113,26 @@ class AttendeeFieldDefinition {
   @override
   String toString() => 'AttendeeFieldDefinition($key, $type, required: $required)';
 }
+
+/// Definisi field peserta default yang wajib ada pada setiap event.
+///
+/// `name` dan `email` adalah kolom wajib tabel `attendees` dan divalidasi ulang
+/// server (`REQUIRED_ATTENDEE_FIELD_KEYS`), sehingga keduanya selalu disertakan
+/// ketika event tidak menyimpan definisi bertipe.
+class OrganizerAttendeeDefaults {
+  OrganizerAttendeeDefaults._();
+
+  static const List<AttendeeFieldDefinition> definitions =
+      <AttendeeFieldDefinition>[
+        AttendeeFieldDefinition(
+          key: 'name',
+          label: 'Nama lengkap',
+          required: true,
+        ),
+        AttendeeFieldDefinition(
+          key: 'email',
+          label: 'Email',
+          required: true,
+        ),
+      ];
+}

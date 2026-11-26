@@ -5,8 +5,10 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/validators/input_validator.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../routes/app_routes.dart';
 import '../../../services/organizer_support/organizer_support_service.dart';
 import '../shell/organizer_shell.dart';
@@ -32,12 +34,21 @@ class _OrganizerSupportScreenState extends State<OrganizerSupportScreen>
 
   // Form controllers
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController(
-    text: OrganizerSupportService.demoOrganizerEmail,
-  );
+  final _emailController = TextEditingController();
   final _subjectController = TextEditingController();
   final _descController = TextEditingController();
   String _selectedCategory = 'Moderasi Event';
+
+  /// Identitas Organizer yang sedang login; dipakai sebagai `user_id` laporan
+  /// agar pengaduan benar-benar terhubung ke akun nyata (bukan id demo).
+  String get _organizerId {
+    final user = context.read<AuthProvider>().user;
+    final id = user?.id ?? '';
+    if (id.isEmpty) {
+      throw StateError('Sesi Organizer tidak valid. Silakan masuk kembali.');
+    }
+    return id;
+  }
 
   @override
   void initState() {
@@ -47,6 +58,8 @@ class _OrganizerSupportScreenState extends State<OrganizerSupportScreen>
       vsync: this,
       initialIndex: widget.initialTab,
     );
+    // Email kontak default diambil dari akun yang login dan tetap dapat diubah.
+    _emailController.text = context.read<AuthProvider>().user?.email ?? '';
     _loadComplaints();
   }
 
@@ -65,9 +78,7 @@ class _OrganizerSupportScreenState extends State<OrganizerSupportScreen>
       _loadError = null;
     });
     try {
-      final list = await _service.listComplaints(
-        OrganizerSupportService.demoOrganizerId,
-      );
+      final list = await _service.listComplaints(_organizerId);
       if (!mounted) return;
       setState(() {
         _complaints = list;
@@ -85,7 +96,7 @@ class _OrganizerSupportScreenState extends State<OrganizerSupportScreen>
     setState(() => _isSubmitting = true);
     try {
       final created = await _service.submitComplaint(
-        organizerId: OrganizerSupportService.demoOrganizerId,
+        organizerId: _organizerId,
         email: _emailController.text.trim(),
         category: _selectedCategory,
         subject: _subjectController.text.trim(),
@@ -98,7 +109,7 @@ class _OrganizerSupportScreenState extends State<OrganizerSupportScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Laporan demo ${created.ticketNumber} berhasil dibuat secara lokal.',
+            'Laporan ${created.ticketNumber} berhasil dikirim.',
           ),
           backgroundColor: Colors.green.shade800,
         ),
@@ -496,7 +507,7 @@ class _OrganizerSupportScreenState extends State<OrganizerSupportScreen>
             FilledButton.icon(
               icon: const Icon(Icons.send),
               label: _isSubmitting
-                  ? const Text('Membuat laporan demo...')
+                  ? const Text('Mengirim laporan...')
                   : const Text('Kirim Tiket Laporan'),
               onPressed: _isSubmitting ? null : _submitComplaint,
             ),

@@ -172,7 +172,7 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pemindai Tiket QR (demo)'),
+        title: const Text('Pemindai Tiket QR'),
       ),
       body: !canScan
           ? _buildAccessDenied()

@@ -21,6 +21,8 @@ function resetState(overrides = {}) {
     usernameRows: [],
     revokedTokenRow: null,
     insertedProfile: null,
+    insertedOrganizerProfile: null,
+    organizerInsertFails: false,
     updatedProfile: null,
     calls: [],
   }, overrides);
@@ -46,6 +48,40 @@ require.cache[dbPath] = {
       }
       if (sql.includes('WHERE id = $1')) return state.profileById;
       return state.existingEmailRow;
+    },
+    // Klien transaksi tiruan: registerUser memakai BEGIN/COMMIT dan pool.connect
+    // agar pembuatan profiles + organizer_profiles atomik. Stub ini meniru
+    // kontrak `pg` seperlunya tanpa menyentuh database sungguhan.
+    pool: {
+      connect: async () => ({
+        query: async (sql, params = []) => {
+          state.calls.push({ sql, params });
+          if (/^(BEGIN|COMMIT|ROLLBACK)$/i.test(sql.trim())) return { rows: [], rowCount: 0 };
+          if (sql.includes('SELECT 1 FROM profiles WHERE email')) {
+            const row = state.existingEmailRow;
+            return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
+          }
+          if (sql.includes('SELECT 1 FROM profiles WHERE username')) {
+            const rows = state.usernameRows || [];
+            return { rows, rowCount: rows.length };
+          }
+          if (sql.includes('INSERT INTO profiles')) {
+            const row = state.insertedProfile;
+            return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
+          }
+          if (sql.includes('INSERT INTO organizer_profiles')) {
+            if (state.organizerInsertFails) {
+              const failure = new Error('insert organizer_profiles failed');
+              failure.code = '23503';
+              throw failure;
+            }
+            const row = state.insertedOrganizerProfile;
+            return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
+          }
+          return { rows: [], rowCount: 0 };
+        },
+        release: () => {},
+      }),
     },
   },
 };
@@ -80,6 +116,7 @@ test('register mengabaikan role kiriman klien dan selalu menyimpan Organizer', a
       id: 'u-1', name: 'Organizer Uji', email: 'organizer@example.test',
       username: 'organizer', role: USER_ROLES.ORGANIZER,
     },
+    insertedOrganizerProfile: { id: 'org-1', user_id: 'u-1', organization_name: null, contact_name: 'Organizer Uji' },
   });
   const res = createResponse();
   const { error } = await run(registerUser, {
@@ -100,9 +137,35 @@ test('register mengabaikan role kiriman klien dan selalu menyimpan Organizer', a
   assert.ok(insert.params.includes(USER_ROLES.ORGANIZER), 'role tersimpan = organizer');
   assert.ok(!insert.params.includes('admin'), 'role klien tidak pernah menjadi parameter');
 
+  // Profil Organizer wajib dibuat pada transaksi yang sama dengan akun User.
+  const orgInsert = state.calls.find((call) => call.sql.includes('INSERT INTO organizer_profiles'));
+  assert.ok(orgInsert, 'profil organizer dibuat');
+  assert.equal(orgInsert.params[0], 'u-1', 'profil organizer terhubung ke user_id akun baru');
+  assert.equal(res.body.user.organizer_profile_id, 'org-1', 'id profil organizer dikembalikan');
+  assert.ok(state.calls.some((call) => call.sql.trim() === 'BEGIN'), 'transaksi dibuka');
+  assert.ok(state.calls.some((call) => call.sql.trim() === 'COMMIT'), 'transaksi di-commit');
+
   const decoded = jwt.verify(res.body.token, process.env.JWT_SECRET);
   assert.equal(decoded.role, 'organizer');
   assert.equal(decoded.id, 'u-1');
+});
+
+test('register membatalkan seluruh proses bila profil Organizer gagal dibuat', async () => {
+  resetState({
+    insertedProfile: { id: 'u-rollback', name: 'Rollback', email: 'rollback@example.test', username: 'rollback', role: USER_ROLES.ORGANIZER },
+    insertedOrganizerProfile: null,
+    organizerInsertFails: true,
+  });
+  const res = createResponse();
+  const { error } = await run(registerUser, {
+    body: { name: 'Rollback', email: 'rollback@example.test', password: 'rahasia123' },
+  }, res);
+
+  assert.ok(error, 'kegagalan profil organizer diteruskan sebagai error');
+  assert.equal(res.body, undefined, 'tidak ada respons sukses');
+  assert.ok(state.calls.some((call) => call.sql.trim() === 'BEGIN'), 'transaksi dibuka');
+  assert.ok(state.calls.some((call) => call.sql.trim() === 'ROLLBACK'), 'transaksi di-rollback');
+  assert.ok(!state.calls.some((call) => call.sql.trim() === 'COMMIT'), 'tidak pernah commit');
 });
 
 test('register menolak email yang sudah terdaftar', async () => {

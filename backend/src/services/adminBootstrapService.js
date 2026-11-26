@@ -44,17 +44,33 @@ const validateAdminConfig = (config) => {
 };
 
 const defaultHashPassword = (password) => bcrypt.hash(password, 12);
+const defaultComparePassword = (password, passwordHash) => bcrypt.compare(password, passwordHash);
 
 const createAdminBootstrapService = ({
   query: runQuery = query,
   getOne: getFirst = getOne,
   hashPassword = defaultHashPassword,
+  comparePassword = defaultComparePassword,
 } = {}) => {
   const resolveUsername = async (baseUsername, existingId) => {
     const base = String(baseUsername || 'admin').trim().toLowerCase() || 'admin';
     const taken = await runQuery('SELECT id FROM profiles WHERE username = $1', [base]);
     const takenByOther = taken.some((row) => row.id !== existingId);
     return takenByOther ? `${base}_${Date.now().toString(36)}` : base;
+  };
+
+  /**
+   * Bandingkan password konfigurasi dengan hash tersimpan.
+   * Mengembalikan `null` bila hash tidak tersedia/ tidak dapat dibandingkan,
+   * sehingga ketidakcocokan tidak pernah diklaim tanpa bukti.
+   */
+  const passwordMatchesStoredHash = async (row, password) => {
+    if (!row || !row.password_hash) return null;
+    try {
+      return Boolean(await comparePassword(password, row.password_hash));
+    } catch {
+      return null;
+    }
   };
 
   /**
@@ -69,7 +85,7 @@ const createAdminBootstrapService = ({
     }
 
     const existing = await getFirst(
-      'SELECT id, role, disabled_at FROM profiles WHERE email = $1',
+      'SELECT id, role, disabled_at, password_hash FROM profiles WHERE email = $1',
       [config.email]
     );
 
@@ -86,6 +102,24 @@ const createAdminBootstrapService = ({
       }
 
       if (!config.rotatePassword) {
+        // Akun sudah ada dan password tidak boleh diubah otomatis. Namun bila
+        // hash tersimpan tidak cocok dengan ADMIN_PASSWORD, login dengan
+        // kredensial yang terdokumentasi akan selalu 401 "Invalid credentials".
+        // Kondisi ini dilaporkan eksplisit (tanpa mengubah data) agar penyebabnya
+        // tidak tersamar sebagai "UNCHANGED".
+        const passwordMatches = await passwordMatchesStoredHash(existing, config.password);
+        if (passwordMatches === false) {
+          return {
+            status: 'PASSWORD_MISMATCH',
+            email: config.email,
+            userId: existing.id,
+            message:
+              'Admin account exists but its stored password does not match ADMIN_PASSWORD; ' +
+              'login with the configured credentials will fail with 401. ' +
+              'Set ADMIN_RESET_PASSWORD=true and run `npm run admin:provision` to rotate it, ' +
+              'or sign in with the password that was used when the account was created.',
+          };
+        }
         return {
           status: 'UNCHANGED',
           email: config.email,
@@ -146,8 +180,28 @@ const createAdminBootstrapService = ({
 
 const service = createAdminBootstrapService();
 
+/**
+ * Bootstrap akun istimewa dari environment variable (dipakai `server.js`).
+ *
+ * Sebelumnya berada di `services/seedService.js` sebagai pembungkus tipis.
+ * Dilebur ke sini agar bootstrap akun hanya punya satu modul. Tidak ada
+ * password default di source code: akun Admin hanya dibuat bila `ADMIN_EMAIL`
+ * dan `ADMIN_PASSWORD` diisi. Akun Organizer tidak di-seed; Organizer dibuat
+ * melalui `POST /api/auth/register`.
+ *
+ * Idempotent: dijalankan berulang tidak membuat akun duplikat dan tidak
+ * mengubah password kecuali `ADMIN_RESET_PASSWORD=true`.
+ */
+const bootstrapConfiguredAccounts = async (env = process.env) => {
+  if (!env.DATABASE_URL) {
+    throw new Error('Account bootstrap requires DATABASE_URL');
+  }
+  return service.ensureAdminAccountFromEnv(env);
+};
+
 module.exports = {
   ...service,
+  bootstrapConfiguredAccounts,
   createAdminBootstrapService,
   readAdminConfig,
   isAdminConfigComplete,

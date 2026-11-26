@@ -21,7 +21,6 @@ import 'features/payments/screens/payment_screen.dart';
 import 'features/public_event/screens/invitation_entry_screen.dart';
 import 'features/public_event/screens/public_event_screen.dart';
 import 'features/public_event/screens/public_registration_screen.dart';
-import 'features/registration/screens/registration_screen.dart';
 import 'features/organizer/membership/team_management_screen.dart';
 import 'features/organizer/plans/subscription_screen.dart';
 import 'features/organizer/events/screens/organizer_event_detail_screen.dart';
@@ -29,8 +28,12 @@ import 'features/organizer/screens/attendee_list_screen.dart';
 import 'features/organizer/screens/event_form_screen.dart';
 import 'features/organizer/screens/event_management_screen.dart';
 import 'features/organizer/screens/organizer_profile_screen.dart';
+import 'features/organizer/screens/organizer_order_list_screen.dart';
 import 'features/organizer/screens/staff_management_screen.dart';
+import 'features/organizer/operations/organizer_scan_screen.dart';
 import 'features/organizer/operations/organizer_scanner_screen.dart';
+import 'features/check_in/screens/check_in_history_screen.dart';
+import 'features/scanner/screens/scanner_screen.dart';
 import 'features/organizer/shell/access_denied_screen.dart';
 import 'features/organizer/support/organizer_support_screen.dart';
 import 'services/organizer_operations/organizer_permission.dart';
@@ -42,7 +45,8 @@ import 'routes/app_routes.dart';
 
 class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
-    final uri = Uri.tryParse(settings.name ?? '/');
+    final normalized = _normalizeRouteName(settings.name);
+    final uri = Uri.tryParse(normalized);
     final path = uri?.path ?? '/';
     final parts = path.split('/').where((part) => part.isNotEmpty).toList();
     final args = settings.arguments is Map
@@ -67,6 +71,9 @@ class AppRouter {
       case AppRoutes.organizerDashboard:
         page = const RoleGuard(admin: false);
         break;
+      case AppRoutes.organizerScan:
+        page = const OrganizerScanScreen();
+        break;
       case AppRoutes.organizerProfile:
         page = const OrganizerProfileScreen();
         break;
@@ -78,9 +85,8 @@ class AppRouter {
         break;
       case AppRoutes.organizerTeam:
         page = TeamManagementScreen(
-          eventId: args['eventId']?.toString() ?? 'evt-1001',
-          eventTitle:
-              args['eventTitle']?.toString() ?? 'Tech Innovation Summit 2026',
+          eventId: args['eventId']?.toString() ?? '',
+          eventTitle: args['eventTitle']?.toString() ?? 'Event',
         );
         break;
       case AppRoutes.organizerPlans:
@@ -101,12 +107,41 @@ class AppRouter {
           returnRoute: args['returnRoute']?.toString() ?? AppRoutes.home,
         );
         break;
+      case AppRoutes.organizerEventScanner:
+        page = OrganizerScannerScreen(
+          eventId: args['eventId']?.toString() ?? '',
+          eventName: args['eventName']?.toString() ?? 'Event',
+          contextScope: OrganizerMembershipContext.owner(
+            eventId: args['eventId']?.toString() ?? '',
+            userId: _authUserId ?? '',
+            userName: _authUserName ?? 'Penyelenggara',
+          ),
+        );
+        break;
       case AppRoutes.staffDashboard:
-      case AppRoutes.staffAssignedEvents:
-      case AppRoutes.staffScanner:
-      case AppRoutes.staffScanResult:
-      case AppRoutes.checkInHistory:
         page = const StaffDashboardScreen();
+        break;
+      case AppRoutes.staffAssignedEvents:
+        page = const StaffDashboardScreen();
+        break;
+      case AppRoutes.staffScanner:
+        // Scanner staf memerlukan event yang benar (K3 T3-D1-02). Bila eventId
+        // tidak tersedia, ScannerScreen menampilkan state "belum ada event"
+        // yang jujur; dashboard staf adalah tempat memilih event.
+        page = args['eventId'] == null
+            ? const StaffDashboardScreen()
+            : ScannerScreen(
+                eventId: args['eventId']?.toString() ?? '',
+                staffId: args['staffId']?.toString() ?? _authUserId ?? '',
+                staffName: args['staffName']?.toString() ?? _authUserName ?? '',
+              );
+        break;
+      case AppRoutes.checkInHistory:
+        page = args['eventId'] == null
+            ? const StaffDashboardScreen()
+            : CheckInHistoryScreen(
+                eventId: args['eventId']?.toString() ?? '',
+              );
         break;
       case AppRoutes.adminDashboard:
         page = const AdminTabController();
@@ -167,8 +202,10 @@ class AppRouter {
         } else if (parts.length == 2 && parts[0] == 'invite') {
           page = InvitationEntryScreen(token: parts[1]);
         } else if (parts.length == 2 && parts[0] == 'registration') {
-          // Alur registrasi guest melalui tautan publik.
-          page = RegistrationScreen(eventId: parts[1]);
+          // Alur pendaftaran guest melalui tautan pendaftaran (PRD §7).
+          // Wajib memakai layar guest: peserta tidak perlu login, dan formulir
+          // mengikuti konfigurasi field milik event tersebut.
+          page = PublicRegistrationScreen(eventId: parts[1]);
         } else if (parts.length == 2 && parts[0] == 'staff') {
           page = StaffDashboardScreen(eventId: parts[1]);
         } else if (parts.length == 4 &&
@@ -192,18 +229,26 @@ class AppRouter {
             parts[0] == 'organizer' &&
             parts[1] == 'events' &&
             parts[3] == 'attendees') {
-          page = const AttendeeListScreen();
+          page = AttendeeListScreen(eventId: parts[2]);
+        } else if (parts.length == 4 &&
+            parts[0] == 'organizer' &&
+            parts[1] == 'events' &&
+            parts[3] == 'orders') {
+          page = OrganizerOrderListScreen(
+            eventId: parts[2],
+            eventName: args['eventName']?.toString() ?? 'Event',
+            contextScope:
+                _organizerContextFor(parts[2], args) ?? _ownerFallback(parts[2]),
+          );
         } else if (parts.length == 4 &&
             parts[0] == 'organizer' &&
             parts[1] == 'events' &&
             parts[3] == 'scanner') {
           page = OrganizerScannerScreen(
             eventId: parts[2],
-            contextScope: OrganizerMembershipContext.owner(
-              userId: 'usr-org-001',
-              userName: 'Penyelenggara Tech (Owner)',
-              eventId: parts[2],
-            ),
+            eventName: args['eventName']?.toString() ?? 'Event',
+            contextScope:
+                _organizerContextFor(parts[2], args) ?? _ownerFallback(parts[2]),
           );
         } else if (parts.length >= 2 && parts.first == 'admin') {
           page = const RoleGuard(admin: true);
@@ -221,6 +266,9 @@ class AppRouter {
       builder: (context) {
         final auth = context.read<AuthProvider>();
         final role = auth.user?.role.name;
+        // Identitas owner untuk layar yang butuh konteks membership Organizer.
+        _authUserId = auth.user?.id;
+        _authUserName = auth.user?.name;
         final adminRoute =
             path == AppRoutes.adminDashboard || path.startsWith('/admin/');
         final organizerRoute =
@@ -269,6 +317,43 @@ class AppRouter {
     );
   }
 
+  /// Konteks membership untuk layar Organizer yang membutuhkan permission.
+  ///
+  /// Identitas owner dibaca dari [AuthProvider] oleh [generateRoute] dan
+  /// diteruskan lewat field privat di bawah; argumen route dapat menimpanya
+  /// bila pemanggil sudah memiliki data membership nyata. Tidak ada lagi ID
+  /// owner hardcoded.
+  static String? _authUserId;
+  static String? _authUserName;
+
+  static OrganizerMembershipContext? _organizerContextFor(
+    String eventId,
+    Map args,
+  ) {
+    final explicit = args['contextScope'];
+    if (explicit is OrganizerMembershipContext) return explicit;
+
+    final userId = args['userId']?.toString() ?? _authUserId;
+    if (userId == null || userId.isEmpty) return null;
+    return OrganizerMembershipContext.owner(
+      eventId: eventId,
+      userId: userId,
+      userName: args['userName']?.toString() ?? _authUserName ?? 'Penyelenggara',
+    );
+  }
+
+  /// Konteks owner berdasarkan identitas sesi aktif.
+  ///
+  /// Permission di layar yang memakai konteks ini tetap divalidasi ulang oleh
+  /// backend (`POST /api/tickets/validate` & `/api/check-ins`), sehingga
+  /// konteks ini hanya menentukan tampilan, bukan otorisasi data.
+  static OrganizerMembershipContext _ownerFallback(String eventId) =>
+      OrganizerMembershipContext.owner(
+        eventId: eventId,
+        userId: _authUserId ?? '',
+        userName: _authUserName ?? 'Penyelenggara',
+      );
+
   static String _homeRouteForRole(String? role) => switch (role) {
     'admin' => AppRoutes.adminDashboard,
     'organizer' => AppRoutes.organizerDashboard,
@@ -278,8 +363,10 @@ class AppRouter {
 
   /// Route yang boleh diakses tanpa token (PRD §6.1, §7).
   ///
-  /// `/registration/:eventId` ikut publik karena halaman itu adalah tujuan
-  /// tautan pendaftaran; seluruh route lain tetap memerlukan login.
+  /// `/e/**` adalah landing + registrasi + pembayaran + tiket guest, dan
+  /// `/registration/:eventId` adalah tujuan tautan pendaftaran. Keduanya publik;
+  /// seluruh route lain (dashboard Organizer/Admin, data peserta, scanner) tetap
+  /// memerlukan login dan otorisasi backend.
   static bool _isPublicPath(String path) {
     if (path == AppRoutes.initial ||
         path == AppRoutes.login ||
@@ -287,9 +374,36 @@ class AppRouter {
         path == AppRoutes.accessDenied) {
       return true;
     }
+    if (path == '/e' || path == '/registration') return true;
     return path.startsWith('/e/') ||
         path.startsWith('/invite/') ||
         path.startsWith('/registration/');
+  }
+
+  /// Normalisasi nama route dari platform/browser.
+  ///
+  /// Mendukung tiga bentuk tautan yang mungkin dibuka peserta:
+  /// 1. path strategy baru: `/e/{eventId}`,
+  /// 2. hash strategy lama: `/#/e/{eventId}` (fragment berisi `/e/{eventId}`),
+  /// 3. URL absolut hasil salin dari address bar:
+  ///    `http://host:3100/e/{eventId}?x=1`.
+  ///
+  /// Tanpa normalisasi, bentuk (2) dan (3) akan dianggap route `/` sehingga
+  /// pengguna diarahkan ke halaman login.
+  static String _normalizeRouteName(String? raw) {
+    final name = (raw == null || raw.trim().isEmpty) ? '/' : raw.trim();
+    final uri = Uri.tryParse(name);
+    if (uri == null) return name;
+
+    if (uri.hasScheme && uri.host.isNotEmpty) {
+      final path = uri.path.isEmpty ? '/' : uri.path;
+      return uri.hasQuery ? '$path?${uri.query}' : path;
+    }
+    if ((uri.path.isEmpty || uri.path == '/') &&
+        uri.fragment.startsWith('/')) {
+      return uri.fragment;
+    }
+    return name;
   }
 
   static bool _isInvitationPath(String path) => path.startsWith('/invite/');

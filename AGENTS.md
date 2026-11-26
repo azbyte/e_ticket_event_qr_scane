@@ -34,10 +34,11 @@ atau dummy sebagai jaminan keamanan maupun perilaku backend.
   routes, middleware, services, models dan validators di `backend/src/`.
 - Persistence/auth: PostgreSQL/Supabase, JWT dan role. Sumber schema dan riwayat
   migration aktif yang ditetapkan adalah `backend/prisma/schema.prisma` dan
-  `backend/prisma/migrations/`. `backend/supabase/migrations/` berisi SQL legacy
-  yang masih dipertahankan untuk fungsi/riwayat tertentu; jangan menjalankannya
-  atau menghapusnya sebagai baseline Prisma tanpa rekonsiliasi dan persetujuan
-  penanggung jawab FINISHING. Backend runtime memakai `pg`, bukan Prisma Client.
+  `backend/prisma/migrations/`. SQL legacy ada di
+  `backend/prisma/legacy-migrations/` (di luar `migrations/` agar tidak pernah
+  dijalankan Prisma); jangan menjalankannya atau menjadikannya baseline Prisma
+  tanpa rekonsiliasi dan persetujuan penanggung jawab FINISHING. Backend runtime
+  memakai `pg`, bukan Prisma Client.
 - Flutter memakai API backend secara default; mode demo harus diaktifkan secara
   eksplisit dengan `MOCK_MODE=true`. Integrasi seluruh modul belum selesai dan
   backend membutuhkan environment variables.

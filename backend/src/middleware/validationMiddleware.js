@@ -10,7 +10,10 @@ const validationMiddleware = (req, res, next) => {
     return res.status(400).json({
       success: false,
       message: 'Validation failed',
-      errors: errors.array().map((e) => ({ field: e.param, message: e.msg })),
+      // express-validator v7 mengganti `param` menjadi `path`; `param` tetap
+      // dibaca sebagai fallback agar bentuk response lama tidak berubah menjadi
+      // `field: undefined` pada klien.
+      errors: errors.array().map((e) => ({ field: e.path || e.param, message: e.msg })),
     });
   }
   next();

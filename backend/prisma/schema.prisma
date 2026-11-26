@@ -235,6 +235,12 @@ model Event {
   publicUrl         String?     @map("public_url") @db.Text
   registrationQrUrl String?     @map("registration_qr_url") @db.Text
 
+  // Desain tiket default event (PRD §5). Struktur:
+  // { source, file_path, content_type, qr: {x,y,size}, info: {x,y,width,height} }
+  // Nilai posisi berupa fraksi 0..1 dari kanvas tiket. Null = desain default
+  // yang dirender sistem saat tiket diterbitkan.
+  ticketDesign Json? @map("ticket_design")
+
   // These two legacy columns are still read and written by the current Express API.
   totalTickets Int?     @default(0) @map("total_tickets")
   legacyPrice  Decimal? @default(0) @map("price") @db.Decimal(14, 2)
@@ -361,6 +367,9 @@ model TicketType {
   isActive    Boolean   @default(true) @map("is_active")
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Desain khusus kategori ini (menimpa desain default event bila terisi).
+  ticketDesign Json? @map("ticket_design")
 
   event      Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
   orderItems OrderItem[]

@@ -5,9 +5,11 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../models/event/event_model.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../services/admin/admin_audit_log_service.dart';
 import '../../../services/organizer_events/organizer_event_contract.dart';
 import '../../../services/organizer_events/organizer_event_repository.dart';
@@ -66,6 +68,23 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
     }
   }
 
+  /// Identitas aktor audit log dari sesi aktif (bukan konstanta).
+  ///
+  /// Pada mode API audit log ditulis backend, sehingga nilai ini hanya dipakai
+  /// jalur demo. Widget test tanpa `AuthProvider` tetap aman karena fallback
+  /// dipakai bila provider tidak tersedia.
+  ({String id, String name}) _actorIdentity() {
+    try {
+      final user = context.read<AuthProvider>().user;
+      if (user != null) {
+        return (id: user.id ?? '', name: user.name);
+      }
+    } catch (_) {
+      // Provider tidak tersedia (mis. widget test): gunakan fallback.
+    }
+    return (id: '', name: 'Admin Platform');
+  }
+
   Future<void> _suspendEvent(EventModel event, String note) async {
     try {
       await _repository.simulatePlatformModeration(
@@ -74,9 +93,10 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
         note: note,
       );
       if (AppConfig.mockMode) {
+        final actor = _actorIdentity();
         await AdminAuditLogService.instance.logAction(
-          actorId: 'admin@event.com',
-          actorName: 'Super Admin',
+          actorId: actor.id,
+          actorName: actor.name,
           action: 'EVENT_SUSPENDED',
           entityType: 'EVENT',
           entityId: event.id,
@@ -112,9 +132,10 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
         note: reasonNote,
       );
       if (AppConfig.mockMode) {
+        final actor = _actorIdentity();
         await AdminAuditLogService.instance.logAction(
-          actorId: 'admin@event.com',
-          actorName: 'Super Admin',
+          actorId: actor.id,
+          actorName: actor.name,
           action: 'EVENT_RESTORED',
           entityType: 'EVENT',
           entityId: event.id,

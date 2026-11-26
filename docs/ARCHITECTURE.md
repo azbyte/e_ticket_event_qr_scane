@@ -12,8 +12,10 @@ berada di `backend/src/{config,controllers,middleware,models,routes,services,uti
 Alur umum API adalah routes → middleware (auth/role/validation) → controllers →
 services/models → PostgreSQL (`src/config/db.js`). Sumber schema yang ditetapkan
 adalah `backend/prisma/schema.prisma`, dan migration Prisma berada di
-`backend/prisma/migrations/`. `backend/supabase/migrations/` memuat SQL legacy
-yang dipertahankan untuk fungsi/riwayat tertentu; ini bukan baseline schema
+`backend/prisma/migrations/`. SQL legacy berada di
+`backend/prisma/legacy-migrations/` — di luar `migrations/` karena Prisma
+memperlakukan setiap subfolder `migrations/` sebagai migration yang dijalankan.
+SQL legacy dipertahankan untuk fungsi/riwayat tertentu; ini bukan baseline schema
 pengganti dan tidak boleh dijalankan/dihapus tanpa rekonsiliasi serta otorisasi
 FINISHING. Saat diperlukan, dokumentasikan fungsi/status migration legacy
 berdasarkan pemeriksaan yang aman. Verifikasi schema lokal dengan `node
@@ -45,6 +47,90 @@ sebagai fallback.
   `{ key, label, type, required, options }` (kompatibel array string legacy) dan
   jawaban peserta disimpan pada `attendees.custom_fields` dalam transaksi order
   yang sama.
+
+### Integrasi Tahap 3 (Developer 1 – FASE 2)
+
+Bagian ini merangkum hasil integrasi lintas modul yang sudah diverifikasi
+terhadap API + PostgreSQL nyata (`cd backend; npm run test:e2e`, 80 pemeriksaan).
+
+**Routing dan guard Flutter (`apps/lib/app_router.dart`)**
+
+- `/organizer/events/:id/attendees` meneruskan `eventId` nyata (sebelumnya
+  `const AttendeeListScreen()` tanpa event).
+- `/organizer/events/:id/orders` tersedia dan meneruskan `eventId`.
+- `/staff/scanner` dan `/staff/check-ins` membuka layar scanner/riwayat dengan
+  `eventId` bila argumen tersedia; tanpa argumen diarahkan ke dashboard staf
+  (pemilihan event), bukan lagi ke dashboard tanpa scanner.
+- Konteks membership Organizer berasal dari identitas sesi (`AuthProvider`);
+  tidak ada lagi `evt-1001`/`usr-org-001` hardcoded di router. Permission tetap
+  divalidasi server (`POST /api/tickets/validate`, `POST /api/check-ins`).
+
+**Navigasi Organizer (`features/organizer/shell/organizer_shell.dart`)**
+
+- Navigasi utama tepat tiga tujuan: Dashboard (`/organizer`), Scan QR
+  (`/organizer/scan`), dan Profil (`/organizer/profile`). Mobile memakai
+  `NavigationBar`; Web/desktop memakai sidebar dengan tujuan yang sama. Drawer
+  dan avatar profil pada AppBar dihapus, ikon notifikasi dipertahankan.
+- `/organizer/scan` menampilkan daftar event milik Organizer dari repository
+  backend sebagai titik masuk kamera pemindai; validasi tiket tetap dilakukan
+  per event di server (`POST /api/tickets/validate`, `POST /api/check-ins`).
+- Halaman turunan (Event Saya, detail event, Tim & Staf, Paket, Bantuan) tidak
+  menampilkan bottom navigation dan kembali melalui tombol kembali. Akses Tim &
+  Staf berada pada detail event, sedangkan Paket dan Bantuan berada pada tab
+  Profil.
+- `OrganizerTabController` kini hanya meneruskan ke
+  `OrganizerDashboardScreen` agar tidak ada bottom navigation kedua yang
+  tumpang tindih.
+
+**Form peserta dinamis**
+
+- `AttendeeFieldBuilder` (`features/organizer/events/widgets/`) menyediakan
+  tambah/ubah/hapus/urutkan field, tipe
+  `text|textarea|number|date|select|checkbox`, penanda wajib, dan opsi `select`.
+- `name` dan `email` bersifat wajib dan tidak dapat dihapus karena keduanya
+  kolom tabel `attendees` dan divalidasi server
+  (`REQUIRED_ATTENDEE_FIELD_KEYS`).
+- Event lama yang hanya menyimpan array string tetap dapat dibuka: fallback
+  `OrganizerAttendeeDefaults` menyertakan `name` + `email`.
+- Form publik (`public_registration_screen.dart`) merender semua tipe dan
+  server mengulang validasi wajib/tipe/opsi sebelum order dibuat.
+
+**Backend (perbaikan integrasi)**
+
+- `checkInController.assertScanPermission` tidak lagi memilih
+  `event_members.status` (kolom tidak ada) — sebelumnya seluruh scan/check-in
+  gagal 500.
+- Query daftar peserta/export CSV tidak lagi memakai `profiles.phone` serta
+  meng-cast `event_orders.status::text` agar `UNION` enum/text valid.
+- `verifyTicketValidator` menerima `token` (scanner kamera) maupun `ticket_code`
+  (input manual); sebelumnya hanya `ticket_code` sehingga semua scan ditolak 400.
+- `updateAccountStatus` menerima `is_active` (dipakai layar Admin), `disabled`,
+  dan `status`; respons akun menyertakan `is_active`.
+- `moderateEvent` memetakan keputusan `PUBLISHED` ke `APPROVED` agar Admin dapat
+  memulihkan event yang ditangguhkan melalui fungsi DB `moderate_event`.
+
+**Alur per role (ringkas)**
+
+| Role | Alur |
+|---|---|
+| Organizer | register/login → event → kategori tiket → publish otomatis → tautan publik/QR → peserta → export CSV → order per event → revenue → staff/membership |
+| Guest | `/e/:eventId` → daftar (field dinamis) → order 1 tiket → bayar simulasi/gratis → tiket + QR |
+| Staff | undang oleh Organizer → login email cocok → terima undangan → scanner → check-in → riwayat |
+| Admin | login hasil provisioning → akun/suspend + audit → settings + history → overview/revenue/paket/langganan → moderasi event |
+
+**QR, check-in, dan token**
+
+QR memuat token opaque hasil HMAC (`ticketTokenService`); database hanya
+menyimpan `token_hash`. Validasi dan check-in bersifat server-authoritative:
+`VALID`, `ALREADY_USED`, `WRONG_EVENT`, `PAYMENT_REQUIRED`, `CANCELLED`,
+`REVOKED`. Check-in menulis satu baris `check_ins` + `scan_logs` dalam satu
+transaksi; percobaan kedua tidak menambah baris.
+
+**Keputusan produk yang ditegakkan**
+
+- C-01: komisi 5% dan fixed fee Rp 5.000 read-only bagi Admin (audit dicatat).
+- C-02: publikasi event otomatis saat valid; tidak ada approval manual Admin.
+- C-03: pengelolaan langganan Admin bersifat read-only.
 
 
 ## Alur kerja

@@ -183,6 +183,12 @@ class AdminAuditLogService {
   }
 
   /// Appends a new administrative audit log record (FR-104, FR-105).
+  ///
+  /// Pada mode API audit log platform ditulis oleh backend ke tabel
+  /// `audit_logs` (mis. `moderate_event`, `PUT /admin/accounts/:id/status`,
+  /// `PUT /admin/settings/:key`). Menyisipkan entri lokal di sini hanya akan
+  /// menampilkan log yang tidak pernah tersimpan di database, sehingga pada
+  /// mode API metode ini tidak melakukan apa pun.
   Future<void> logAction({
     required String actorId,
     required String actorName,
@@ -194,6 +200,8 @@ class AdminAuditLogService {
     String? details,
     Map<String, dynamic>? metadata,
   }) async {
+    if (!AppConfig.mockMode && !_isTestEnvironment) return;
+
     final entry = AdminAuditLogEntry(
       id: 'aud-${DateTime.now().millisecondsSinceEpoch}',
       timestamp: DateTime.now(),

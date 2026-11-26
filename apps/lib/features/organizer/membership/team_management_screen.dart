@@ -300,7 +300,7 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
                     SnackBar(
                       content: Text(
                         updated
-                            ? 'Izin staf ${member.name} diperbarui (demo).'
+                            ? 'Izin staf ${member.name} diperbarui.'
                             : 'Izin staf tidak dapat diperbarui.',
                       ),
                     ),
@@ -614,7 +614,7 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
                                               SnackBar(
                                                 content: Text(
                                                   revoked
-                                                      ? 'Akses ${m.name} dicabut (demo).'
+                                                      ? 'Akses ${m.name} dicabut.'
                                                       : 'Akses staf tidak dapat dicabut.',
                                                 ),
                                               ),

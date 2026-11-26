@@ -33,11 +33,14 @@ const assertScanPermission = async (eventId, user) => {
   if (user.role === 'admin') return null;
   if (event.created_by === user.id) return null;
 
+  // Tabel `event_members` tidak menyimpan kolom status: keberadaan baris
+  // membership berarti staf aktif (lihat `docs/DATABASE.md`). Sebelumnya query
+  // ini memilih `status` yang tidak ada sehingga seluruh scan/check-in gagal 500.
   const member = await getOne(
-    'SELECT id, status FROM event_members WHERE event_id = $1 AND user_id = $2',
+    'SELECT id FROM event_members WHERE event_id = $1 AND user_id = $2',
     [eventId, user.id]
   );
-  if (!member || (member.status && member.status !== 'ACTIVE' && member.status !== 'active')) {
+  if (!member) {
     const err = new Error('You are not an active staff member of this event');
     err.statusCode = 403;
     throw err;
@@ -340,6 +343,8 @@ const recordCheckIn = asyncHandler(async (req, res) => {
     throw new Error('Tiket tidak berlaku untuk event ini');
   }
   if (ticket.status === 'used') {
+    // Kontrak D2: tiket yang sudah `used` mengembalikan 400, sedangkan jalur
+    // balapan (status masih active namun baris check_ins sudah ada) 409.
     res.status(400);
     throw new Error('Tiket sudah digunakan untuk check-in sebelumnya');
   }
@@ -418,7 +423,7 @@ const listEventAttendees = asyncHandler(async (req, res) => {
         ci.checked_in_at,
         eo.id AS order_id,
         eo.order_number,
-        eo.status AS order_status,
+        eo.status::text AS order_status,
         COALESCE(op.status::text, eo.status::text) AS payment_status
       FROM attendees a
       JOIN order_items oi ON oi.id = a.order_item_id
@@ -444,7 +449,7 @@ const listEventAttendees = asyncHandler(async (req, res) => {
         COALESCE(a.order_item_id, t.id) AS attendee_order_item_id,
         COALESCE(a.name, p.name, 'Peserta') AS attendee_name,
         COALESCE(a.email, p.email) AS attendee_email,
-        COALESCE(a.phone, p.phone) AS attendee_phone,
+        a.phone AS attendee_phone,
         a.organization,
         a.custom_fields,
         COALESCE(a.created_at, t.purchased_at) AS attendee_created_at,
@@ -570,7 +575,7 @@ const exportEventAttendeesCsv = asyncHandler(async (req, res) => {
         ci.checked_in_at,
         eo.id AS order_id,
         eo.order_number,
-        eo.status AS order_status,
+        eo.status::text AS order_status,
         COALESCE(op.status::text, eo.status::text) AS payment_status
       FROM attendees a
       JOIN order_items oi ON oi.id = a.order_item_id
@@ -596,7 +601,7 @@ const exportEventAttendeesCsv = asyncHandler(async (req, res) => {
         COALESCE(a.order_item_id, t.id) AS attendee_order_item_id,
         COALESCE(a.name, p.name, 'Peserta') AS attendee_name,
         COALESCE(a.email, p.email) AS attendee_email,
-        COALESCE(a.phone, p.phone) AS attendee_phone,
+        a.phone AS attendee_phone,
         a.organization,
         a.custom_fields,
         COALESCE(a.created_at, t.purchased_at) AS attendee_created_at,
@@ -705,7 +710,7 @@ const getEventOrders = asyncHandler(async (req, res) => {
 
   const rows = await query(
     `SELECT
-      eo.id, eo.order_number, eo.event_id, eo.purchaser_id, eo.status AS order_status,
+      eo.id, eo.order_number, eo.event_id, eo.purchaser_id, eo.status::text AS order_status,
       eo.subtotal, eo.service_fee, eo.guest_name, eo.guest_email, eo.guest_phone,
       eo.created_at,
       op.id AS payment_id, op.status AS payment_status, op.method AS payment_method,

@@ -1,9 +1,10 @@
-﻿const asyncHandler = require('express-async-handler');
+const asyncHandler = require('express-async-handler');
 const { query, getOne } = require('../config/db');
 const { getAuthorizedOrder } = require('./orderController');
 const { assertScanPermission, normalizeTicketStatus, commitCheckIn } = require('./checkInController');
 const tokens = require('../services/ticketTokenService');
 const emailService = require('../services/emailService');
+const ticketDesignService = require('../services/ticketDesignService');
 const logger = require('../utils/logger');
 
 const EVENT_SELECT = `t.*, e.id AS events_id, e.title AS events_title,
@@ -56,7 +57,10 @@ const belongsToOrder = async (ticket, order) => {
 const resolveAccess = async (req, ticket) => {
   if (req.user?.role === 'admin') return { allowed: true, owner: false };
   if (req.user && ticket.user_id === req.user.id) return { allowed: true, owner: true };
-  const orderId = typeof req.query.order_id === 'string' ? req.query.order_id : null;
+  // order_id dari query diutamakan; bila tidak ada, pakai order milik tiket
+  // (dipakai jalur unduh PDF agar tautannya bisa dipakai langsung).
+  const orderIdFromQuery = typeof req.query.order_id === 'string' ? req.query.order_id : null;
+  const orderId = orderIdFromQuery || ticket.order_id || null;
   if (orderId) {
     const order = await getAuthorizedOrder(orderId, req.user, req.get('X-Order-Access-Token'));
     if (await belongsToOrder(ticket, order)) return { allowed: true, owner: true };
@@ -141,6 +145,41 @@ const verifyTicket = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Tiket final dalam format PDF, memakai desain tiket yang dipilih Organizer
+ * (kategori lebih dulu, lalu desain default event, lalu desain default sistem).
+ *
+ * Otorisasi memakai jalur yang sama dengan detail tiket: pemilik tiket, Admin,
+ * atau pemegang token akses order untuk tiket pada order tersebut. Berbeda
+ * dengan detail tiket, `order_id` tidak wajib dikirim sebagai query karena
+ * order tiket sudah diketahui dari baris tiket; ini membuat tautan unduh PDF
+ * dapat dipakai langsung (mis. dari halaman tiket/email).
+ */
+const getTicketPdf = asyncHandler(async (req, res) => {
+  const ticket = await getOne(
+    `SELECT t.*, oi.order_id AS order_id
+       FROM tickets t
+       LEFT JOIN attendees a ON a.id = t.attendee_id
+       LEFT JOIN order_items oi ON oi.id = a.order_item_id
+      WHERE t.id = $1`,
+    [req.params.id],
+  );
+  if (!ticket) { res.status(404); throw new Error('Ticket not found'); }
+  const access = await resolveAccess(req, ticket);
+  if (!access.allowed) { res.status(404); throw new Error('Ticket not found'); }
+
+  const full = await ticketDesignService.loadTicketForPdf(ticket.id);
+  if (!full) { res.status(404); throw new Error('Ticket not found'); }
+  const pdf = await ticketDesignService.buildTicketPdf(full);
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="tiket-${full.ticket_code || full.id}.pdf"`,
+  );
+  res.status(200).send(pdf);
+});
+
 const resendTicketEmail = asyncHandler(async (req, res) => {
   const ticket = await getOne('SELECT * FROM tickets WHERE id=$1', [req.params.id]);
   if (!ticket) { res.status(404); throw new Error('Ticket not found'); }
@@ -155,4 +194,4 @@ const resendTicketEmail = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { getMyTickets, getTicketById, verifyTicket, resendTicketEmail };
+module.exports = { getMyTickets, getTicketById, getTicketPdf, verifyTicket, resendTicketEmail };

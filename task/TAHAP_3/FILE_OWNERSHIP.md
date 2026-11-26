@@ -673,7 +673,7 @@ Pengecualian dokumentasi: D1 **boleh** memperbarui `task/PEMBAGIAN_TUGAS_FINAL.m
 | `scripts/**` | D1 | D1 | Tooling; jangan hapus tanpa audit |
 | `prisma/schema.prisma` | beku | beku | Tidak boleh diubah |
 | `prisma/migrations/**` | beku | beku | Tidak boleh diubah |
-| `supabase/migrations/**` | beku | beku | Legacy; tidak dijalankan |
+| `prisma/legacy-migrations/**` | beku | beku | Legacy; tidak dijalankan |
 
 ---
 
@@ -968,8 +968,7 @@ Tidak boleh menghapus berdasarkan nama atau asumsi.
 
 ### 12.3 File yang wajib dipertahankan
 
-- `backend/prisma/**` (schema + migration).
-- `backend/supabase/migrations/**` (legacy, tidak dijalankan).
+- `backend/prisma/**` (schema + migration + `legacy-migrations/` yang tidak dijalankan).
 - `backend/scripts/**` (tooling validasi/audit/provisioning).
 - Seluruh test di `apps/test/**` dan `backend/test/**`.
 - `docs/**`, `README.md`, `backend/README.md`, `PRD.md`.

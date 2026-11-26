@@ -23,7 +23,7 @@ const main = async () => {
   console.log(`Admin bootstrap status: ${result.status}`);
   console.log(`Detail: ${result.message}`);
 
-  if (['INVALID_CONFIG', 'CONFLICT'].includes(result.status)) {
+  if (['INVALID_CONFIG', 'CONFLICT', 'PASSWORD_MISMATCH'].includes(result.status)) {
     process.exitCode = 1;
   }
 };

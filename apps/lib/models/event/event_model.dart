@@ -87,11 +87,22 @@ class EventModel {
   /// Definisi field peserta yang dipakai form publik.
   ///
   /// Fallback ke definisi default per kunci untuk event lama/fixture yang hanya
-  /// menyimpan array string.
-  List<AttendeeFieldDefinition> get resolvedAttendeeFields =>
-      attendeeFieldDefinitions.isNotEmpty
-      ? attendeeFieldDefinitions
-      : AttendeeFieldDefinition.listFromKeys(attendeeFields);
+  /// menyimpan array string, lalu dipastikan tetap memuat `name` dan `email`
+  /// karena keduanya kolom wajib `attendees` dan divalidasi server.
+  List<AttendeeFieldDefinition> get resolvedAttendeeFields {
+    if (attendeeFieldDefinitions.isNotEmpty) return attendeeFieldDefinitions;
+    final fromLegacy = AttendeeFieldDefinition.listFromKeys(attendeeFields);
+    if (fromLegacy.isEmpty) {
+      return OrganizerAttendeeDefaults.definitions;
+    }
+    final merged = <AttendeeFieldDefinition>[...fromLegacy];
+    for (final required in OrganizerAttendeeDefaults.definitions) {
+      if (!merged.any((field) => field.key == required.key)) {
+        merged.add(required);
+      }
+    }
+    return merged;
+  }
 
   /// Alasan validasi yang siap ditampilkan.
   ///
