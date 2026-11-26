@@ -181,30 +181,44 @@ class OrganizerInfoBanner extends StatelessWidget {
     required this.message,
     this.icon = Icons.info_outline,
     this.color = AppTheme.primaryColor,
+    this.backgroundColor,
+    this.borderColor,
+    this.iconColor,
+    this.textColor,
   });
 
   final String message;
   final IconData icon;
   final Color color;
+  final Color? backgroundColor;
+  final Color? borderColor;
+  final Color? iconColor;
+  final Color? textColor;
 
   @override
   Widget build(BuildContext context) => Container(
         width: double.infinity,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
+          color: backgroundColor ?? color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.35)),
+          border: Border.all(
+            color: borderColor ?? color.withValues(alpha: 0.35),
+          ),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Icon(icon, size: 18, color: color),
+            Icon(icon, size: 18, color: iconColor ?? color),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
                 message,
-                style: TextStyle(color: color, fontSize: 12.5, height: 1.35),
+                style: TextStyle(
+                  color: textColor ?? color,
+                  fontSize: 12.5,
+                  height: 1.35,
+                ),
               ),
             ),
           ],
