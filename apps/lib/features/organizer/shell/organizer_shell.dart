@@ -92,9 +92,27 @@ class OrganizerShell extends StatelessWidget {
     final selectedIndex = _selectedIndex;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF6F6F6),
       appBar: AppBar(
-        title: Text(title),
-        elevation: 0.5,
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Color(0xFF181818),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        backgroundColor: const Color(0xFFFFFFFF),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        iconTheme: const IconThemeData(color: Color(0xFF181818)),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1.0),
+          child: Divider(
+            height: 1.0,
+            thickness: 1.0,
+            color: Color(0xFFE2E2E2),
+          ),
+        ),
         actions: <Widget>[
           ...?actions,
           _buildNotificationAction(context),
@@ -121,7 +139,7 @@ class OrganizerShell extends StatelessWidget {
       children: <Widget>[
         IconButton(
           tooltip: 'Notifikasi',
-          icon: const Icon(Icons.notifications_outlined),
+          icon: const Icon(Icons.notifications_outlined, color: Color(0xFF181818)),
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute<void>(
@@ -138,14 +156,14 @@ class OrganizerShell extends StatelessWidget {
                 padding: const EdgeInsets.all(4),
                 constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                 decoration: const BoxDecoration(
-                  color: Colors.red,
+                  color: Color(0xFFE03E3E),
                   shape: BoxShape.circle,
                 ),
                 child: Text(
                   '$unreadCount',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFFFFFFFF),
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
                   ),
@@ -158,19 +176,47 @@ class OrganizerShell extends StatelessWidget {
   }
 
   Widget _buildBottomNav(BuildContext context, int selectedIndex) {
-    return NavigationBar(
-      selectedIndex: selectedIndex,
-      onDestinationSelected: (index) =>
-          _openDestination(context, _destinations[index].route),
-      destinations: _destinations
-          .map(
-            (destination) => NavigationDestination(
-              icon: Icon(destination.icon),
-              selectedIcon: Icon(destination.selectedIcon),
-              label: destination.label,
-            ),
-          )
-          .toList(growable: false),
+    return NavigationBarTheme(
+      data: NavigationBarThemeData(
+        backgroundColor: const Color(0xFF1E1E1E),
+        indicatorColor: const Color(0xFFC94426),
+        iconTheme: WidgetStateProperty.resolveWith<IconThemeData>((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const IconThemeData(color: Color(0xFFFFFFFF));
+          }
+          return const IconThemeData(color: Color(0xFFA8A8A8));
+        }),
+        labelTextStyle: WidgetStateProperty.resolveWith<TextStyle>((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const TextStyle(
+              color: Color(0xFFFFFFFF),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            );
+          }
+          return const TextStyle(
+            color: Color(0xFFA8A8A8),
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          );
+        }),
+      ),
+      child: NavigationBar(
+        selectedIndex: selectedIndex,
+        backgroundColor: const Color(0xFF1E1E1E),
+        indicatorColor: const Color(0xFFC94426),
+        onDestinationSelected: (index) =>
+            _openDestination(context, _destinations[index].route),
+        destinations: _destinations
+            .map(
+              (destination) => NavigationDestination(
+                icon: Icon(destination.icon),
+                selectedIcon: Icon(destination.selectedIcon),
+                label: destination.label,
+              ),
+            )
+            .toList(growable: false),
+      ),
     );
   }
 

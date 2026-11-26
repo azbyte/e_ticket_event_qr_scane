@@ -114,7 +114,7 @@ class _OrganizerScanScreenState extends State<OrganizerScanScreen> {
       actions: <Widget>[
         IconButton(
           tooltip: 'Segarkan',
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(Icons.refresh, color: Color(0xFF181818)),
           onPressed: _loadEvents,
         ),
       ],
@@ -152,18 +152,25 @@ class _OrganizerScanScreenState extends State<OrganizerScanScreen> {
               message:
                   'Pilih event yang sedang berlangsung. Validasi tiket dilakukan '
                   'per event agar check-in tercatat pada acara yang tepat.',
+              backgroundColor: Color(0xFFEAEAEA),
+              borderColor: Color(0xFFE2E2E2),
+              iconColor: Color(0xFFC94426),
+              textColor: Color(0xFF181818),
             ),
             const SizedBox(height: 20),
             Text(
               'Pilih event',
-              style: Theme.of(context).textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w700),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF181818),
+              ),
             ),
             const SizedBox(height: 4),
             Text(
               'Ketuk event untuk membuka kamera pemindai QR tiket.',
-              style: Theme.of(context).textTheme.bodySmall
-                  ?.copyWith(color: Colors.black54),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: const Color(0xFF7A7A7A),
+              ),
             ),
             const SizedBox(height: 12),
             ..._events.map(_buildEventTile),
@@ -175,7 +182,6 @@ class _OrganizerScanScreenState extends State<OrganizerScanScreen> {
 
   Widget _buildEventTile(EventModel event) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final location = event.needsPhysicalLocation
         ? (event.location ?? 'Lokasi belum diisi')
         : (event.onlineUrl ?? 'Acara online');
@@ -183,6 +189,12 @@ class _OrganizerScanScreenState extends State<OrganizerScanScreen> {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.antiAlias,
+      color: const Color(0xFFFFFFFF),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0xFFE2E2E2), width: 1),
+      ),
       child: InkWell(
         key: Key('scan-event-${event.id}'),
         onTap: () => _openScanner(event),
@@ -190,11 +202,9 @@ class _OrganizerScanScreenState extends State<OrganizerScanScreen> {
           padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
           child: Row(
             children: <Widget>[
-              CircleAvatar(
-                backgroundColor: colorScheme.primaryContainer.withValues(
-                  alpha: 0.7,
-                ),
-                child: Icon(Icons.qr_code_scanner, color: colorScheme.primary),
+              const CircleAvatar(
+                backgroundColor: Color(0xFFEAEAEA),
+                child: Icon(Icons.qr_code_scanner, color: Color(0xFFC94426)),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -207,6 +217,7 @@ class _OrganizerScanScreenState extends State<OrganizerScanScreen> {
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
+                        color: const Color(0xFF181818),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -217,7 +228,7 @@ class _OrganizerScanScreenState extends State<OrganizerScanScreen> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 12,
-                        color: Colors.black54,
+                        color: Color(0xFF7A7A7A),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -226,7 +237,7 @@ class _OrganizerScanScreenState extends State<OrganizerScanScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.chevron_right, size: 20, color: Colors.black38),
+              const Icon(Icons.chevron_right, size: 20, color: Color(0xFF7A7A7A)),
             ],
           ),
         ),

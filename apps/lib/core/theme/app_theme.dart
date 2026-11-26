@@ -10,7 +10,7 @@ class AppTheme {
 
   static const Color primaryColor = Color(0xFF6366F1); // Indigo
   static const Color secondaryColor = Color(0xFFEC4899); // Pink
-  static const Color surfaceColor = Color(0xFFFAFAFA);
+  static const Color surfaceColor = Color(0xFFF6F6F6);
   static const Color errorColor = Color(0xFFEF4444);
   static const Color successColor = Color(0xFF10B981);
   static const Color warningColor = Color(0xFFF59E0B);

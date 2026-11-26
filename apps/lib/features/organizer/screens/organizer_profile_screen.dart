@@ -9,7 +9,6 @@ library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/theme/app_theme.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../routes/app_routes.dart';
 import '../shell/organizer_content_frame.dart';
@@ -49,12 +48,12 @@ class OrganizerProfileScreen extends StatelessWidget {
                 Center(
                   child: CircleAvatar(
                     radius: 40,
-                    backgroundColor: theme.colorScheme.primaryContainer,
+                    backgroundColor: const Color(0xFFC94426),
                     child: Text(
                       initial,
                       style: theme.textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: theme.colorScheme.onPrimaryContainer,
+                        color: const Color(0xFFFFFFFF),
                       ),
                     ),
                   ),
@@ -65,13 +64,14 @@ class OrganizerProfileScreen extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w700,
+                    color: const Color(0xFF181818),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   email,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 13, color: Colors.black54),
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF7A7A7A)),
                 ),
                 const SizedBox(height: 10),
                 Center(child: _buildRoleChip(context, roleLabel)),
@@ -81,24 +81,30 @@ class OrganizerProfileScreen extends StatelessWidget {
                 Card(
                   margin: EdgeInsets.zero,
                   clipBehavior: Clip.antiAlias,
+                  color: const Color(0xFFFFFFFF),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: Color(0xFFE2E2E2), width: 1),
+                  ),
                   child: Column(
                     children: <Widget>[
                       ListTile(
-                        leading: const Icon(Icons.person_outline),
-                        title: const Text('Nama'),
-                        subtitle: Text(name),
+                        leading: const Icon(Icons.person_outline, color: Color(0xFFC94426)),
+                        title: const Text('Nama', style: TextStyle(color: Color(0xFF181818), fontWeight: FontWeight.w600)),
+                        subtitle: Text(name, style: const TextStyle(color: Color(0xFF7A7A7A))),
                       ),
-                      const Divider(height: 1),
+                      const Divider(height: 1, thickness: 1, color: Color(0xFFE2E2E2)),
                       ListTile(
-                        leading: const Icon(Icons.email_outlined),
-                        title: const Text('Email'),
-                        subtitle: Text(email),
+                        leading: const Icon(Icons.email_outlined, color: Color(0xFFC94426)),
+                        title: const Text('Email', style: TextStyle(color: Color(0xFF181818), fontWeight: FontWeight.w600)),
+                        subtitle: Text(email, style: const TextStyle(color: Color(0xFF7A7A7A))),
                       ),
-                      const Divider(height: 1),
+                      const Divider(height: 1, thickness: 1, color: Color(0xFFE2E2E2)),
                       ListTile(
-                        leading: const Icon(Icons.badge_outlined),
-                        title: const Text('Peran'),
-                        subtitle: Text(roleLabel),
+                        leading: const Icon(Icons.badge_outlined, color: Color(0xFFC94426)),
+                        title: const Text('Peran', style: TextStyle(color: Color(0xFF181818), fontWeight: FontWeight.w600)),
+                        subtitle: Text(roleLabel, style: const TextStyle(color: Color(0xFF7A7A7A))),
                       ),
                     ],
                   ),
@@ -109,6 +115,12 @@ class OrganizerProfileScreen extends StatelessWidget {
                 Card(
                   margin: EdgeInsets.zero,
                   clipBehavior: Clip.antiAlias,
+                  color: const Color(0xFFFFFFFF),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: Color(0xFFE2E2E2), width: 1),
+                  ),
                   child: Column(
                     children: <Widget>[
                       _buildMenuTile(
@@ -119,7 +131,7 @@ class OrganizerProfileScreen extends StatelessWidget {
                         onTap: () =>
                             Navigator.pushNamed(context, AppRoutes.profileEdit),
                       ),
-                      const Divider(height: 1),
+                      const Divider(height: 1, thickness: 1, color: Color(0xFFE2E2E2)),
                       _buildMenuTile(
                         context,
                         icon: Icons.stars_outlined,
@@ -130,7 +142,7 @@ class OrganizerProfileScreen extends StatelessWidget {
                           AppRoutes.organizerPlans,
                         ),
                       ),
-                      const Divider(height: 1),
+                      const Divider(height: 1, thickness: 1, color: Color(0xFFE2E2E2)),
                       _buildMenuTile(
                         context,
                         icon: Icons.help_outline,
@@ -147,15 +159,25 @@ class OrganizerProfileScreen extends StatelessWidget {
                 const SizedBox(height: 24),
                 OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.errorColor,
-                    side: BorderSide(
-                      color: AppTheme.errorColor.withValues(alpha: 0.5),
+                    backgroundColor: const Color(0xFFFFFFFF),
+                    foregroundColor: const Color(0xFFE03E3E),
+                    side: const BorderSide(
+                      color: Color(0xFFE03E3E),
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onPressed: () => _logout(context),
-                  icon: const Icon(Icons.logout, size: 18),
-                  label: const Text('Logout'),
+                  icon: const Icon(Icons.logout, size: 18, color: Color(0xFFE03E3E)),
+                  label: const Text(
+                    'Logout',
+                    style: TextStyle(
+                      color: Color(0xFFE03E3E),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -168,25 +190,26 @@ class OrganizerProfileScreen extends StatelessWidget {
   Widget _buildSectionTitle(BuildContext context, String title) {
     return Text(
       title,
-      style: Theme.of(context).textTheme.titleSmall
-          ?.copyWith(fontWeight: FontWeight.w700, color: Colors.black87),
+      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+        fontWeight: FontWeight.w700,
+        color: const Color(0xFF181818),
+      ),
     );
   }
 
   Widget _buildRoleChip(BuildContext context, String label) {
-    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       decoration: BoxDecoration(
-        color: colorScheme.primaryContainer.withValues(alpha: 0.7),
+        color: const Color(0xFFFDF3F1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
         label,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
-          color: colorScheme.onPrimaryContainer,
+          color: Color(0xFFC94426),
         ),
       ),
     );
@@ -200,10 +223,19 @@ class OrganizerProfileScreen extends StatelessWidget {
     required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text(subtitle),
-      trailing: const Icon(Icons.chevron_right, size: 20),
+      leading: Icon(icon, color: const Color(0xFFC94426)),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF181818),
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(color: Color(0xFF7A7A7A)),
+      ),
+      trailing: const Icon(Icons.chevron_right, size: 20, color: Color(0xFF7A7A7A)),
       onTap: onTap,
     );
   }

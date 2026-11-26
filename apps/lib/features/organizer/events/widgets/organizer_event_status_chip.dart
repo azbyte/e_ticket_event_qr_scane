@@ -35,18 +35,24 @@ class OrganizerEventStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = colorFor(status);
+    final isPublished = status == OrganizerEventStatus.published ||
+        status == OrganizerEventStatus.approved;
+
+    final bg = isPublished ? const Color(0xFFE8F5EE) : colorFor(status).withValues(alpha: 0.12);
+    final border = isPublished ? const Color(0xFF2E8B57) : colorFor(status).withValues(alpha: 0.5);
+    final textColor = isPublished ? const Color(0xFF2E8B57) : colorFor(status);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: bg,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.5)),
+        border: Border.all(color: border),
       ),
       child: Text(
         OrganizerEventStatus.label(status),
         style: TextStyle(
-          color: color,
+          color: textColor,
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),

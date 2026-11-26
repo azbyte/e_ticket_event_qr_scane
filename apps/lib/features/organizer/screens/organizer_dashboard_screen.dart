@@ -101,15 +101,24 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
       actions: <Widget>[
         IconButton(
           tooltip: 'Segarkan',
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(Icons.refresh, color: Color(0xFF181818)),
           onPressed: _loadMetrics,
         ),
       ],
       floatingActionButton: FloatingActionButton.extended(
         key: const Key('dashboard-create-event-fab'),
         onPressed: _createEvent,
-        icon: const Icon(Icons.add),
-        label: const Text('Tambah Event'),
+        backgroundColor: const Color(0xFFC94426),
+        foregroundColor: const Color(0xFFFFFFFF),
+        splashColor: const Color(0xFFA8351C),
+        icon: const Icon(Icons.add, color: Color(0xFFFFFFFF)),
+        label: const Text(
+          'Tambah Event',
+          style: TextStyle(
+            color: Color(0xFFFFFFFF),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
       child: _buildBody(),
     );
@@ -162,13 +171,14 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.w700,
+                color: const Color(0xFF181818),
               ),
             ),
             const SizedBox(height: 4),
             Text(
               'Kelola event, tiket, dan check-in dari satu tempat.',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: Colors.black54,
+                color: const Color(0xFF7A7A7A),
               ),
             ),
           ],
@@ -214,13 +224,18 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
         Expanded(
           child: Text(
             'Event Milik Saya',
-            style: Theme.of(context).textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.w700),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF181818),
+            ),
           ),
         ),
         TextButton(
           key: const Key('dashboard-open-event-list'),
           onPressed: _openEventList,
+          style: TextButton.styleFrom(
+            foregroundColor: const Color(0xFFC94426),
+          ),
           child: const Text('Lihat semua'),
         ),
       ],
@@ -295,6 +310,12 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.antiAlias,
+      color: const Color(0xFFFFFFFF),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0xFFE2E2E2), width: 1),
+      ),
       child: InkWell(
         key: Key('dashboard-event-$eventId'),
         onTap: () => _openEvent(eventId),
@@ -313,6 +334,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
+                        color: const Color(0xFF181818),
                       ),
                     ),
                   ),
@@ -336,18 +358,18 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
                   const Icon(
                     Icons.confirmation_number_outlined,
                     size: 14,
-                    color: Colors.black54,
+                    color: Color(0xFF7A7A7A),
                   ),
                   const SizedBox(width: 4),
                   Text(
                     '$ticketsSold tiket',
-                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF7A7A7A)),
                   ),
                   const SizedBox(width: 12),
                   const Icon(
                     Icons.people_outline,
                     size: 14,
-                    color: Colors.black54,
+                    color: Color(0xFF7A7A7A),
                   ),
                   const SizedBox(width: 4),
                   Expanded(
@@ -357,14 +379,14 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 12,
-                        color: Colors.black54,
+                        color: Color(0xFF7A7A7A),
                       ),
                     ),
                   ),
                   const Icon(
                     Icons.chevron_right,
                     size: 18,
-                    color: Colors.black38,
+                    color: Color(0xFF7A7A7A),
                   ),
                 ],
               ),
@@ -380,17 +402,17 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
     required String primary,
     String? secondary,
   }) {
-    const style = TextStyle(fontSize: 12, color: Colors.black54);
+    const style = TextStyle(fontSize: 12, color: Color(0xFF7A7A7A));
     final hasSecondary = secondary != null && secondary.isNotEmpty;
     return Row(
       children: <Widget>[
-        Icon(icon, size: 14, color: Colors.black54),
+        Icon(icon, size: 14, color: const Color(0xFF7A7A7A)),
         const SizedBox(width: 4),
         Text(primary, style: style),
         if (hasSecondary) ...<Widget>[
           const Text(
             ' • ',
-            style: TextStyle(fontSize: 12, color: Colors.black38),
+            style: TextStyle(fontSize: 12, color: Color(0xFF7A7A7A)),
           ),
           Expanded(
             child: Text(
