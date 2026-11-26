@@ -84,10 +84,10 @@ class OrganizerSupportService {
       answer: 'Staf cukup mendaftar atau login menggunakan email yang sama dengan email undangan. Hak akses akan otomatis terhubung ke event yang ditentukan.',
     ),
     OrganizerFaqItem(
-      category: 'Mode Offline',
+      category: 'Koneksi & Pemindai',
       question:
           'Bagaimana jika koneksi internet terputus saat proses check-in?',
-      answer: 'Aplikasi scanner mendukung mode offline lokal. Data kehadiran akan disimpan di antrean perangkat dan dapat disinkronkan saat online kembali.',
+      answer: 'Pemindaian tiket membutuhkan koneksi internet aktif untuk memverifikasi tiket secara realtime langsung ke server.',
     ),
     OrganizerFaqItem(
       category: 'Paket & Batasan',

@@ -1,4 +1,11 @@
 process.env.NODE_ENV = 'test';
+// Peluncuran simulasi pembayaran mensyaratkan NODE_ENV=test atau flag eksplisit.
+// Unit test ini hanya menguji validasi input, jadi tidak ada koneksi database.
+process.env.DATABASE_URL = 'postgresql://tester:secret@127.0.0.1:5432/e_ticket_test';
+process.env.JWT_SECRET = 'test-only-jwt-secret';
+process.env.TICKET_TOKEN_SECRET = 'test-only-ticket-token-secret';
+process.env.SIMULATED_PAYMENTS_ENABLED = 'true';
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { serializePayment } = require('../src/utils/orderResponse');

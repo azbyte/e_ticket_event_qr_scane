@@ -118,15 +118,20 @@ const getEventSalesPoints = asyncHandler(async (req, res) => {
 });
 
 const moderateEvent = asyncHandler(async (req, res) => {
-  const status = String(req.body.status || '').toUpperCase();
+  const requested = String(req.body.status || '').toUpperCase();
   const allowed = ['APPROVED', 'REVISION_REQUESTED', 'REJECTED', 'SUSPENDED', 'PUBLISHED'];
   const note = typeof req.body.note === 'string'
     ? req.body.note.trim()
     : (typeof req.body.reason === 'string' ? req.body.reason.trim() : '');
-  if (!allowed.includes(status)) {
+  if (!allowed.includes(requested)) {
     res.status(400);
     throw new Error('Invalid moderation decision');
   }
+  // `PUBLISHED` adalah status tayang hasil auto-publish; fungsi database
+  // `moderate_event` memakai keputusan `APPROVED` untuk memulihkan event yang
+  // ditangguhkan. Petakan agar klien Flutter (yang mengirim `PUBLISHED` saat
+  // restore) tidak mendapat 400.
+  const status = requested === 'PUBLISHED' ? 'APPROVED' : requested;
   if (status !== 'APPROVED' && note.length === 0) {
     res.status(400);
     throw new Error('A moderation note is required for this decision');

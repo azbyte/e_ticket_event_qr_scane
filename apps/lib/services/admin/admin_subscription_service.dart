@@ -172,15 +172,15 @@ class AdminSubscriptionService {
           '/admin/subscriptions',
           query: queryParams.isEmpty ? null : queryParams,
         );
-        final list = response['data'] as List<dynamic>?;
+        final list = (response['subscriptions'] ?? response['data']) as List<dynamic>?;
         if (list != null) {
           return list
               .whereType<Map<String, dynamic>>()
               .map(AdminSubscriptionModel.fromJson)
               .toList(growable: false);
         }
-      } catch (_) {
-        // Fallback to mock
+      } catch (e) {
+        rethrow;
       }
     }
     await Future<void>.delayed(const Duration(milliseconds: 150));
@@ -214,6 +214,11 @@ class AdminSubscriptionService {
     required String actorId,
     required String actorName,
   }) async {
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      throw UnsupportedError(
+        'Mutasi administrasi langganan berstatus read-only (Keputusan Produk C-03).',
+      );
+    }
     await Future<void>.delayed(const Duration(milliseconds: 200));
     final index = _subscriptions.indexWhere((s) => s.id == subscriptionId);
     if (index != -1) {
@@ -241,6 +246,11 @@ class AdminSubscriptionService {
     required String actorId,
     required String actorName,
   }) async {
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      throw UnsupportedError(
+        'Mutasi administrasi langganan berstatus read-only (Keputusan Produk C-03).',
+      );
+    }
     await Future<void>.delayed(const Duration(milliseconds: 200));
     final index = _subscriptions.indexWhere((s) => s.id == subscriptionId);
     if (index != -1) {
@@ -269,6 +279,11 @@ class AdminSubscriptionService {
     required String actorId,
     required String actorName,
   }) async {
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      throw UnsupportedError(
+        'Mutasi administrasi langganan berstatus read-only (Keputusan Produk C-03).',
+      );
+    }
     await Future<void>.delayed(const Duration(milliseconds: 200));
     final index = _subscriptions.indexWhere((s) => s.id == subscriptionId);
     if (index != -1) {

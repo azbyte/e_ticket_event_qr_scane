@@ -1,7 +1,12 @@
-﻿const test = require('node:test');
+const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 
+process.env.NODE_ENV = 'test';
+// Unit test token/log/email/plan: tidak ada koneksi database. Variabel ini hanya
+// memenuhi validasi startup `config/env.js` pada modul yang di-require.
+process.env.DATABASE_URL = 'postgresql://tester:secret@127.0.0.1:5432/e_ticket_test';
+process.env.JWT_SECRET = 'test-only-jwt-secret';
 process.env.TICKET_TOKEN_SECRET = 'test-only-ticket-token-secret';
 process.env.SMTP_HOST = 'json';
 
@@ -53,7 +58,24 @@ test('email template includes event/ticket access but never embeds QR bearer tok
   assert.match(message.text, /TKT-REF-1/);
   assert.match(message.html, /Peserta &lt;Uji&gt;/);
   assert.doesNotMatch(message.text + message.html, /qr_token|rawToken|SECRET/);
-  assert.match(message.text, /QR tidak dikirim/);
+  assert.match(message.text, /Buka e-ticket/);
+  assert.equal(message.attachments, undefined);
+});
+
+test('email template melampirkan PDF e-ticket saat desain tiket dirender', () => {
+  const attachment = {
+    filename: 'tiket-TKT-REF-1.pdf',
+    content: Buffer.from('%PDF-1.4 contoh'),
+    contentType: 'application/pdf',
+  };
+  const message = email.buildMessage({
+    id: 'ticket-1', ticket_code: 'TKT-REF-1', attendee_name: 'Peserta',
+    event_title: 'Event Aman', ticket_type_name: 'Reguler',
+    event_date: new Date('2026-11-18T10:00:00.000Z'), location: 'Jakarta',
+  }, 'recipient@example.test', { attachment });
+  assert.equal(message.attachments.length, 1);
+  assert.equal(message.attachments[0].contentType, 'application/pdf');
+  assert.match(message.text, /terlampir/);
 });
 
 test('plan validator rejects invalid prices, limits, and status', () => {

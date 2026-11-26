@@ -457,7 +457,7 @@ class _AssistedRegistrationScreenState
                 child: _isSubmitting
                     ? const CircularProgressIndicator(color: Colors.white)
                     : const Text(
-                        'Buat Pesanan & Terbitkan VA Demo',
+                        'Buat Pesanan & Terbitkan Virtual Account',
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
               ),
@@ -488,7 +488,7 @@ class _AssistedRegistrationScreenState
           ),
           const SizedBox(height: 24),
 
-          // VA Demo Box
+          // Kotak instruksi Virtual Account (pembayaran simulasi backend).
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -528,7 +528,7 @@ class _AssistedRegistrationScreenState
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'Nomor Virtual Account Demo:',
+                  'Nomor Virtual Account:',
                   style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 Text(

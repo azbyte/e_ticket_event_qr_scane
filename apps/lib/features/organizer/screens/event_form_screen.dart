@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_utils.dart' as core;
+import '../../../models/event/attendee_field_definition.dart';
 import '../../../models/event/event_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../services/organizer_events/organizer_event_contract.dart';
@@ -12,6 +13,7 @@ import '../../../services/organizer_events/organizer_event_fixtures.dart';
 import '../../../services/organizer_events/organizer_event_repository.dart';
 import '../../../services/organizer_events/organizer_event_validators.dart';
 import '../../../services/organizer_events/organizer_event_repository_factory.dart';
+import '../../organizer/events/widgets/attendee_field_builder.dart';
 import '../../organizer/events/screens/organizer_event_preview_screen.dart';
 import '../../organizer/events/widgets/organizer_feedback_view.dart';
 
@@ -58,6 +60,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
   String _format = OrganizerEventFormat.offline;
   String _category = OrganizerEventCategories.all.first;
   final Set<String> _attendeeFields = <String>{OrganizerAttendeeFields.name};
+  List<AttendeeFieldDefinition> _attendeeFieldDefinitions =
+      OrganizerEventDraft.defaultAttendeeFieldDefinitions;
 
   EventModel? _existing;
   bool _loading = false;
@@ -136,6 +140,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
                 ? <String>[OrganizerAttendeeFields.name]
                 : event.attendeeFields,
           );
+        _attendeeFieldDefinitions = OrganizerEventDraft.fromEvent(
+          event,
+        ).resolvedAttendeeFieldDefinitions;
       });
     } on OrganizerEventAccessDeniedException catch (error) {
       if (mounted) setState(() => _loadError = error.message);
@@ -170,22 +177,25 @@ class _EventFormScreenState extends State<EventFormScreen> {
     );
   }
 
-  OrganizerEventDraft _buildDraft() => OrganizerEventDraft(
-    title: _title.text,
-    category: _category,
-    description: _description.text,
-    organizerName: _organizerName.text,
-    contactInfo: _contactInfo.text,
-    startDateTime: _startDateTime ?? DateTime.now(),
-    endDateTime: _endDateTime ?? DateTime.now(),
-    timeZone: _timeZone,
-    format: _format,
-    posterUrl: _posterUrl.text,
-    location: _location.text,
-    onlineUrl: _onlineUrl.text,
-    publicInfo: _publicInfo.text,
-    attendeeFields: _attendeeFields.toList(growable: false),
-  );
+  OrganizerEventDraft _buildDraft() {
+    return OrganizerEventDraft(
+      title: _title.text,
+      category: _category,
+      description: _description.text,
+      organizerName: _organizerName.text,
+      contactInfo: _contactInfo.text,
+      startDateTime: _startDateTime ?? DateTime.now(),
+      endDateTime: _endDateTime ?? DateTime.now(),
+      timeZone: _timeZone,
+      format: _format,
+      posterUrl: _posterUrl.text,
+      location: _location.text,
+      onlineUrl: _onlineUrl.text,
+      publicInfo: _publicInfo.text,
+      attendeeFields: _attendeeFields.toList(growable: false),
+      attendeeFieldDefinitions: _attendeeFieldDefinitions,
+    );
+  }
 
   /// Menyimpan perubahan event sebagai draft.
   Future<void> _save() async {
@@ -387,7 +397,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
             TextFormField(
               controller: _posterUrl,
               decoration: const InputDecoration(
-                labelText: 'URL poster (opsional, fixture demo)',
+                labelText: 'URL poster (opsional)',
                 helperText:
                     'Gambar tidak diunduh; hanya disimpan sebagai teks.',
               ),
@@ -527,38 +537,17 @@ class _EventFormScreenState extends State<EventFormScreen> {
             ),
             const SizedBox(height: 24),
             _sectionTitle('E. Pengaturan registrasi'),
-            const Text(
-              'Data peserta yang wajib diisi',
-              style: TextStyle(fontSize: 12.5, color: Colors.black54),
+            AttendeeFieldBuilder(
+              fields: _attendeeFieldDefinitions,
+              errorText:
+                  _fieldErrors[OrganizerEventValidators.fieldAttendeeFields],
+              onChanged: (fields) => setState(() {
+                _attendeeFieldDefinitions = fields;
+                _attendeeFields
+                  ..clear()
+                  ..addAll(fields.map((field) => field.key));
+              }),
             ),
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              value: true,
-              onChanged: null,
-              title: const Text('Nama lengkap'),
-              subtitle: const Text('Selalu wajib dan tidak dapat dilepas.'),
-              controlAffinity: ListTileControlAffinity.leading,
-            ),
-            for (final field in OrganizerAttendeeFields.optional)
-              CheckboxListTile(
-                key: Key('attendee-field-$field'),
-                contentPadding: EdgeInsets.zero,
-                value: _attendeeFields.contains(field),
-                onChanged: (checked) => setState(() {
-                  if (checked == true) {
-                    _attendeeFields.add(field);
-                  } else {
-                    _attendeeFields.remove(field);
-                  }
-                }),
-                title: Text(OrganizerAttendeeFields.label(field)),
-                controlAffinity: ListTileControlAffinity.leading,
-              ),
-            if (_fieldErrors[OrganizerEventValidators.fieldAttendeeFields] !=
-                null)
-              _errorText(
-                _fieldErrors[OrganizerEventValidators.fieldAttendeeFields]!,
-              ),
             const SizedBox(height: 8),
             TextFormField(
               controller: _publicInfo,

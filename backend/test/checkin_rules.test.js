@@ -3,6 +3,10 @@ const assert = require('node:assert/strict');
 
 process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL = 'postgresql://tester:secret@127.0.0.1:5432/e_ticket_test';
+// config/env.js memvalidasi JWT_SECRET saat startup. Unit test ini tidak pernah
+// menyentuh database (lapisan `db` di-stub di bawah), tetapi modul controller
+// yang di-require tetap memuat config/env, jadi secret khusus test disediakan.
+process.env.JWT_SECRET = 'test-only-jwt-secret';
 process.env.TICKET_TOKEN_SECRET = 'test-only-ticket-token-secret';
 
 const dbPath = require.resolve('../src/config/db');

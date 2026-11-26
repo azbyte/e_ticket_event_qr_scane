@@ -8,8 +8,9 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../../core/config/app_config.dart';
-import '../../../services/organizer_operations/organizer_operations_repository.dart';
+import '../../../services/check_in/check_in_service.dart';
 import '../../../services/organizer_operations/organizer_permission.dart';
+import '../../../services/scanner/scanner_service.dart';
 import '../../scanner/screens/scanner_screen.dart';
 
 class OrganizerScannerScreen extends StatefulWidget {
@@ -30,10 +31,10 @@ class OrganizerScannerScreen extends StatefulWidget {
 
 class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
   final TextEditingController _tokenController = TextEditingController();
-  final OrganizerOperationsRepository _repo =
-      OrganizerOperationsRepository.instance;
+  final ScannerService _scannerService = ScannerService();
+  final CheckInService _checkInService = CheckInService();
 
-  ScanCheckInResult? _lastResult;
+  Map<String, dynamic>? _lastResult;
   bool _isProcessing = false;
 
   final List<Map<String, String>> _quickPresets = [
@@ -65,75 +66,83 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
 
     setState(() => _isProcessing = true);
 
-    final result = _repo.validateAndCheckIn(
-      eventId: widget.eventId,
-      ticketCode: code.trim(),
-      context: widget.contextScope,
-      autoCommitCheckIn: false,
-    );
-
-    if (result.isSuccess &&
-        result.status == 'VALID' &&
-        widget.contextScope.hasPermission(OrganizerPermission.checkInTicket)) {
-      final shouldCheckIn = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Konfirmasi check-in'),
-          content: Text(
-            'Tiket valid untuk ${result.attendee?.name ?? 'peserta ini'}. '
-            'Lanjutkan check-in demo?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Batal'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Konfirmasi'),
-            ),
-          ],
-        ),
+    try {
+      final result = await _scannerService.validateTicket(
+        code.trim(),
+        eventId: widget.eventId,
       );
-      if (!mounted) return;
-      if (shouldCheckIn == true) {
-        final committed = _repo.validateAndCheckIn(
-          eventId: widget.eventId,
-          ticketCode: code.trim(),
-          context: widget.contextScope,
-          autoCommitCheckIn: true,
+
+      final isValid = result['valid'] == true;
+      final status = (result['status'] as String? ?? '').toUpperCase();
+
+      if (isValid &&
+          status == 'VALID' &&
+          widget.contextScope.hasPermission(OrganizerPermission.checkInTicket)) {
+        final ticketData = result['ticket'] as Map<String, dynamic>? ?? {};
+        final attendeeName = ticketData['attendee_name'] as String? ?? 'peserta ini';
+
+        if (!mounted) return;
+        final shouldCheckIn = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Konfirmasi check-in'),
+            content: Text(
+              'Tiket valid untuk $attendeeName. Lanjutkan check-in?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Batal'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Konfirmasi'),
+              ),
+            ],
+          ),
         );
+        if (!mounted) return;
+        if (shouldCheckIn == true) {
+          final ticketId = ticketData['id'] as String? ?? ticketData['token'] as String? ?? code.trim();
+          final committed = await _scannerService.recordCheckIn(
+            ticketId: ticketId,
+            eventId: widget.eventId,
+            staffId: widget.contextScope.userId,
+            staffName: widget.contextScope.userName,
+            token: code.trim(),
+          );
+          setState(() {
+            _lastResult = {
+              'status': 'VALID',
+              'valid': true,
+              'message': 'Check-in berhasil dicatat.',
+              'ticket': ticketData,
+              'check_in': committed['check_in'],
+            };
+            _isProcessing = false;
+            _tokenController.clear();
+          });
+          return;
+        }
+      }
+
+      setState(() {
+        _lastResult = result;
+        _isProcessing = false;
+        _tokenController.clear();
+      });
+    } catch (e) {
+      if (mounted) {
         setState(() {
-          _lastResult = committed;
+          _lastResult = {
+            'status': 'INVALID',
+            'valid': false,
+            'message': 'Gagal memeriksa tiket: $e',
+          };
           _isProcessing = false;
-          _tokenController.clear();
         });
-        return;
       }
     }
-
-    setState(() {
-      _lastResult = result;
-      _isProcessing = false;
-      _tokenController.clear();
-    });
-  }
-
-  void _handleSyncOffline() {
-    final report = _repo.syncOfflineQueue(widget.eventId);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Hasil Sinkronisasi Offline'),
-        content: Text(report['message'] as String),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Tutup'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -163,7 +172,7 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pemindai Tiket QR (demo)'),
+        title: const Text('Pemindai Tiket QR'),
       ),
       body: !canScan
           ? _buildAccessDenied()
@@ -197,48 +206,6 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-
-                  // Offline queue alert if present
-                  if (_repo.offlineQueue.isNotEmpty)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.amber.shade400),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.cloud_off, color: Colors.orange),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Ada ${_repo.offlineQueue.length} data check-in lokal tersimpan di antrean offline.',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.orange,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                            ),
-                            onPressed: _handleSyncOffline,
-                            child: const Text(
-                              'Sinkron',
-                              style: TextStyle(fontSize: 12),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
 
                   // Simulated Camera Viewfinder
                   Container(
@@ -279,11 +246,9 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                               color: Colors.black54,
                               borderRadius: BorderRadius.circular(20),
                             ),
-                            child: Text(
-                              _repo.isOfflineModeEnabled
-                                  ? 'Mode Scanner Offline Aktif'
-                                  : 'Arahkan QR Code Tiket ke Kotak',
-                              style: const TextStyle(
+                            child: const Text(
+                              'Arahkan QR Code Tiket ke Kotak',
+                              style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 11,
                               ),
@@ -407,32 +372,44 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
     );
   }
 
-  Widget _buildResultDisplay(ScanCheckInResult result) {
+  Widget _buildResultDisplay(Map<String, dynamic> result) {
     Color cardColor;
     Color iconColor;
     IconData icon;
+    final status = (result['status'] as String? ?? 'INVALID').toUpperCase();
 
-    switch (result.status) {
+    switch (status) {
       case 'VALID':
         cardColor = Colors.green.shade50;
         iconColor = Colors.green.shade700;
         icon = Icons.check_circle;
         break;
-      case 'OFFLINE_QUEUED':
-        cardColor = Colors.amber.shade50;
-        iconColor = Colors.orange.shade700;
-        icon = Icons.cloud_off;
-        break;
+      case 'ALREADY_USED':
       case 'ALREADY_CHECKED_IN':
         cardColor = Colors.blue.shade50;
         iconColor = Colors.blue.shade700;
         icon = Icons.warning_amber_rounded;
+        break;
+      case 'WRONG_EVENT':
+        cardColor = Colors.orange.shade50;
+        iconColor = Colors.orange.shade700;
+        icon = Icons.wrong_location_outlined;
+        break;
+      case 'PAYMENT_REQUIRED':
+        cardColor = Colors.deepOrange.shade50;
+        iconColor = Colors.deepOrange.shade700;
+        icon = Icons.payment;
         break;
       default:
         cardColor = Colors.red.shade50;
         iconColor = Colors.red.shade700;
         icon = Icons.error_outline;
     }
+
+    final ticket = (result['ticket'] as Map<String, dynamic>?) ?? {};
+    final attendeeName = ticket['attendee_name'] as String?;
+    final ticketType = ticket['ticket_type'] as String? ?? ticket['ticket_type_name'] as String?;
+    final ticketCode = ticket['ticket_code'] as String? ?? ticket['token'] as String?;
 
     return Card(
       color: cardColor,
@@ -453,12 +430,14 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        result.status == 'VALID'
+                        status == 'VALID'
                             ? 'CHECK-IN BERHASIL'
-                            : result.status == 'OFFLINE_QUEUED'
-                            ? 'DISIMPAN OFFLINE'
-                            : result.status == 'ALREADY_CHECKED_IN'
+                            : status == 'ALREADY_USED' || status == 'ALREADY_CHECKED_IN'
                             ? 'TIKET SUDAH DIGUNAKAN'
+                            : status == 'WRONG_EVENT'
+                            ? 'EVENT TIDAK SESUAI'
+                            : status == 'PAYMENT_REQUIRED'
+                            ? 'PEMBAYARAN DIPERLUKAN'
                             : 'CHECK-IN DITOLAK',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
@@ -468,7 +447,7 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        result.message,
+                        result['message'] as String? ?? '',
                         style: const TextStyle(fontSize: 12),
                       ),
                     ],
@@ -476,7 +455,7 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                 ),
               ],
             ),
-            if (result.attendee != null) ...[
+            if (attendeeName != null) ...[
               const Divider(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -486,7 +465,7 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                     style: TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                   Text(
-                    result.attendee!.name,
+                    attendeeName,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
@@ -494,40 +473,44 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Kategori:',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
-                  Text(
-                    result.attendee!.ticketType,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
+              if (ticketType != null) ...[
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Kategori:',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Kode Tiket:',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
-                  Text(
-                    result.attendee!.ticketCode,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
+                    Text(
+                      ticketType,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
+              if (ticketCode != null) ...[
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Kode Tiket:',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                    Text(
+                      ticketCode,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ],
         ),
@@ -535,10 +518,10 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
     );
   }
 
-  void _showHistoryModal(BuildContext context) {
-    final attendees = _repo.getAttendeesForEvent(widget.eventId);
-    final checkedInList = attendees.where((a) => a.checkedIn).toList();
+  void _showHistoryModal(BuildContext context) async {
+    final checkIns = await _checkInService.listCheckIns(eventId: widget.eventId);
 
+    if (!context.mounted) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -561,7 +544,7 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Riwayat Check-in (${checkedInList.length} Peserta)',
+                        'Riwayat Check-in (${checkIns.length} Peserta)',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -574,7 +557,7 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                     ],
                   ),
                   const Divider(),
-                  if (checkedInList.isEmpty)
+                  if (checkIns.isEmpty)
                     const Expanded(
                       child: Center(
                         child: Text('Belum ada tiket yang di-check-in.'),
@@ -584,53 +567,40 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                     Expanded(
                       child: ListView.builder(
                         controller: scrollController,
-                        itemCount: checkedInList.length,
+                        itemCount: checkIns.length,
                         itemBuilder: (_, idx) {
-                          final a = checkedInList[idx];
+                          final a = checkIns[idx];
+                          final ticketCode = a['ticket_id'] as String? ?? '-';
+                          final staff = a['staff_name'] as String? ?? '-';
+                          final checkedAt = a['checked_in_at'] as String? ?? '';
                           return ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: a.isOfflinePending
-                                  ? Colors.orange.shade100
-                                  : Colors.green.shade100,
-                              child: Icon(
-                                a.isOfflinePending
-                                    ? Icons.cloud_off
-                                    : Icons.check,
-                                color: a.isOfflinePending
-                                    ? Colors.orange
-                                    : Colors.green,
+                              backgroundColor: Colors.green.shade100,
+                              child: const Icon(
+                                Icons.check,
+                                color: Colors.green,
                                 size: 18,
                               ),
                             ),
                             title: Text(
-                              a.name,
+                              'Tiket: $ticketCode',
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             subtitle: Text(
-                              '${a.ticketCode} • ${a.ticketType}\nOleh: ${a.checkedInBy ?? "-"} (${a.checkedInAt?.hour}:${a.checkedInAt?.minute.toString().padLeft(2, "0")} WIB)',
+                              'Petugas: $staff • $checkedAt',
                               style: const TextStyle(fontSize: 11),
                             ),
-                            trailing: a.isOfflinePending
-                                ? const Chip(
-                                    label: Text(
-                                      'Offline',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.orange,
-                                      ),
-                                    ),
-                                  )
-                                : const Chip(
-                                    label: Text(
-                                      'Tersinkron',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.green,
-                                      ),
-                                    ),
-                                  ),
+                            trailing: const Chip(
+                              label: Text(
+                                'Tersinkron',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ),
                           );
                         },
                       ),

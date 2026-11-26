@@ -22,6 +22,7 @@ class AppConstants {
   static const String eventStatusApproved = 'approved';
   static const String eventStatusPublished = 'published';
   static const String eventStatusRejected = 'rejected';
+  static const String eventStatusSuspended = 'suspended';
   static const String eventStatusCompleted = 'completed';
   static const String eventStatusCancelled = 'cancelled';
 

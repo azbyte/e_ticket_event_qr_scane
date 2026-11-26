@@ -78,7 +78,7 @@ class OrganizerEventCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '${core.DateUtils.formatDateTime(event.startDateTime)}'
-                          ' ÃŽâ€œÃƒâ€¡ÃƒÂ³ ${event.formatLabel}',
+                          ' • ${event.formatLabel}',
                           style: const TextStyle(
                             fontSize: 12.5,
                             color: Colors.black54,

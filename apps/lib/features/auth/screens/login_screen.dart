@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/config/app_config.dart';
+import '../../../core/errors/app_exception.dart';
+import '../../../core/network/api_client.dart';
 import '../../../core/validators/input_validator.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../routes/app_routes.dart';
@@ -21,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _identity = TextEditingController();
   final _password = TextEditingController();
   bool _obscure = true;
+  bool _checkingConnection = false;
 
   @override
   void dispose() {
@@ -29,17 +33,55 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  /// Memeriksa `/health` backend agar pengguna dapat memastikan aplikasi
+  /// benar-benar terhubung ke backend dan database sebelum mencoba masuk.
+  Future<void> _checkConnection() async {
+    setState(() => _checkingConnection = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final health = await fetchServerHealth();
+      final database = health['database']?.toString() ?? 'unknown';
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            database == 'connected'
+                ? 'Terhubung ke ${AppConfig.apiBaseUrl} (database: connected).'
+                : 'Backend terjangkau, tetapi database: $database.',
+          ),
+        ),
+      );
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            error is AppException
+                ? error.message
+                : 'Tidak dapat terhubung ke ${AppConfig.apiBaseUrl}.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _checkingConnection = false);
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
     final auth = context.read<AuthProvider>();
+    // Identitas dikirim apa adanya: backend menerima email ATAU username.
     final identity = _identity.text.trim();
-    final success = await auth.login(email: identity.contains('@') ? identity : identity, password: _password.text);
+    final success = await auth.login(email: identity, password: _password.text);
     if (!mounted) return;
     if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(auth.error ?? 'Login gagal.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(auth.error ?? 'Login gagal.')),
+      );
       return;
     }
     final redirect = widget.redirectRoute;
+    // AuthGate (`/`) mengarahkan ke dashboard sesuai role pengguna; deep link
+    // yang eksplisit tetap diprioritaskan.
     Navigator.of(context).pushNamedAndRemoveUntil(
       redirect != null && redirect.isNotEmpty ? redirect : AppRoutes.initial,
       (_) => false,
@@ -80,6 +122,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     )),
                     TextButton(onPressed: () => Navigator.pushNamed(context, AppRoutes.register),
                       child: const Text('Belum punya akun? Daftar sebagai penyelenggara')),
+                    TextButton.icon(
+                      onPressed: _checkingConnection ? null : _checkConnection,
+                      icon: _checkingConnection
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.wifi_tethering, size: 18),
+                      label: const Text('Cek koneksi server'),
+                    ),
                   ]),
                 ),
               ),

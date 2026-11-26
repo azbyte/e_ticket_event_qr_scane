@@ -5,6 +5,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../models/event/event_model.dart';
@@ -98,11 +99,14 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
       widget.initialMembershipContext?.eventId ??
       (AppConfig.mockMode ? 'evt-1001' : '');
   String get _targetEventTitle =>
-      widget.event?.title ?? 'Tech Innovation Summit 2026';
+      widget.event?.title ??
+      (widget.eventId != null && widget.eventId!.isNotEmpty
+          ? 'Event #${widget.eventId}'
+          : (AppConfig.mockMode ? 'Tech Innovation Summit 2026' : 'Acara'));
   bool get _canViewParticipants =>
       _currentContext.hasPermission(OrganizerPermission.viewParticipants);
 
-  void _exportCsv() {
+  Future<void> _exportCsv() async {
     if (!_currentContext.hasPermission(
       OrganizerPermission.exportParticipants,
     )) {
@@ -110,13 +114,45 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
       return;
     }
 
+    if (_targetEventId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ID Acara tidak valid untuk ekspor.')),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 16),
+                Text('Mengunduh CSV dari server...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
     try {
-      final csvContent = _repo.exportAttendeesCsv(
+      final csvContent = await _repo.exportAttendeesCsvFromApi(
         _targetEventId,
         _currentContext,
       );
-      final lineCount = csvContent.split('\n').length - 2;
+      if (mounted) Navigator.pop(context); // close progress dialog
 
+      final lines = csvContent.split(RegExp(r'\r?\n')).where((l) => l.trim().isNotEmpty).toList();
+      final lineCount = lines.length > 1 ? lines.length - 1 : 0;
+      final previewLines = lines.take(5).join('\n');
+
+      if (!mounted) return;
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -124,7 +160,7 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
             children: [
               Icon(Icons.file_download_done, color: Colors.teal),
               SizedBox(width: 8),
-              Text('Simulasi Ekspor CSV'),
+              Text('Ekspor CSV Server'),
             ],
           ),
           content: Column(
@@ -132,19 +168,35 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Ekspor $lineCount peserta acara "$_targetEventTitle" berhasil dibuat (simulasi offline-first).',
+                'Ekspor $lineCount peserta acara "$_targetEventTitle" berhasil diambil dari server.',
                 style: const TextStyle(fontSize: 14),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Container(
+                width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.grey.shade300),
                 ),
+                child: Text(
+                  previewLines.isNotEmpty ? '$previewLines\n...' : 'File CSV kosong.',
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                ),
                 child: const Text(
-                  'Catatan Kepatuhan PRD: Seluruh data email & no. telepon peserta telah disamarkan (masked) untuk perlindungan data pribadi.',
+                  'Kepatuhan PRD: Formula injection dicegah di server; data sensitif dilindungi.',
                   style: TextStyle(
                     fontSize: 11,
                     fontStyle: FontStyle.italic,
@@ -155,6 +207,20 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
             ],
           ),
           actions: [
+            OutlinedButton.icon(
+              icon: const Icon(Icons.copy, size: 16),
+              label: const Text('Salin CSV'),
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: csvContent));
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(
+                      content: Text('Isi CSV berhasil disalin ke clipboard!'),
+                    ),
+                  );
+                }
+              },
+            ),
             TextButton(
               onPressed: () => Navigator.pop(ctx),
               child: const Text('Tutup'),
@@ -163,9 +229,11 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
         ),
       );
     } catch (e) {
+      if (mounted) Navigator.pop(context); // close progress dialog
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString()),
+          content: Text('Gagal mengekspor CSV: $e'),
           backgroundColor: Colors.red.shade700,
         ),
       );
@@ -337,7 +405,7 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
                 OrganizerPermission.exportParticipants,
               ))
                 IconButton(
-                  tooltip: 'Simulasi Ekspor CSV',
+                  tooltip: 'Ekspor CSV Peserta',
                   icon: const Icon(Icons.download),
                   onPressed: _exportCsv,
                 ),

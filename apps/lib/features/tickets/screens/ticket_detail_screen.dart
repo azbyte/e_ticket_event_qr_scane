@@ -1,18 +1,24 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/config/app_config.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_utils.dart' as app_date;
+import '../../../models/ticket/ticket_model.dart';
 import '../../../providers/ticket_provider.dart';
 import '../widgets/qr_ticket_display.dart';
 
 /// Ticket detail screen — e-ticket with QR code (PRD sections 4.6, 7.2 F).
 class TicketDetailScreen extends StatefulWidget {
-  const TicketDetailScreen({super.key, this.ticketId, this.orderId});
+  const TicketDetailScreen({
+    super.key,
+    this.ticketId,
+    this.orderId,
+    this.ticket,
+  });
 
   final String? ticketId;
   final String? orderId;
+  final TicketModel? ticket;
 
   @override
   State<TicketDetailScreen> createState() => _TicketDetailScreenState();
@@ -32,7 +38,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       if (routeArg is String && routeArg.isNotEmpty) {
         _effectiveTicketId = routeArg;
       }
-      if (_effectiveTicketId.isNotEmpty) {
+      if (widget.ticket == null && _effectiveTicketId.isNotEmpty) {
         _ticketProvider.loadTicket(_effectiveTicketId, orderId: widget.orderId);
       }
     });
@@ -43,16 +49,29 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     Color fg;
     String label;
 
-    switch (status) {
-      case AppConstants.ticketStatusValid:
+    switch (status.toLowerCase()) {
+      case 'valid':
+      case 'active':
         bg = Colors.green.shade50;
         fg = Colors.green.shade700;
         label = 'VALID / SIAP CHECK-IN';
         break;
-      case AppConstants.ticketStatusCheckedIn:
+      case 'checked_in':
+      case 'used':
         bg = Colors.blue.shade50;
         fg = Colors.blue.shade700;
         label = 'SUDAH CHECK-IN';
+        break;
+      case 'pending':
+        bg = Colors.amber.shade50;
+        fg = Colors.orange.shade800;
+        label = 'BELUM DIBAYAR';
+        break;
+      case 'cancelled':
+      case 'revoked':
+        bg = Colors.red.shade50;
+        fg = Colors.red.shade700;
+        label = status.toUpperCase() == 'CANCELLED' ? 'DIBATALKAN' : 'DICABUT';
         break;
       default:
         bg = Colors.red.shade50;
@@ -94,7 +113,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             );
           }
 
-          final ticket = _ticketProvider.selectedTicket;
+          final ticket = widget.ticket ?? _ticketProvider.selectedTicket;
           if (ticket == null) {
             return Center(
               child: Padding(
@@ -164,30 +183,37 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text(
-                                  'E-TICKET EVENT PASS',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 12,
-                                    letterSpacing: 1.5,
-                                    fontWeight: FontWeight.bold,
+                                const Flexible(
+                                  child: Text(
+                                    'E-TICKET EVENT PASS',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                      letterSpacing: 1.5,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white24,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    ticket.ticketTypeId.toUpperCase(),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white24,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      ticket.ticketTypeId.toUpperCase(),
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -264,11 +290,86 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                             _buildStatusBadge(ticket.status),
                             const SizedBox(height: 20),
 
-                            // QR Display
-                            QrTicketDisplay(
-                              ticketData: ticket.token,
-                              size: 190,
-                            ),
+                            // QR Display or Status Box
+                            if (ticket.isPending)
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.shade50,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: Colors.amber.shade300),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      Icons.payment,
+                                      size: 48,
+                                      color: Colors.orange.shade800,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'Menunggu Pembayaran',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.orange.shade900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'E-ticket dan kode QR akan aktif otomatis setelah pembayaran diverifikasi oleh sistem.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.orange.shade900,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else if (ticket.isCancelled || ticket.isRevoked)
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade50,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: Colors.red.shade300),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      Icons.cancel_outlined,
+                                      size: 48,
+                                      color: Colors.red.shade700,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      ticket.isCancelled ? 'Tiket Dibatalkan' : 'Tiket Dicabut',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.red.shade900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Tiket ini tidak berlaku lagi dan tidak dapat digunakan untuk memasuki acara.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.red.shade800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else
+                              QrTicketDisplay(
+                                ticketData: ticket.token,
+                                size: 190,
+                              ),
                             const SizedBox(height: 20),
 
                             // Ticket Details List
@@ -359,16 +460,25 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+        Flexible(
+          child: Text(
+            label,
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 12,
-            color: Colors.black87,
+        const SizedBox(width: 8),
+        Flexible(
+          flex: 2,
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              color: Colors.black87,
+            ),
           ),
         ),
       ],

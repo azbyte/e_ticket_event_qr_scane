@@ -1,6 +1,7 @@
 ﻿const nodemailer = require('nodemailer');
 const config = require('../config/env');
 const { query, getOne, pool } = require('../config/db');
+const ticketDesignService = require('./ticketDesignService');
 const logger = require('../utils/logger');
 
 /*
@@ -45,7 +46,7 @@ const loadTicketContext = (ticketId) => getOne(
   [ticketId]
 );
 
-const buildMessage = (ticket, recipient) => {
+const buildMessage = (ticket, recipient, { attachment = null } = {}) => {
   const date = ticket.event_date ? new Date(ticket.event_date).toISOString() : '-';
   // Tautan menuju halaman tiket publik; token akses guest tidak pernah
   // ditempatkan pada URL (PRD §8.2 / C-02).
@@ -58,7 +59,9 @@ const buildMessage = (ticket, recipient) => {
     `Jenis: ${ticket.ticket_type_name || '-'} | Jadwal: ${date}`,
     `Lokasi: ${ticket.location || ticket.online_url || '-'}`,
     `Buka e-ticket dan QR dari perangkat yang dipakai saat memesan: ${url}`,
-    'QR tidak dikirim lewat email demi keamanan. Jangan bagikan QR Anda.',
+    attachment
+      ? 'E-ticket PDF dengan QR unik terlampir pada email ini. Jangan bagikan QR Anda.'
+      : 'Buka e-ticket di aplikasi untuk melihat QR unik. Jangan bagikan QR Anda.',
   ].join('\n');
   const html = `<p>Halo ${escapeHtml(ticket.attendee_name || 'Peserta')},</p>
 <p>Tiket untuk <strong>${escapeHtml(ticket.event_title)}</strong> telah terbit.</p>
@@ -67,8 +70,15 @@ const buildMessage = (ticket, recipient) => {
 <li>Jadwal: ${escapeHtml(date)}</li>
 <li>Lokasi: ${escapeHtml(ticket.location || ticket.online_url || '-')}</li></ul>
 <p><a href="${escapeHtml(url)}">Buka e-ticket di aplikasi</a>.</p>
-<p>QR tidak dikirim lewat email demi keamanan. Jangan bagikan QR Anda.</p>`;
-  return { from: config.smtp.from, to: recipient, subject: `E-Ticket ${ticket.event_title}`, text, html };
+${attachment ? '<p>E-ticket PDF dengan QR unik terlampir pada email ini.</p>' : '<p>Buka e-ticket di aplikasi untuk melihat QR unik.</p>'}`;
+  return {
+    from: config.smtp.from,
+    to: recipient,
+    subject: `E-Ticket ${ticket.event_title}`,
+    text,
+    html,
+    ...(attachment ? { attachments: [attachment] } : {}),
+  };
 };
 
 const upsertDelivery = async ({ ticketId, recipient, status, error, incrementAttempt = true }) => {
@@ -120,6 +130,28 @@ const upsertDelivery = async ({ ticketId, recipient, status, error, incrementAtt
   }
 };
 
+/**
+ * Lampiran e-ticket PDF (desain Organizer + QR unik).
+ *
+ * Bila rendering gagal, email tetap dikirim tanpa lampiran dan kegagalan
+ * dicatat; status pengiriman tidak diklaim lebih baik dari kenyataan.
+ */
+const buildPdfAttachment = async (ticketId) => {
+  try {
+    const ticket = await ticketDesignService.loadTicketForPdf(ticketId);
+    if (!ticket) return null;
+    const buffer = await ticketDesignService.buildTicketPdf(ticket);
+    return {
+      filename: `tiket-${ticket.ticket_code || ticketId}.pdf`,
+      content: buffer,
+      contentType: 'application/pdf',
+    };
+  } catch (error) {
+    logger.error('ticket_pdf_render_failed', { ticketId, error: error.message });
+    return null;
+  }
+};
+
 const sendTicketEmail = async (ticketId, { recipient, force = false } = {}) => {
   try {
     const ticket = await loadTicketContext(ticketId);
@@ -146,7 +178,8 @@ const sendTicketEmail = async (ticketId, { recipient, force = false } = {}) => {
       return { status: 'NOT_CONFIGURED', delivery };
     }
 
-    const info = await mailTransport.sendMail(buildMessage(ticket, to));
+    const attachment = await buildPdfAttachment(ticketId);
+    const info = await mailTransport.sendMail(buildMessage(ticket, to, { attachment }));
     const note = mode === 'json'
       ? 'json transport: dirender lokal, TIDAK dikirim ke jaringan.'
       : null;

@@ -31,6 +31,29 @@ const isPubliclyVisible = (event) =>
 const publicUrlFor = (event) =>
   isPubliclyVisible(event) ? buildPublicUrl(event.id) : null;
 
+/**
+ * Serialisasi event untuk response API.
+ *
+ * `attendee_fields` dapat tersimpan sebagai JSONB (objek/array) atau teks JSON
+ * tergantung jalur penulisan (insert vs update). Tanpa normalisasi, kolom teks
+ * terkirim sebagai string sehingga klien tidak dapat membaca konfigurasi form
+ * peserta — form publik jatuh ke form default. Di sini nilai selalu diubah ke
+ * array agar kontrak API konsisten.
+ */
+const parseAttendeeFields = (value) => {
+  if (value === null || value === undefined) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_error) {
+      return [];
+    }
+  }
+  return [];
+};
+
 const serializeEvent = (event) => {
   if (typeof event.status !== 'string' || typeof event.event_format !== 'string') {
     throw new TypeError('Event status and format are required by the API contract');
@@ -44,6 +67,7 @@ const serializeEvent = (event) => {
     start_date_time: event.event_date,
     event_type: event.event_format.toLowerCase(),
     category: category?.name || null,
+    attendee_fields: parseAttendeeFields(event.attendee_fields),
     status: event.status.toLowerCase(),
     public_url: publicUrlFor(event),
     validation_errors: parseValidationNote(event.review_note),
@@ -52,6 +76,7 @@ const serializeEvent = (event) => {
 
 module.exports = {
   serializeEvent,
+  parseAttendeeFields,
   appPublicUrl,
   buildPublicUrl,
   buildInviteUrl,

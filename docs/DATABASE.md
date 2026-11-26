@@ -6,9 +6,12 @@
   Supabase (32 model/tabel target), dengan seluruh objek aplikasi berada di
   schema `public`; ini sumber kebenaran schema yang ditetapkan repository.
 - Migration Prisma yang dimiliki set schema tersebut berada di
-  `backend/prisma/migrations/`. File `backend/supabase/migrations/` adalah SQL
-  legacy yang dipertahankan untuk fungsi/riwayat tertentu; bukan baseline Prisma
-  paralel. Jangan menyimpulkan migration itu tidak diperlukan hanya karena Prisma
+  `backend/prisma/migrations/`. SQL legacy berada di
+  `backend/prisma/legacy-migrations/` (satu folder database: `backend/prisma/`)
+  dan dipertahankan untuk fungsi/riwayat tertentu; bukan baseline Prisma
+  paralel. Lokasi itu sengaja di luar `migrations/` karena Prisma memperlakukan
+  setiap subfolder `migrations/` sebagai migration yang akan dijalankan. Jangan
+  menyimpulkan migration legacy tidak diperlukan hanya karena Prisma
   menjadi schema authority, dan jangan menjalankan/menghapusnya tanpa
   rekonsiliasi fungsi/status serta persetujuan tertulis FINISHING.
 - Developer 1–3 tidak memiliki otoritas mengubah schema, migration, SQL, seed,
@@ -38,9 +41,12 @@
     dan `expire_event_order_reservations` tersedia di schema `public`;
     `node scripts/diagnose-db-functions.js` menyatakan 4/4 function identik
     dengan definisi migration terakhir.
-  - SQL legacy di `supabase/migrations/` bukan pengganti baseline Prisma.
-    Riwayat/fungsi SQL legacy harus direkonsiliasi sebelum operator memutuskan
-    apakah/di mana ia dijalankan; jangan menyatakan semuanya tidak diperlukan.
+  - SQL legacy di `backend/prisma/legacy-migrations/` bukan pengganti baseline
+    Prisma. Riwayat/fungsi SQL legacy harus direkonsiliasi sebelum operator
+    memutuskan apakah/di mana ia dijalankan; jangan menyatakan semuanya tidak
+    diperlukan. Satu-satunya objek yang belum tercakup migration Prisma adalah
+    unique index `lower(username)` (`profiles_username_lower_unique`); lihat
+    proposal DP-05 pada `../task/DB_CHANGE_PROPOSAL.md`.
 - Kredensial DB dan `JWT_SECRET` telah dikonfirmasi dirotasi. Jangan menyalin
   nilainya ke log, issue, atau dokumentasi. Status RLS/grants aktual (verifikasi
   read-only 23 November 2026, lihat `../task/DATABASE_AUDIT_FINAL.md`):

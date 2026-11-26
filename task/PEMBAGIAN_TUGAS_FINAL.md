@@ -20,7 +20,7 @@
 | Kepemilikan file | [`TAHAP_2/INTEGRATION_CONTRACT.md`](TAHAP_2/INTEGRATION_CONTRACT.md) Bagian 2 + [`TAHAP_2/FILE_OWNERSHIP.md`](TAHAP_2/FILE_OWNERSHIP.md) (ringkasan) |
 | Lembar kerja per developer Tahap 2 | `TAHAP_2/DEVELOPER_{1,2,3}_TASK.md` |
 | Rincian task Tahap 3 + gate | [`TAHAP_3/README_TAHAP_3.md`](TAHAP_3/README_TAHAP_3.md) |
-| Checklist penerimaan akhir (diisi di Tahap 3) | [`FINAL_ACCEPTANCE_CHECKLIST.md`](FINAL_ACCEPTANCE_CHECKLIST.md) |
+| Checklist penerimaan akhir (diisi di Tahap 3) | [`TAHAP_3/FINAL_ACCEPTANCE_CHECKLIST.md`](TAHAP_3/FINAL_ACCEPTANCE_CHECKLIST.md) |
 | Kebutuhan perubahan database (tidak diotorisasi) | [`DB_CHANGE_PROPOSAL.md`](DB_CHANGE_PROPOSAL.md) |
 | Otoritas DB/FINISHING | [`FINISHING_AUTHORITY.md`](FINISHING_AUTHORITY.md) |
 
@@ -54,7 +54,7 @@ Jika Anda baru bergabung dan mendapat pesan "Kerjakan Developer N Tahap 2", ikut
 |---|---|---|---|
 | **1 (selesai)** | Fondasi: auth, schema, event/kategori tiket, order 1 tiket, pembayaran simulasi, tiket, check-in atomik, invitation backend, test dasar | 32 tabel, 9 migration, backend 89 test, Flutter 188 test | Tertutup (laporan D1–D4 Tahap 1) |
 | **2 (prioritas utama)** | Menyelesaikan **seluruh fungsi inti MVP** dan menghubungkan semua layar in-scope ke API nyata | 3 developer × 5 task; setiap alur end-to-end | Gate G2 (§5) |
-| **3 (finalisasi)** | Uji integrasi, keamanan, UI/UX, performa, deployment readiness, dokumentasi operasional — **dikerjakan Developer 4** | 13 task T3-01…T3-13 | Gate G3 (`TAHAP_3/RENCANA_KERJA.md` §F) |
+| **3 (finalisasi)** | Uji integrasi, keamanan, UI/UX, performa, deployment readiness, dokumentasi operasional — **FASE 1: Developer 2 + 3 paralel; FASE 2: Developer 1** | Task T3-D1-01…T3-D1-10 + T3-D2-* + T3-D3-* | Gate F1 + F2 (`TAHAP_3/README_TAHAP_3.md` §5) |
 
 ## Prinsip yang tidak boleh dilanggar:
 1. Satu developer menangani satu alur end-to-end (backend + Flutter + test).

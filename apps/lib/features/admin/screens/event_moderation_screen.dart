@@ -5,9 +5,11 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../models/event/event_model.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../services/admin/admin_audit_log_service.dart';
 import '../../../services/organizer_events/organizer_event_contract.dart';
 import '../../../services/organizer_events/organizer_event_repository.dart';
@@ -33,8 +35,8 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
   List<EventModel> _events = const <EventModel>[];
   bool _isLoading = true;
   String? _loadError;
-  // Admin sebaiknya langsung melihat event yang membutuhkan tindak lanjut;
-  // publikasi tetap otomatis dan tidak menunggu persetujuan Admin.
+  // Admin memantau status moderasi platform; publikasi tetap otomatis
+  // dan tidak menunggu persetujuan manual Admin (C-02, FR-12, FR-16, FR-86).
   String _filter = OrganizerEventStatus.pendingReview;
   final TextEditingController _searchController = TextEditingController();
 
@@ -66,6 +68,23 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
     }
   }
 
+  /// Identitas aktor audit log dari sesi aktif (bukan konstanta).
+  ///
+  /// Pada mode API audit log ditulis backend, sehingga nilai ini hanya dipakai
+  /// jalur demo. Widget test tanpa `AuthProvider` tetap aman karena fallback
+  /// dipakai bila provider tidak tersedia.
+  ({String id, String name}) _actorIdentity() {
+    try {
+      final user = context.read<AuthProvider>().user;
+      if (user != null) {
+        return (id: user.id ?? '', name: user.name);
+      }
+    } catch (_) {
+      // Provider tidak tersedia (mis. widget test): gunakan fallback.
+    }
+    return (id: '', name: 'Admin Platform');
+  }
+
   Future<void> _suspendEvent(EventModel event, String note) async {
     try {
       await _repository.simulatePlatformModeration(
@@ -74,9 +93,10 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
         note: note,
       );
       if (AppConfig.mockMode) {
+        final actor = _actorIdentity();
         await AdminAuditLogService.instance.logAction(
-          actorId: 'admin@event.com',
-          actorName: 'Super Admin',
+          actorId: actor.id,
+          actorName: actor.name,
           action: 'EVENT_SUSPENDED',
           entityType: 'EVENT',
           entityId: event.id,
@@ -103,21 +123,23 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
     }
   }
 
-  Future<void> _restoreEvent(EventModel event) async {
+  Future<void> _restoreEvent(EventModel event, [String? note]) async {
+    final reasonNote = note ?? 'Dipulihkan oleh Super Admin';
     try {
       await _repository.simulatePlatformModeration(
         eventId: event.id,
         status: OrganizerEventStatus.published,
-        note: 'Dipulihkan oleh Super Admin',
+        note: reasonNote,
       );
       if (AppConfig.mockMode) {
+        final actor = _actorIdentity();
         await AdminAuditLogService.instance.logAction(
-          actorId: 'admin@event.com',
-          actorName: 'Super Admin',
+          actorId: actor.id,
+          actorName: actor.name,
           action: 'EVENT_RESTORED',
           entityType: 'EVENT',
           entityId: event.id,
-          reason: 'Dipulihkan oleh Super Admin',
+          reason: reasonNote,
           details: 'Memulihkan event "${event.title}" ke status tayang/published.',
           metadata: {
             'title': event.title,
@@ -138,6 +160,68 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
         );
       }
     }
+  }
+
+  void _showRestoreDialog(EventModel event) {
+    final reasonController = TextEditingController(text: 'Dipulihkan oleh Super Admin');
+    final formKey = GlobalKey<FormState>();
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle_outline, color: Colors.green),
+            SizedBox(width: 8),
+            Text('Pulihkan Event?'),
+          ],
+        ),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Event yang dipulihkan akan kembali tayang dan menerima pesanan tiket.',
+                style: TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: reasonController,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Alasan Pemulihan Event *',
+                  hintText: 'Cth: Klarifikasi selesai / dokumen legalitas telah diverifikasi',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().length < 5) {
+                    return 'Alasan pemulihan wajib diisi minimal 5 karakter.';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.green),
+            onPressed: () async {
+              if (!formKey.currentState!.validate()) return;
+              Navigator.pop(ctx);
+              await _restoreEvent(event, reasonController.text.trim());
+            },
+            child: const Text('Pulihkan Event'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showSuspendDialog(EventModel event) {
@@ -178,8 +262,8 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
                   border: OutlineInputBorder(),
                 ),
                 validator: (val) {
-                  if (val == null || val.trim().isEmpty) {
-                    return 'Alasan penangguhan wajib diisi.';
+                  if (val == null || val.trim().length < 5) {
+                    return 'Alasan penangguhan wajib diisi minimal 5 karakter.';
                   }
                   return null;
                 },
@@ -415,14 +499,6 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
                 ),
                 const SizedBox(width: 8),
                 ChoiceChip(
-                  label: const Text('Ditolak'),
-                  selected: _filter == OrganizerEventStatus.rejected,
-                  onSelected: (_) => setState(
-                    () => _filter = OrganizerEventStatus.rejected,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ChoiceChip(
                   label: const Text('Disetujui/Tayang'),
                   selected: _filter == OrganizerEventStatus.published,
                   onSelected: (_) =>
@@ -434,6 +510,13 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
                   selected: _filter == OrganizerEventStatus.suspended,
                   onSelected: (_) =>
                       setState(() => _filter = OrganizerEventStatus.suspended),
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('Ditolak'),
+                  selected: _filter == OrganizerEventStatus.rejected,
+                  onSelected: (_) =>
+                      setState(() => _filter = OrganizerEventStatus.rejected),
                 ),
                 const SizedBox(width: 8),
                 ChoiceChip(
@@ -600,7 +683,7 @@ class _EventModerationScreenState extends State<EventModerationScreen> {
                           foregroundColor: Colors.green,
                           side: const BorderSide(color: Colors.green),
                         ),
-                        onPressed: () => _restoreEvent(item),
+                        onPressed: () => _showRestoreDialog(item),
                         child: const Text('Pulihkan'),
                       ),
                     ],

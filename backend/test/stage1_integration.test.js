@@ -865,14 +865,17 @@ test('route Tahap 1 yang dipakai klien Flutter tetap terdaftar', () => {
   const readRoute = (file) =>
     fs.readFileSync(path.join(__dirname, '..', 'src', 'routes', file), 'utf8');
 
-  const eventRoutes = readRoute('eventRoutes.js');
-  assert.match(eventRoutes, /router\.get\('\/public'/);
-  assert.match(eventRoutes, /router\.get\('\/:eventId\/ticket-types', optionalAuth/);
-  assert.match(eventRoutes, /router\.post\('\/:eventId\/ticket-types', authMiddleware, allowRoles\('organizer'\)/);
+  // Route digabung per domain (Tier C): events.js memuat event + kategori tiket
+  // + undangan; orders.js memuat order + pembayaran + tiket + check-in.
+  const events = readRoute('events.js');
+  assert.match(events, /eventRouter\.get\('\/public'/);
+  assert.match(events, /eventRouter\.get\('\/:eventId\/ticket-types', optionalAuth/);
+  assert.match(events, /eventRouter\.post\('\/:eventId\/ticket-types', authMiddleware, allowRoles\('organizer'\)/);
 
-  assert.match(readRoute('orderRoutes.js'), /router\.post\('\/', optionalAuth/);
-  assert.match(readRoute('orderRoutes.js'), /router\.get\('\/:id', optionalAuth/);
-  assert.match(readRoute('paymentRoutes.js'), /router\.post\('\/simulate', optionalAuth/);
-  assert.match(readRoute('ticketRoutes.js'), /router\.get\('\/my-tickets', optionalAuth/);
+  const orders = readRoute('orders.js');
+  assert.match(orders, /orderRouter\.post\('\/', optionalAuth/);
+  assert.match(orders, /orderRouter\.get\('\/:id', optionalAuth/);
+  assert.match(orders, /paymentRouter\.post\('\/simulate', optionalAuth/);
+  assert.match(orders, /ticketRouter\.get\('\/my-tickets', optionalAuth/);
 });
 

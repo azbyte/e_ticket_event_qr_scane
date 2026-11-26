@@ -7,6 +7,7 @@ library;
 
 import '../../core/config/app_config.dart';
 import '../../core/constants/app_constants.dart';
+import '../../models/event/attendee_field_definition.dart';
 import '../../models/event/event_model.dart';
 import '../../models/event/ticket_type_model.dart';
 
@@ -227,7 +228,13 @@ class OrganizerEventDraft {
     this.onlineUrl,
     this.publicInfo,
     this.attendeeFields = const <String>[OrganizerAttendeeFields.name],
+    this.attendeeFieldDefinitions = const <AttendeeFieldDefinition>[],
   });
+
+  /// Definisi default: nama & email wajib, sesuai kolom `attendees` dan
+  /// aturan server (`REQUIRED_ATTENDEE_FIELD_KEYS`).
+  static const List<AttendeeFieldDefinition> defaultAttendeeFieldDefinitions =
+      OrganizerAttendeeDefaults.definitions;
 
   final String title;
   final String category;
@@ -248,6 +255,29 @@ class OrganizerEventDraft {
   /// Field data peserta yang wajib diisi saat registrasi.
   final List<String> attendeeFields;
 
+  /// Definisi field bertipe (D1-04). Bila terisi, inilah yang dikirim ke API
+  /// sebagai `attendee_fields`; [attendeeFields] hanya dipakai untuk
+  /// kompatibilitas event lama berbentuk array string.
+  final List<AttendeeFieldDefinition> attendeeFieldDefinitions;
+
+  /// Definisi yang benar-benar dipakai, termasuk fallback legacy.
+  ///
+  /// Fallback ini selalu menghasilkan minimal `name` dan `email` karena server
+  /// menolak konfigurasi tanpa keduanya (keduanya kolom wajib `attendees`).
+  /// Field legacy lain (mis. `phone`, `organization`) tetap dipertahankan.
+  List<AttendeeFieldDefinition> get resolvedAttendeeFieldDefinitions {
+    if (attendeeFieldDefinitions.isNotEmpty) return attendeeFieldDefinitions;
+    final fromLegacy = AttendeeFieldDefinition.listFromKeys(attendeeFields);
+    if (fromLegacy.isEmpty) return OrganizerAttendeeDefaults.definitions;
+    final merged = <AttendeeFieldDefinition>[...fromLegacy];
+    for (final required in OrganizerAttendeeDefaults.definitions) {
+      if (!merged.any((field) => field.key == required.key)) {
+        merged.add(required);
+      }
+    }
+    return merged;
+  }
+
   /// Membuat draft dari event tersimpan (mode edit).
   factory OrganizerEventDraft.fromEvent(EventModel event) {
     return OrganizerEventDraft(
@@ -267,6 +297,7 @@ class OrganizerEventDraft {
       attendeeFields: event.attendeeFields.isEmpty
           ? const <String>[OrganizerAttendeeFields.name]
           : event.attendeeFields,
+      attendeeFieldDefinitions: event.resolvedAttendeeFields,
     );
   }
 }

@@ -24,6 +24,8 @@ import '../../../organizer/screens/event_form_screen.dart';
 import '../widgets/organizer_event_status_chip.dart';
 import '../widgets/organizer_feedback_view.dart';
 import '../widgets/organizer_summary_widgets.dart';
+import '../widgets/registration_qr_view.dart';
+import 'ticket_design_screen.dart';
 import 'organizer_event_preview_screen.dart';
 import 'organizer_ticket_type_form_screen.dart';
 
@@ -94,8 +96,22 @@ void dispose() {
   super.dispose();
 }
 
+/// Tautan pendaftaran peserta yang dapat dibuka di browser.
+///
+/// `public_url` dari server dipakai sebagai fallback, tetapi origin aplikasi
+/// yang sedang berjalan lebih diutamakan supaya tautan/QR tidak menunjuk ke
+/// host backend. Null berarti event belum tayang.
+String? _registrationShareUrl(EventModel event) {
+  if (!event.hasPublicLink) return null;
+  return AppConfig.publicRegistrationUrl(
+    event.id,
+    serverPublicUrl: event.publicUrl,
+  );
+}
+
 Future<void> _copyLink(EventModel event) async {
-  if (!event.hasPublicLink) {
+  final url = _registrationShareUrl(event);
+  if (url == null) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text(
@@ -105,7 +121,7 @@ Future<void> _copyLink(EventModel event) async {
     );
     return;
   }
-  await Clipboard.setData(ClipboardData(text: event.publicUrl!));
+  await Clipboard.setData(ClipboardData(text: url));
   if (!mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(
     const SnackBar(content: Text('Tautan pendaftaran peserta disalin.')),
@@ -546,6 +562,7 @@ Widget _infoRow(IconData icon, String label, String? value) => Padding(
 
 Widget _buildRingkasan(EventModel event) {
   final summary = _provider.summary;
+  final shareUrl = _registrationShareUrl(event);
   final period =
       '${core.DateUtils.formatDateTime(event.startDateTime)} - '
       '${core.DateUtils.formatDateTime(event.endDateTime)} '
@@ -634,7 +651,7 @@ Widget _buildRingkasan(EventModel event) {
             color: Colors.blueGrey,
           ),
           OrganizerStatTile(
-            label: 'Penjualan kotor (demo)',
+            label: 'Penjualan kotor',
             value: OrganizerFormatters.rupiah(summary?.grossSales ?? 0),
             icon: Icons.payments_outlined,
           ),
@@ -674,7 +691,7 @@ Widget _buildRingkasan(EventModel event) {
         ),
       ),
       _sectionCard(
-        'Grafik penjualan (demo)',
+        'Grafik penjualan',
         OrganizerMiniBarChart(series: _provider.salesPointSeries),
       ),
       _sectionCard(
@@ -691,21 +708,25 @@ Widget _buildRingkasan(EventModel event) {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                OrganizerQrPlaceholder(seed: event.id),
+                RegistrationQrView(data: shareUrl),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      const Text(
-                        'QR registrasi (representasi demo)',
-                        style: TextStyle(fontSize: 12, color: Colors.black54),
+                      Text(
+                        shareUrl == null
+                            ? 'QR pendaftaran'
+                            : 'QR pendaftaran peserta (dapat dipindai)',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.black54,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       SelectableText(
-                        event.hasPublicLink
-                            ? event.publicUrl!
-                            : 'Belum tersedia — terbitkan event terlebih dahulu.',
+                        shareUrl ??
+                            'Belum tersedia — terbitkan event terlebih dahulu.',
                         key: const Key('event-public-link-text'),
                         style: const TextStyle(fontSize: 12.5),
                       ),
@@ -1164,6 +1185,44 @@ Widget _buildTiket(EventModel event) {
         )
       else
         for (final type in types) _buildTicketTile(event, type),
+      const SizedBox(height: 16),
+      // Desain tiket (PRD §5) dibuka lewat layar khusus agar data desain hanya
+      // dimuat saat dibutuhkan dan susunan tab Tiket tetap seperti semula.
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              const Text(
+                'Desain tiket',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Unggah desain sendiri atau pakai template, lalu atur posisi QR. '
+                'Desain dipakai saat tiket peserta diterbitkan.',
+                style: TextStyle(fontSize: 12, color: Colors.black54),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.tonalIcon(
+                key: const Key('ticket-design-open'),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => TicketDesignScreen(
+                      eventId: event.id,
+                      eventTitle: event.title,
+                      ticketTypes: types,
+                    ),
+                  ),
+                ),
+                icon: const Icon(Icons.brush_outlined, size: 18),
+                label: const Text('Atur desain tiket'),
+              ),
+            ],
+          ),
+        ),
+      ),
     ],
   );
 }

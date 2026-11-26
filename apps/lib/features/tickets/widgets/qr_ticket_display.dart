@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -41,29 +41,53 @@ class QrTicketDisplay extends StatelessWidget {
         children: [
           // QR code asli dari token tiket (AC-06). Payload hanya identifier
           // tiket; tidak memuat email/telepon/harga (FR-36).
-          Semantics(
-            label: 'QR code e-ticket',
-            child: Container(
+          if (ticketData.trim().isEmpty)
+            Container(
               width: size,
               height: size,
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300, width: 2),
+                border: Border.all(color: Colors.grey.shade300, width: 1.5),
               ),
-              child: QrImageView(
-                key: const Key('ticket-qr-image'),
-                data: ticketData,
-                version: QrVersions.auto,
-                size: size - 24,
-                gapless: true,
-                errorCorrectionLevel: QrErrorCorrectLevel.M,
-                backgroundColor: Colors.white,
-                semanticsLabel: 'QR code e-ticket',
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.qr_code_2, size: 48, color: Colors.grey.shade400),
+                  const SizedBox(height: 8),
+                  Text(
+                    'QR Code belum aktif',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            )
+          else
+            Semantics(
+              label: 'QR code e-ticket',
+              child: Container(
+                width: size,
+                height: size,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300, width: 2),
+                ),
+                child: QrImageView(
+                  key: const Key('ticket-qr-image'),
+                  data: ticketData,
+                  version: QrVersions.auto,
+                  size: size - 24,
+                  gapless: true,
+                  errorCorrectionLevel: QrErrorCorrectLevel.M,
+                  backgroundColor: Colors.white,
+                  semanticsLabel: 'QR code e-ticket',
+                ),
               ),
             ),
-          ),
           const SizedBox(height: 16),
 
           // Token Display
@@ -77,37 +101,46 @@ class QrTicketDisplay extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                ticketData,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
-                  fontFamily: 'monospace',
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(width: 6),
-              InkWell(
-                onTap: () {
-                  Clipboard.setData(ClipboardData(text: ticketData));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Kode tiket disalin!'),
-                      duration: Duration(seconds: 1),
+          if (ticketData.trim().isNotEmpty)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    ticketData,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
+                      fontFamily: 'monospace',
+                      color: Colors.black87,
                     ),
-                  );
-                },
-                child: const Padding(
-                  padding: EdgeInsets.all(4),
-                  child: Icon(Icons.copy, size: 16, color: AppTheme.primaryColor),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-            ],
-          ),
+                const SizedBox(width: 6),
+                InkWell(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: ticketData));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Kode tiket disalin!'),
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(Icons.copy, size: 16, color: AppTheme.primaryColor),
+                  ),
+                ),
+              ],
+            )
+          else
+            Text(
+              'Menunggu penerbitan',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+            ),
           const SizedBox(height: 10),
 
           // FR-36 Compliance Note
@@ -116,9 +149,12 @@ class QrTicketDisplay extends StatelessWidget {
             children: [
               Icon(Icons.shield_outlined, size: 14, color: Colors.green.shade700),
               const SizedBox(width: 4),
-              Text(
-                'Terverifikasi & Aman (FR-36 compliant)',
-                style: TextStyle(fontSize: 11, color: Colors.green.shade700, fontWeight: FontWeight.w500),
+              Flexible(
+                child: Text(
+                  'Terverifikasi & Aman (FR-36 compliant)',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11, color: Colors.green.shade700, fontWeight: FontWeight.w500),
+                ),
               ),
             ],
           ),

@@ -25,74 +25,198 @@ bool get _isTestEnvironment {
   }
 }
 
-/// DTO Ringkasan Keuangan Platform sesuai Kontrak Integrasi Developer 3.
+Map<String, dynamic> _asMap(Object? value) =>
+    value is Map<String, dynamic> ? value : const <String, dynamic>{};
+
+double _asDouble(Object? value, [double fallback = 0]) {
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value) ?? fallback;
+  return fallback;
+}
+
+int _asInt(Object? value, [int fallback = 0]) {
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? fallback;
+  return fallback;
+}
+
+/// Satu titik data tren mingguan dari `GET /api/admin/overview` (`trends`).
+class PlatformTrendPoint {
+  const PlatformTrendPoint({
+    required this.weekStart,
+    required this.gross,
+    required this.revenue,
+    required this.transactions,
+  });
+
+  final DateTime? weekStart;
+  final double gross;
+  final double revenue;
+  final int transactions;
+}
+
+/// Ringkasan keuangan & operasional konsol Admin.
+///
+/// Nilai pada mode API berasal dari agregasi PostgreSQL
+/// (`GET /api/admin/overview` + `GET /api/revenue/admin/summary`). Tidak ada
+/// angka contoh/hardcoded: sebelum data database diterima seluruh metrik
+/// bernilai 0 ([PlatformRevenueSummary.empty]).
 class PlatformRevenueSummary {
   final AdminRevenueSummary revenue;
   final int totalOrders;
   final int totalTicketsIssued;
   final int totalOrganizers;
   final int totalParticipants;
+  final int totalCheckIns;
+  final int eventsTotal;
+  final int eventsPublished;
+  final int eventsPendingReview;
+  final int eventsRejected;
+  final int eventsDraft;
+  final int eventsSuspended;
+  final List<PlatformTrendPoint> trends;
 
   const PlatformRevenueSummary({
     required this.revenue,
-    required this.totalOrders,
-    required this.totalTicketsIssued,
-    required this.totalOrganizers,
-    required this.totalParticipants,
+    this.totalOrders = 0,
+    this.totalTicketsIssued = 0,
+    this.totalOrganizers = 0,
+    this.totalParticipants = 0,
+    this.totalCheckIns = 0,
+    this.eventsTotal = 0,
+    this.eventsPublished = 0,
+    this.eventsPendingReview = 0,
+    this.eventsRejected = 0,
+    this.eventsDraft = 0,
+    this.eventsSuspended = 0,
+    this.trends = const [],
   });
 
-  factory PlatformRevenueSummary.forPeriod(
-    String period,
-    AdminRevenueSummary revenue,
-  ) {
-    final counts = switch (period) {
-      'today' => (5, 78, 5, 65),
-      '7d' => (8, 395, 8, 320),
-      '30d' || 'this_month' => (14, 1650, 14, 1240),
-      _ => (24, 3820, 24, 2950),
-    };
+  static const AdminRevenueSummary _zeroRevenue = AdminRevenueSummary(
+    grossTicketSales: 0,
+    ticketCommissionRevenue: 0,
+    packageRevenue: 0,
+    totalPlatformRevenue: 0,
+    totalTicketOrders: 0,
+    totalPackageInvoices: 0,
+    period: 'all',
+  );
+
+  /// Ringkasan kosong untuk mode API sebelum respons database diterima.
+  factory PlatformRevenueSummary.empty() =>
+      const PlatformRevenueSummary(revenue: _zeroRevenue);
+
+  /// Ringkasan dari data revenue lokal; hanya dipakai mode demo (`MOCK_MODE`)
+  /// dan widget test. Jumlah event dihitung dari daftar event yang diberikan.
+  factory PlatformRevenueSummary.fromRevenue(
+    AdminRevenueSummary revenue, {
+    List<Map<String, dynamic>> events = const [],
+  }) {
+    var pending = 0;
+    var published = 0;
+    var rejected = 0;
+    var draft = 0;
+    var suspended = 0;
+    for (final event in events) {
+      final status = event['status']?.toString().toLowerCase() ?? '';
+      if (status == AppConstants.eventStatusPendingReview) {
+        pending += 1;
+      } else if (status == AppConstants.eventStatusPublished ||
+          status == AppConstants.eventStatusApproved) {
+        published += 1;
+      } else if (status == AppConstants.eventStatusRejected) {
+        rejected += 1;
+      } else if (status == AppConstants.eventStatusSuspended) {
+        suspended += 1;
+      } else {
+        draft += 1;
+      }
+    }
     return PlatformRevenueSummary(
       revenue: revenue,
       totalOrders: revenue.totalTicketOrders,
-      totalTicketsIssued: counts.$2,
-      totalOrganizers: counts.$3,
-      totalParticipants: counts.$4,
+      eventsTotal: events.length,
+      eventsPublished: published,
+      eventsPendingReview: pending,
+      eventsRejected: rejected,
+      eventsDraft: draft,
+      eventsSuspended: suspended,
     );
   }
 
+  /// Membaca payload `overview` dari `GET /api/admin/overview`.
+  ///
+  /// Bentuk respons backend (`adminOverviewController`):
+  /// `{ events: {total, published, pending_review, ...}, active_organizers,
+  ///    total_orders, tickets_sold, total_participants, total_check_ins,
+  ///    financials: {gross_amount, commission_amount, service_fee,
+  ///                 platform_revenue, organizer_net_amount}, trends: [...] }`.
   factory PlatformRevenueSummary.fromOverview(
-    Map<String, dynamic> data,
-    AdminRevenueSummary fallbackRevenue,
-  ) {
-    final financials = data['financials'] as Map<String, dynamic>? ?? {};
-    final orders = data['orders'] as Map<String, dynamic>? ?? {};
-    final tickets = data['tickets'] as Map<String, dynamic>? ?? {};
-    final organizers = data['organizers'] as Map<String, dynamic>? ?? {};
-    final attendees = data['attendees'] as Map<String, dynamic>? ?? {};
+    Map<String, dynamic> overview, {
+    AdminRevenueSummary? fallbackRevenue,
+  }) {
+    final financials = _asMap(overview['financials']);
+    final events = _asMap(overview['events']);
 
-    final gross = (financials['gross_sales'] ?? fallbackRevenue.grossTicketSales).toDouble();
-    final comm = (financials['platform_commission'] ?? fallbackRevenue.ticketCommissionRevenue).toDouble();
-    final ordCount = (orders['total'] ?? fallbackRevenue.totalTicketOrders) as int;
-    final tktCount = (tickets['sold'] ?? 0) as int;
-    final orgCount = (organizers['active'] ?? 0) as int;
-    final attCount = (attendees['total'] ?? 0) as int;
+    final gross = _asDouble(
+      financials['gross_amount'],
+      fallbackRevenue?.grossTicketSales ?? 0,
+    );
+    final commission = _asDouble(
+      financials['commission_amount'],
+      fallbackRevenue?.ticketCommissionRevenue ?? 0,
+    );
+    final packageRevenue = fallbackRevenue?.packageRevenue ?? 0;
+    // `platform_revenue` sudah mencakup komisi + biaya layanan + paket.
+    final platformRevenue = financials.containsKey('platform_revenue')
+        ? _asDouble(financials['platform_revenue'])
+        : commission + packageRevenue;
+    final orders = _asInt(
+      overview['total_orders'],
+      fallbackRevenue?.totalTicketOrders ?? 0,
+    );
 
     final rev = AdminRevenueSummary(
-      period: 'all',
+      period: fallbackRevenue?.period ?? 'all',
       grossTicketSales: gross,
-      ticketCommissionRevenue: comm,
-      packageRevenue: fallbackRevenue.packageRevenue,
-      totalPlatformRevenue: comm + fallbackRevenue.packageRevenue,
-      totalTicketOrders: ordCount,
-      totalPackageInvoices: fallbackRevenue.totalPackageInvoices,
+      ticketCommissionRevenue: commission,
+      packageRevenue: packageRevenue,
+      totalPlatformRevenue: platformRevenue,
+      totalTicketOrders: orders,
+      totalPackageInvoices: fallbackRevenue?.totalPackageInvoices ?? 0,
     );
+
+    final trends = <PlatformTrendPoint>[];
+    final rawTrends = overview['trends'];
+    if (rawTrends is List) {
+      for (final item in rawTrends) {
+        final row = _asMap(item);
+        if (row.isEmpty) continue;
+        trends.add(
+          PlatformTrendPoint(
+            weekStart: DateTime.tryParse(row['week']?.toString() ?? ''),
+            gross: _asDouble(row['gross']),
+            revenue: _asDouble(row['revenue']),
+            transactions: _asInt(row['transactions']),
+          ),
+        );
+      }
+    }
 
     return PlatformRevenueSummary(
       revenue: rev,
-      totalOrders: ordCount,
-      totalTicketsIssued: tktCount,
-      totalOrganizers: orgCount,
-      totalParticipants: attCount,
+      totalOrders: orders,
+      totalTicketsIssued: _asInt(overview['tickets_sold']),
+      totalOrganizers: _asInt(overview['active_organizers']),
+      totalParticipants: _asInt(overview['total_participants']),
+      totalCheckIns: _asInt(overview['total_check_ins']),
+      eventsTotal: _asInt(events['total']),
+      eventsPublished: _asInt(events['published']),
+      eventsPendingReview: _asInt(events['pending_review']),
+      eventsRejected: _asInt(events['rejected']),
+      eventsDraft: _asInt(events['draft']),
+      eventsSuspended: _asInt(events['suspended']),
+      trends: trends,
     );
   }
 }
@@ -113,10 +237,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   String _selectedPeriod = '30d'; // today, 7d, 30d, this_month, all
   late Future<List<Map<String, dynamic>>> _eventsFuture;
   late PlatformRevenueSummary _summary;
+  bool _summaryLoading = false;
+  String? _summaryError;
 
   @override
   void initState() {
     super.initState();
+    _summary = PlatformRevenueSummary.empty();
     _reload();
   }
 
@@ -132,31 +259,99 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   void _reload() {
+    final useLocalSnapshot = AppConfig.mockMode || _isTestEnvironment;
     setState(() {
       _eventsFuture = _loadEvents();
-      _summary = PlatformRevenueSummary.forPeriod(
-        _selectedPeriod,
-        AdminRevenueService.instance.getRevenueSummarySnapshot(
-          period: _selectedPeriod,
-        ),
-      );
+      _summaryError = null;
+      if (useLocalSnapshot) {
+        // Mode demo/test: angka berasal dari fixture lokal, bukan database.
+        _summary = PlatformRevenueSummary.fromRevenue(
+          AdminRevenueService.instance.getRevenueSummarySnapshot(
+            period: _selectedPeriod,
+          ),
+        );
+        _summaryLoading = false;
+      } else {
+        // Mode API: jangan tampilkan angka contoh; mulai dari nol sampai
+        // agregasi database diterima.
+        _summary = PlatformRevenueSummary.empty();
+        _summaryLoading = true;
+      }
     });
-    if (!AppConfig.mockMode && !_isTestEnvironment) {
+    if (!useLocalSnapshot) {
       _loadOverviewFromApi();
     }
   }
 
+  /// Rentang tanggal untuk filter periode (`GET /api/admin/overview?from&to`).
+  Map<String, dynamic>? _periodQuery(String period) {
+    final now = DateTime.now();
+    DateTime? start;
+    switch (period) {
+      case 'today':
+        start = DateTime(now.year, now.month, now.day);
+      case '7d':
+        start = now.subtract(const Duration(days: 7));
+      case '30d':
+        start = now.subtract(const Duration(days: 30));
+      case 'this_month':
+        start = DateTime(now.year, now.month);
+      case 'all':
+      default:
+        start = null;
+    }
+    if (start == null) return null;
+    return {
+      'from': start.toUtc().toIso8601String(),
+      'to': now.toUtc().toIso8601String(),
+    };
+  }
+
   Future<void> _loadOverviewFromApi() async {
+    final period = _selectedPeriod;
     try {
-      final response = await ApiClient().get('/admin/overview');
-      final data = response['data'] as Map<String, dynamic>?;
-      if (data != null && mounted) {
+      // Hitungan operasional & keuangan platform berasal dari agregasi
+      // PostgreSQL pada /admin/overview.
+      final response = await ApiClient().get(
+        '/admin/overview',
+        query: _periodQuery(period),
+      );
+      final overview = response['overview'];
+      if (!mounted || period != _selectedPeriod) return;
+      if (overview is! Map<String, dynamic>) {
         setState(() {
-          _summary = PlatformRevenueSummary.fromOverview(data, _summary.revenue);
+          _summaryLoading = false;
+          _summaryError = 'Respons /admin/overview tidak valid.';
         });
+        return;
       }
-    } catch (_) {
-      // Keep existing snapshot
+
+      // Rincian tiket vs paket langganan diambil terpisah; kegagalan endpoint
+      // ini tidak boleh menghapus angka utama yang sudah valid dari database.
+      AdminRevenueSummary? revenue;
+      try {
+        revenue = await AdminRevenueService.instance.getRevenueSummary(
+          period: period,
+        );
+      } catch (_) {
+        revenue = null;
+      }
+      if (!mounted || period != _selectedPeriod) return;
+
+      setState(() {
+        _summary = PlatformRevenueSummary.fromOverview(
+          overview,
+          fallbackRevenue: revenue,
+        );
+        _summaryLoading = false;
+        _summaryError = null;
+      });
+    } catch (error) {
+      if (!mounted || period != _selectedPeriod) return;
+      setState(() {
+        _summaryLoading = false;
+        _summaryError = 'Gagal memuat ringkasan dari database.';
+      });
     }
   }
 
@@ -241,7 +436,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${auth.user?.email ?? "admin@event.com"} • Administrator Platform-Wide',
+                              '${auth.user?.email ?? "Administrator"} • Administrator Platform-Wide',
                               style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                             ),
                           ],
@@ -274,22 +469,55 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     DropdownMenuItem(value: 'all', child: Text('Semua Waktu')),
                   ],
                   onChanged: (val) {
-                    if (val != null) {
-                      setState(() {
-                        _selectedPeriod = val;
-                        _summary = PlatformRevenueSummary.forPeriod(
-                          val,
-                          AdminRevenueService.instance
-                              .getRevenueSummarySnapshot(period: val),
-                        );
-                      });
-                    }
+                    if (val == null || val == _selectedPeriod) return;
+                    _selectedPeriod = val;
+                    // Muat ulang dari API untuk periode baru. Pada mode
+                    // demo/test angka tetap berasal dari snapshot lokal.
+                    _reload();
                   },
                 ),
               ],
             ),
 
             const SizedBox(height: 12),
+
+            // Status ringkasan dari database: jangan sembunyikan kegagalan API
+            // agar admin tahu angka yang tampil benar-benar berasal dari DB.
+            if (_summaryError != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.cloud_off, size: 16, color: Colors.redAccent),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${_summaryError!} Metrik ditampilkan 0 sampai data database berhasil dimuat.',
+                        style: const TextStyle(fontSize: 12, color: Colors.redAccent),
+                      ),
+                    ),
+                    TextButton(onPressed: _reload, child: const Text('Muat ulang')),
+                  ],
+                ),
+              )
+            else if (_summaryLoading)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Memuat ringkasan dari database...',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
 
             // Future Builder for Event Data
             FutureBuilder<List<Map<String, dynamic>>>(
@@ -319,6 +547,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 int activeCount = 0;
                 int upcomingCount = 0;
                 int completedCount = 0;
+                int rejectedCount = 0;
 
                 for (final evt in events) {
                   final status = evt['status']?.toString().toLowerCase() ?? '';
@@ -346,12 +575,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     }
                   } else if (status == AppConstants.eventStatusCompleted) {
                     completedCount++;
+                  } else if (status == AppConstants.eventStatusRejected ||
+                      status == AppConstants.eventStatusSuspended) {
+                    rejectedCount++;
                   }
                 }
 
-                // If demo has no active yet, assign realistic defaults for UI demo
-                if (activeCount == 0 && events.isNotEmpty) activeCount = 1;
-                if (upcomingCount == 0 && events.isNotEmpty) upcomingCount = events.length - activeCount;
+                // Event yang tidak termasuk kategori di atas (mis. draft).
+                final otherCount = events.length -
+                    pendingCount -
+                    activeCount -
+                    upcomingCount -
+                    completedCount -
+                    rejectedCount;
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -592,7 +828,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     const SizedBox(height: 8),
-                    _buildVisualChartCard(),
+                    _buildVisualChartCard(
+                      published: activeCount,
+                      upcoming: upcomingCount,
+                      pending: pendingCount,
+                      rejected: rejectedCount,
+                      other: otherCount + completedCount,
+                    ),
 
                     const SizedBox(height: 20),
 
@@ -684,7 +926,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildVisualChartCard() {
+  /// Grafik distribusi status & tren penjualan.
+  ///
+  /// Semua angka berasal dari database: distribusi dihitung dari daftar event
+  /// (`GET /api/events`) dan tren mingguan dari `trends` pada
+  /// `GET /api/admin/overview`. Tidak ada bar/contoh hardcoded.
+  Widget _buildVisualChartCard({
+    required int published,
+    required int upcoming,
+    required int pending,
+    required int rejected,
+    required int other,
+  }) {
+    final distributionTotal =
+        published + upcoming + pending + rejected + other;
+    final trends = _summary.trends.reversed.toList(growable: false);
+    final maxGross = trends.isEmpty
+        ? 0.0
+        : trends
+            .map((trend) => trend.gross)
+            .reduce((a, b) => a > b ? a : b);
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -698,27 +960,54 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
             const SizedBox(height: 12),
-            // Multi-segment progress bar
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Row(
-                children: [
-                  Expanded(flex: 55, child: Container(height: 14, color: Colors.green)),
-                  Expanded(flex: 25, child: Container(height: 14, color: Colors.purple)),
-                  Expanded(flex: 15, child: Container(height: 14, color: Colors.orange)),
-                  Expanded(flex: 5, child: Container(height: 14, color: Colors.red)),
-                ],
+            if (distributionTotal == 0)
+              Text(
+                'Belum ada event pada database.',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              )
+            else
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Row(
+                  children: [
+                    if (published > 0)
+                      Expanded(
+                        flex: published,
+                        child: Container(height: 14, color: Colors.green),
+                      ),
+                    if (upcoming > 0)
+                      Expanded(
+                        flex: upcoming,
+                        child: Container(height: 14, color: Colors.purple),
+                      ),
+                    if (pending > 0)
+                      Expanded(
+                        flex: pending,
+                        child: Container(height: 14, color: Colors.orange),
+                      ),
+                    if (rejected > 0)
+                      Expanded(
+                        flex: rejected,
+                        child: Container(height: 14, color: Colors.red),
+                      ),
+                    if (other > 0)
+                      Expanded(
+                        flex: other,
+                        child: Container(height: 14, color: Colors.blueGrey),
+                      ),
+                  ],
+                ),
               ),
-            ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 16,
               runSpacing: 8,
               children: [
-                _buildLegendItem('Tayang/Disetujui (55%)', Colors.green),
-                _buildLegendItem('Mendatang (25%)', Colors.purple),
-                _buildLegendItem('Review (15%)', Colors.orange),
-                _buildLegendItem('Ditolak (5%)', Colors.red),
+                _buildLegendItem('Tayang ($published)', Colors.green),
+                _buildLegendItem('Mendatang ($upcoming)', Colors.purple),
+                _buildLegendItem('Menunggu Moderasi ($pending)', Colors.orange),
+                _buildLegendItem('Ditolak ($rejected)', Colors.red),
+                _buildLegendItem('Lainnya ($other)', Colors.blueGrey),
               ],
             ),
             const Divider(height: 24),
@@ -727,22 +1016,45 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
             const SizedBox(height: 12),
-            // Simulated chart bars
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                _buildBarCol('Mg 1', 0.4, 'Rp 1.5jt'),
-                _buildBarCol('Mg 2', 0.65, 'Rp 2.8jt'),
-                _buildBarCol('Mg 3', 0.5, 'Rp 2.1jt'),
-                _buildBarCol('Mg 4', 0.85, 'Rp 3.9jt'),
-                _buildBarCol('Mg 5', 1.0, 'Rp 4.7jt'),
-              ],
-            ),
+            if (trends.isEmpty)
+              Text(
+                'Belum ada transaksi terekam pada database.',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              )
+            else
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: trends
+                    .map(
+                      (trend) => _buildBarCol(
+                        trend.weekStart == null
+                            ? '-'
+                            : '${trend.weekStart!.day}/${trend.weekStart!.month}',
+                        maxGross <= 0 ? 0.05 : trend.gross / maxGross,
+                        _formatCompactCurrency(trend.gross),
+                      ),
+                    )
+                    .toList(growable: false),
+              ),
           ],
         ),
       ),
     );
+  }
+
+  /// Format singkat untuk label grafik (Rp 1,5 jt / Rp 250 rb).
+  String _formatCompactCurrency(double amount) {
+    if (amount >= 1000000000) {
+      return 'Rp ${(amount / 1000000000).toStringAsFixed(1)} M';
+    }
+    if (amount >= 1000000) {
+      return 'Rp ${(amount / 1000000).toStringAsFixed(1)} jt';
+    }
+    if (amount >= 1000) {
+      return 'Rp ${(amount / 1000).toStringAsFixed(0)} rb';
+    }
+    return _formatCurrency(amount);
   }
 
   Widget _buildLegendItem(String label, Color color) {

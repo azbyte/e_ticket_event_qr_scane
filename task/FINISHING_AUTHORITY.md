@@ -54,7 +54,7 @@ perubahan yang disetujui. Setiap perubahan harus:
 
 - sesuai PRD/keputusan tertulis dan konsisten dengan `backend/prisma/schema.prisma`
   sebagai sumber schema yang ditetapkan;
-- meninjau riwayat dan objek legacy `backend/supabase/migrations/` tanpa
+- meninjau riwayat dan objek legacy `backend/prisma/legacy-migrations/` tanpa
   menjalankan/menghapusnya secara otomatis;
 - memiliki migration yang reviewable dan tidak merusak data/migration sebelumnya;
 - memeriksa relasi, constraint, indeks, otorisasi, kompatibilitas runtime dan

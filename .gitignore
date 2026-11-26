@@ -47,6 +47,18 @@ android/app/debug/
 android/app/profile/
 android/app/release/
 
+# --- Media unggahan runtime (desain tiket Organizer) ---
+# File desain tersimpan di disk server, bukan di repo. Template bawaan
+# (backend/assets/ticket-templates) TETAP di-commit karena bagian dari produk.
+backend/storage/
+backend/_verify-out/
+backend/_server.out.log
+backend/_server.err.log
+
+# --- Backup database ---
+# Berisi data pribadi peserta (email/telepon) dan tidak boleh masuk repo.
+backend/backups/
+
 # =============================================================================
 # Catatan:
 # - File sumber (*.dart, *.js, *.md, *.json, *.yaml, *.yml, *.txt) TIDAK diabaikan.

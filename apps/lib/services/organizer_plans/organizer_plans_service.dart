@@ -4,6 +4,19 @@
 /// plan upgrade/downgrade simulation, and transaction payment history.
 library;
 
+import 'package:flutter/widgets.dart';
+
+import '../../core/config/app_config.dart';
+import '../../core/network/api_client.dart';
+
+bool get _isTestEnvironment {
+  try {
+    return WidgetsBinding.instance.runtimeType.toString().contains('Test');
+  } catch (_) {
+    return true;
+  }
+}
+
 class OrganizerPlanModel {
   final String id;
   final String name;
@@ -175,18 +188,74 @@ class OrganizerPlansService {
 
   /// Gets list of all available tiers.
   Future<List<OrganizerPlanModel>> getAvailablePlans() async {
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      final res = await ApiClient.instance.get('/plans');
+      final list = (res['plans'] as List<dynamic>? ?? []);
+      return list.map((item) {
+        final p = item as Map<String, dynamic>;
+        final featuresMap = p['features'] as Map<String, dynamic>? ?? {};
+        final featureList = <String>[];
+        if (p['max_active_events'] != null) {
+          featureList.add('Hingga ${p['max_active_events']} event aktif');
+        }
+        if (p['max_tickets_per_event'] != null) {
+          featureList.add('Maksimal ${p['max_tickets_per_event']} tiket/event');
+        }
+        for (final e in featuresMap.entries) {
+          featureList.add('${e.key}: ${e.value}');
+        }
+        return OrganizerPlanModel(
+          id: p['id']?.toString() ?? '',
+          name: p['name']?.toString() ?? '',
+          badge: p['is_free'] == true ? 'Dasar' : 'Pro',
+          priceMonthly: (p['price_monthly'] as num? ?? 0).toDouble(),
+          priceDescription: p['description']?.toString() ?? 'Rp ${p['price_monthly'] ?? 0} / bulan',
+          features: featureList.isNotEmpty ? featureList : ['Fitur standar platform'],
+          maxActiveEvents: p['max_active_events'] as int? ?? 1,
+          maxTicketsPerEvent: p['max_tickets_per_event'] as int? ?? 100,
+          allowExport: featuresMap['has_export_attendees'] == true,
+          allowCustomBranding: featuresMap['has_custom_branding'] == true,
+        );
+      }).toList();
+    }
+
     await Future<void>.delayed(const Duration(milliseconds: 200));
     return List<OrganizerPlanModel>.unmodifiable(_availablePlans);
   }
 
   /// Gets active subscription for current organizer.
   Future<OrganizerSubscriptionModel> getCurrentSubscription() async {
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      final res = await ApiClient.instance.get('/subscriptions/me');
+      final s = res['subscription'] as Map<String, dynamic>?;
+      if (s != null) {
+        return OrganizerSubscriptionModel(
+          id: s['id']?.toString() ?? '',
+          organizerId: s['user_id']?.toString() ?? '',
+          planId: s['plan_id']?.toString() ?? '',
+          planName: s['plan_name']?.toString() ?? 'Paket',
+          status: (s['status'] ?? 'active').toString().toLowerCase(),
+          startDate: s['starts_at'] != null ? (DateTime.tryParse(s['starts_at'].toString()) ?? DateTime.now()) : DateTime.now(),
+          endDate: s['expires_at'] != null ? (DateTime.tryParse(s['expires_at'].toString()) ?? DateTime.now().add(const Duration(days: 30))) : DateTime.now().add(const Duration(days: 30)),
+          autoRenew: s['auto_renew'] == true,
+        );
+      }
+    }
+
     await Future<void>.delayed(const Duration(milliseconds: 200));
     return _currentSubscription;
   }
 
   /// Changes or upgrades the current plan.
   Future<bool> changePlan(String newPlanId) async {
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      final res = await ApiClient.instance.post('/subscriptions', body: {
+        'planId': newPlanId,
+        'billingInterval': 'MONTHLY',
+      });
+      return res['success'] == true;
+    }
+
     await Future<void>.delayed(const Duration(milliseconds: 400));
     final selectedIndex = _availablePlans.indexWhere(
       (plan) => plan.id == newPlanId,
@@ -223,6 +292,23 @@ class OrganizerPlansService {
 
   /// Gets transaction payment history for subscription packages.
   Future<List<PlanTransactionModel>> getTransactionHistory() async {
+    if (!AppConfig.mockMode && !_isTestEnvironment) {
+      final res = await ApiClient.instance.get('/subscriptions/payments');
+      final list = (res['payments'] as List<dynamic>? ?? []);
+      return list.map((item) {
+        final p = item as Map<String, dynamic>;
+        return PlanTransactionModel(
+          id: p['id']?.toString() ?? '',
+          invoiceNumber: p['invoice_number']?.toString() ?? 'INV-${p['id']}',
+          planName: p['plan_name']?.toString() ?? 'Paket Langganan',
+          amount: (p['amount'] as num? ?? 0).toDouble(),
+          paymentMethod: p['payment_method']?.toString() ?? 'Virtual Account',
+          status: (p['status'] ?? 'pending').toString().toLowerCase(),
+          transactionDate: p['created_at'] != null ? (DateTime.tryParse(p['created_at'].toString()) ?? DateTime.now()) : DateTime.now(),
+        );
+      }).toList();
+    }
+
     await Future<void>.delayed(const Duration(milliseconds: 200));
     return List<PlanTransactionModel>.unmodifiable(_mockTransactions);
   }

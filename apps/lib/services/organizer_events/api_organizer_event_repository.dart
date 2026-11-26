@@ -306,7 +306,9 @@ class ApiOrganizerEventRepository implements OrganizerEventRepository {
     'contact_info': draft.contactInfo.trim(),
     'organizer_name': draft.organizerName.trim(),
     'public_info': _trimToNull(draft.publicInfo),
-    'attendee_fields': draft.attendeeFields,
+    'attendee_fields': draft.resolvedAttendeeFieldDefinitions
+        .map((field) => field.toJson())
+        .toList(growable: false),
   };
 
   static Map<String, dynamic> _ticketTypePayload(

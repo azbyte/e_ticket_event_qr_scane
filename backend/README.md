@@ -12,89 +12,182 @@ Dibangun dengan **Node.js + Express + JavaScript** dan database **PostgreSQL via
   `src/config/db.js`. `src/config/supabase.js` hanya alias kompatibilitas dan
   tidak lagi membuat Supabase JS client.
 - Migration Prisma **sudah diterapkan** pada database yang dikonfigurasi
-  `DATABASE_URL` dan tercatat di `_prisma_migrations` (6 migration, terakhir
-  `20261118000100_fix_payment_status_enum`).
+  `DATABASE_URL` dan tercatat di `_prisma_migrations` (9 migration, terakhir
+  `20261118000400_restore_payment_status_enum_cast`). Bukti pemeriksaan ada di
+  [`../task/DATABASE_AUDIT_FINAL.md`](../task/DATABASE_AUDIT_FINAL.md).
 - `npx prisma migrate diff --from-schema-datasource prisma/schema.prisma
   --to-schema-datamodel prisma/schema.prisma --script` menghasilkan
   `-- This is an empty migration.` yang berarti struktur database aktual sesuai
   schema.
 - Function PostgreSQL `moderate_event`, `create_event_order`,
   `simulate_event_payment`, dan `expire_event_order_reservations` tersedia.
-- RLS **belum diaktifkan pada seluruh 32 tabel aplikasi** (0 policy), sementara role
-  Supabase `anon` dan `authenticated` masih memiliki 7 privilege penuh pada setiap
-  tabel (SELECT/INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER). Artinya data
-  dapat dibaca dan diubah lewat Supabase REST bila `anon` key diketahui.
-  Backend terhubung sebagai pemilik tabel (`postgres`), sehingga pengaktifan RLS
-  tidak akan memutus backend. Ini prasyarat wajib sebelum rilis.
+- RLS aktif pada **32/32** tabel aplikasi dengan **0 policy** dan **0 grant**
+  untuk `anon`/`authenticated` (diterapkan oleh migration
+  `20261118000200_rls_and_supabase_grants`); hanya `service_role` yang memiliki
+  privilege. Pemilik tabel adalah `postgres` (juga role koneksi backend),
+  sehingga RLS tidak memutus backend. Otorisasi aplikasi tetap ditegakkan di
+  middleware/controller backend, bukan oleh RLS.
 - Verifikasi schema berlapis: `npm run verify:db-schema` (introspeksi `prisma db
   pull` + `migrate diff` dua arah + perbandingan jumlah index). Hasil terakhir:
   tidak ada perbedaan.
-- Audit read-only: `node scripts/audit-db.js`. Rekonsiliasi function yang hilang
-  pada database lama: `node scripts/apply-db-functions.js --apply`.
+- Audit read-only: `node scripts/audit-db.js`. Rekonsiliasi function PL/pgSQL
+  pada database lama dilakukan lewat migration Prisma (`npx prisma migrate
+  deploy`), bukan skrip terpisah.
 
 ## Struktur Folder
 
 ```
 backend/
-├── .env                  # Environment variables (buat dari .env.example)
-├── .env.example          # Contoh variabel environment
+├── .env                    # Environment variables lokal (buat dari .env.example)
+├── .env.example            # Contoh variabel environment
+├── .env.test.example       # Contoh variabel untuk environment uji
 ├── .gitignore
+├── nodemon.json            # Konfigurasi watch untuk `npm run dev`
 ├── package.json
-├── server.js             # Entry point server
+├── package-lock.json
+├── server.js               # Entry point server (bootstrap akun + listen)
 ├── README.md
+├── backups/                # Backup JSON lokal (di-ignore Git)
+├── prisma/
+│   ├── schema.prisma       # Sumber kebenaran schema
+│   ├── migrations/         # 9 migration aktif + migration_lock.toml
+│   └── legacy-migrations/  # SQL legacy; jangan dijalankan tanpa rekonsiliasi
+├── scripts/                # Tooling dev, audit, verifikasi, backup, dan E2E
+│   └── integration/        # Harness integrasi destruktif (opt-in)
+├── test/                   # 29 file `*.test.js` untuk `npm test`
 └── src/
-    ├── app.js            # Express app setup & middleware
+    ├── app.js              # Setup Express + mount 5 router domain pada `/api`
     ├── config/
-    │   ├── env.js        # Validasi & ekspor environment variables
-    │   └── supabase.js   # Alias kompatibilitas (tanpa Supabase JS client)
+    │   ├── db.js           # Pool PostgreSQL (`pg`) satu-satunya koneksi
+    │   ├── env.js          # Validasi & ekspor environment variables
+    │   └── supabase.js     # Alias kompatibilitas (tanpa Supabase JS client)
     ├── controllers/
-    │   ├── authController.js      # Register, login, profile
-    │   ├── eventController.js     # CRUD, visibilitas, dan moderasi event
-    │   ├── eventMetricsController.js # Ringkasan event, grafik, dan moderasi
-    │   ├── orderController.js    # Checkout dan akses order
-    │   ├── paymentController.js  # Pembayaran Virtual Account simulasi
-    │   ├── ticketController.js    # Buat tiket, lihat tiket, verifikasi QR
-    │   └── ticketTypeController.js # CRUD kategori tiket
+    │   ├── adminController.js             # Daftar akun & aktif/nonaktif
+    │   ├── adminOverviewController.js     # Ringkasan konsol Admin
+    │   ├── auditLogController.js          # Riwayat audit platform
+    │   ├── authController.js              # Register, login, profil, logout
+    │   ├── checkInController.js           # Check-in, peserta, export, order event
+    │   ├── eventController.js             # CRUD, publikasi, anggota event
+    │   ├── eventInvitationController.js   # Undangan staf & membership
+    │   ├── eventMetricsController.js      # Ringkasan, grafik, moderasi
+    │   ├── notificationController.js      # Notifikasi in-app
+    │   ├── orderController.js             # Checkout dan akses order
+    │   ├── organizerProfileController.js  # Profil organizer
+    │   ├── paymentController.js           # Pembayaran Virtual Account simulasi
+    │   ├── planController.js              # Katalog paket langganan
+    │   ├── platformSettingsController.js  # Pengaturan platform
+    │   ├── reportController.js            # Laporan dukungan
+    │   ├── revenueController.js           # Pendapatan organizer & platform
+    │   ├── subscriptionController.js      # Langganan organizer
+    │   ├── ticketController.js            # Tiket, QR, kirim ulang email
+    │   └── ticketTypeController.js        # CRUD kategori tiket
     ├── middleware/
-    │   ├── authMiddleware.js      # Verifikasi JWT
-    │   ├── errorMiddleware.js     # Global error handler
-    │   ├── notFoundMiddleware.js  # 404 handler
-    │   └── validationMiddleware.js# Hasil express-validator
+    │   ├── authMiddleware.js       # Verifikasi JWT + role dari database
+    │   ├── errorMiddleware.js      # Global error handler
+    │   ├── notFoundMiddleware.js   # 404 handler
+    │   ├── rateLimitMiddleware.js  # Limit global/auth/scan/tulis
+    │   ├── requestLogger.js        # Log request terstruktur
+    │   ├── roleMiddleware.js       # Gate role
+    │   └── validationMiddleware.js # Hasil express-validator
     ├── models/            # Legacy (tidak dipakai runtime; lihat catatan di bawah)
     │   ├── User.js      # Model profil pengguna (legacy Supabase client)
     │   ├── Event.js     # Model event (legacy)
     │   └── Ticket.js    # Model tiket & QR code (legacy)
-    ├── routes/
-    │   ├── authRoutes.js
-    │   ├── eventRoutes.js
-    │   ├── organizerRoutes.js
-    │   ├── orderRoutes.js
-    │   ├── paymentRoutes.js
-    │   ├── ticketRoutes.js
-    │   └── ticketTypeRoutes.js
+    ├── routes/                     # 5 router domain; semuanya di-mount pada `/api`
+    │   ├── admin.js       # /admin, /plans, /subscriptions, /revenue,
+    │   │                  # /support-reports, /notifications
+    │   ├── auth.js        # /auth, /me
+    │   ├── events.js      # /events, /ticket-types, /invitations
+    │   ├── orders.js      # /orders, /payments, /tickets, /check-ins
+    │   └── organizer.js   # /organizer (overview, summaries, profile)
     ├── services/
+    │   ├── adminBootstrapService.js# Bootstrap akun admin (+ bootstrapConfiguredAccounts)
     │   ├── authService.js          # Logic auth (token, hash password)
-    │   ├── ticketTokenService.js   # Token QR tiket bertanda tangan (HMAC)
     │   ├── emailService.js         # Pengiriman email tiket
     │   ├── notificationService.js  # Notifikasi in-app
-    │   ├── seedService.js          # Seed data demo
-    │   └── adminBootstrapService.js# Bootstrap akun admin
+    │   └── ticketTokenService.js   # Token QR tiket bertanda tangan (HMAC)
     ├── utils/
-    │   ├── response.js    # Helper response standar
-    │   ├── constants.js   # Konstanta aplikasi
-    │   └── validators.js  # Validator sederhana
+    │   ├── auditLog.js       # Penulisan audit log
+    │   ├── constants.js      # Konstanta aplikasi
+    │   ├── eventResponse.js  # Serializer event
+    │   ├── eventSummary.js   # Agregasi ringkasan event
+    │   ├── eventValidation.js# Validasi kelayakan publikasi
+    │   ├── logger.js         # Logger terstruktur
+    │   ├── orderResponse.js  # Serializer order/payment
+    │   ├── response.js       # Helper response standar (dipakai test)
+    │   └── validators.js     # Validator sederhana
     └── validators/
-        ├── authValidator.js     # Validasi register/login
-        └── ticketValidator.js   # Validasi tiket
+        └── index.js             # Validasi register/login & verifikasi tiket
 ```
 
 > **Catatan legacy:** `src/models/*.js` dan `src/config/supabase.js` adalah sisa
 > lapisan Supabase JS client lama. Runtime sekarang memakai `pg` melalui
-> `src/config/db.js`, dan tidak ada modul yang mengimpor `models/*`. Keduanya
-> dipertahankan sementara karena berada di area konfigurasi database yang
+> `src/config/db.js`, dan tidak ada modul runtime yang mengimpor `models/*`.
+> Keduanya dipertahankan sementara karena berada di area konfigurasi database yang
 > wewenangnya ada pada FINISHING; lihat proposal di laporan audit struktur.
+> `src/utils/response.js` juga tidak dipakai controller, tetapi tetap dipertahankan
+> karena diuji oleh `test/utils.test.js`.
+
+Daftar di atas adalah kondisi aktual `backend/`. Setiap modul, route, atau script
+baru wajib ditambahkan ke daftar ini pada perubahan yang sama agar dokumentasi
+tidak menyimpang dari kode.
+
+**Konsolidasi router (Tier C).** Enam belas berkas route lama
+(`authRoutes`, `eventRoutes`, `ticketRoutes`, `ticketTypeRoutes`,
+`checkInRoutes`, `invitationsRoutes`, `meRoutes`, `notificationRoutes`,
+`reportRoutes`, `adminRoutes`, `organizerRoutes`, `orderRoutes`,
+`paymentRoutes`, `planRoutes`, `subscriptionRoutes`, `revenueRoutes`) digabung
+menjadi **5 router domain** di atas. Setiap router di-mount pada `/api` dan
+mendaftarkan sub-path-nya sendiri, sehingga **path API tidak berubah**
+(88 endpoint, terverifikasi `npm run routes:list` dan `npm run test:routes`).
+Empat route yang sebelumnya didaftarkan langsung di `app.js`
+(`/api/events/:id/attendees/export`, `/api/events/:id/orders`,
+`/api/organizer/profile` GET/PUT, `/api/admin/email/retry`) kini berada di
+domainnya masing-masing.
+
+**Konsolidasi berkas pendukung (Tier B).** `services/seedService.js` dilebur ke
+`services/adminBootstrapService.js` (ekspor `bootstrapConfiguredAccounts`), dan
+`validators/authValidator.js` + `validators/ticketValidator.js` dilebur menjadi
+`validators/index.js`. Nama ekspor tidak berubah.
+
+Menambah endpoint baru: letakkan pada router domain yang sesuai di
+`src/routes/*.js`. Penggabungan berkas **tidak** memengaruhi performa request
+(`require` di-cache Node); dampaknya hanya pada waktu boot.
+
+### Script dan tooling
+
+| Script | Dijalankan lewat | Fungsi |
+|--------|------------------|--------|
+| `scripts/check-syntax.js` | `npm run check` / `npm run lint` | Parse seluruh `src/` dan `server.js` |
+| `scripts/check-format.js` | `npm run format:check` | Deteksi CRLF dan trailing whitespace |
+| `scripts/preflight-port.js` + `scripts/dev.js` | `npm run dev` / `npm run dev:reset` | Cek port dan jalankan nodemon tanpa proses yatim |
+| `scripts/provision-admin.js` | `npm run admin:provision` | Bootstrap akun Admin idempotent |
+| `scripts/audit-db.js` | `npm run audit:db` | Audit database read-only |
+| `scripts/verify-schema-sync.js` | `npm run verify:db-schema` | Bandingkan schema Prisma dengan database (read-only) |
+| `scripts/integration/` | `npm run test:integration` | Harness integrasi destruktif (opt-in) |
+| `scripts/e2e-live.js` + `scripts/e2e-live-helpers.js` | `npm run test:e2e` | E2E alur PRD terhadap API + database nyata |
+| `scripts/e2e-auth-live.js` | `npm run test:auth-live` | E2E login & registrasi Organizer terhadap API + database nyata |
+| `scripts/verify-db-state.js` | `npm run verify:auth-db` | Ringkasan akun & profil Organizer di database (read-only) |
+| `scripts/repair-organizer-profiles.js` | `npm run repair:organizer-profiles` | Buat `organizer_profiles` yang hilang (idempotent, tidak menghapus akun) |
+| `scripts/dump-routes.js` | `npm run routes:list` | Cetak tabel 88 route yang terdaftar di Express (read-only) |
+| `scripts/smoke-routes.js` | `npm run test:routes` | Pastikan semua endpoint terdaftar (regresi konsolidasi router) |
+| `scripts/backup-db-json.js` | manual | Backup seluruh tabel sebagai JSON sebelum operasi destruktif |
+
+### Test
+
+- `npm test` menjalankan seluruh `test/*.test.js` dengan `node --test`.
+- `npm run test:sync-config` memvalidasi validator sinkronisasi konfigurasi.
+- `npm run test:integration` dan `npm run test:e2e` memerlukan database/API uji
+  serta `ALLOW_DESTRUCTIVE_TESTS=true`; jangan arahkan ke database produksi.
+- `npm run test:registration-flow` menguji alur nyata (registrasi Organizer →
+  event → kategori → publikasi → link/QR publik → desain tiket → pendaftaran
+  guest → pembayaran simulasi → tiket PDF) terhadap backend yang sedang
+  berjalan. `npm run verify:ticket-pdf` memverifikasi rendering template/tiket.
 
 ## Endpoint API
+
+Health check: `GET /health` (tanpa prefix `/api`) mengembalikan status server dan
+koneksi database.
 
 ### Auth
 | Method | Endpoint | Deskripsi | Akses |
@@ -108,16 +201,22 @@ backend/
 ### Events
 | Method | Endpoint | Deskripsi | Akses |
 |--------|----------|-----------|-------|
-| GET | `/api/events/public` | Event yang disetujui dan dipublikasikan | Public |
+| GET | `/api/events/public` | Event yang dipublikasikan | Public |
 | GET | `/api/events/mine` | Event milik Organizer login | Organizer |
 | GET | `/api/events` | Semua event untuk moderasi | Admin |
 | GET | `/api/events/:id` | Detail event publik atau milik pengguna berhak | Public/owner/Admin |
 | POST | `/api/events` | Buat draft event | Organizer |
 | PUT | `/api/events/:id` | Perbarui event yang statusnya dapat diedit | Owner/Admin |
 | DELETE | `/api/events/:id` | Hapus draft event | Owner/Admin |
-| POST | `/api/events/:id/submit-review` | Ajukan event untuk moderasi | Organizer |
+| POST | `/api/events/:id/submit-review` | Ajukan publikasi event; langsung `PUBLISHED` bila valid | Organizer |
+| POST | `/api/events/:id/publish` | Publikasi event setelah validasi (perilaku sama dengan `submit-review`) | Organizer |
 | GET/POST | `/api/events/:id/ticket-types` | Baca/buat kategori tiket | Public/Organizer |
 | PUT/DELETE | `/api/events/:id/ticket-types/:ticketTypeId` | Ubah/hapus kategori tiket | Organizer |
+| GET | `/api/ticket-types/:id` | Detail kategori tiket | Public |
+| GET | `/api/events/:id/ticket-design` | Desain tiket event + per kategori (posisi QR) | Owner/Admin |
+| PUT | `/api/events/:id/ticket-design` | Unggah desain tiket (`scope=event` atau `scope=ticket_type`) | Owner/Admin |
+| DELETE | `/api/events/:id/ticket-design?scope=` | Hapus desain (kembali ke desain default) | Owner/Admin |
+| GET | `/api/ticket-design-template?format=pdf\|png` | Unduh template desain tiket (ukuran + penanda QR) | Public |
 | GET | `/api/events/:id/summary` | Ringkasan operasional event | Organizer/Admin |
 | GET | `/api/events/:id/sales` | Seri tiket/check-in 7 hari | Organizer/Admin |
 | GET/POST | `/api/events/:id/members` | Daftar/tambah staf event + izin | Owner |
@@ -131,18 +230,30 @@ backend/
 | GET | `/api/me/memberships` | Event yang diikuti pengguna sebagai staf + izinnya | Private |
 | GET | `/api/organizer/overview` | Ringkasan event Organizer | Organizer |
 | GET | `/api/organizer/events/summaries` | Ringkasan per event Organizer | Organizer |
+| GET/PUT | `/api/organizer/profile` | Baca/perbarui profil Organizer login | Organizer |
 | PUT | `/api/admin/events/:id/moderation` | Keputusan moderasi atomik dan audit | Admin |
 | GET | `/api/admin/accounts` | Daftar akun | Admin |
+| GET | `/api/admin/organizers` | Daftar akun Organizer | Admin |
 | PUT | `/api/admin/accounts/:id/status` | Aktif/nonaktifkan akun | Admin |
+| GET | `/api/admin/audit-logs` | Riwayat audit platform | Admin |
+| GET | `/api/admin/settings` | Daftar pengaturan platform | Admin |
+| PUT | `/api/admin/settings/:key` | Ubah satu pengaturan platform | Admin |
+| GET | `/api/admin/overview` | Ringkasan konsol Admin | Admin |
+| GET | `/api/admin/subscriptions` | Langganan seluruh Organizer | Admin |
+| POST | `/api/admin/email/retry` | Kirim ulang email tiket yang tertunda | Admin |
 
 ### Tickets
 | Method | Endpoint | Deskripsi | Akses |
 |--------|----------|-----------|-------|
-| POST | `/api/tickets` | Terbitkan tiket langsung (khusus owner event, legacy; alur utama via order) | Organizer/Admin |
 | GET | `/api/tickets/my-tickets` | Tiket milik user login; guest mengirim `order_id` + header `X-Order-Access-Token` | Private/order token |
 | GET | `/api/tickets/:id` | Detail tiket milik user login atau `order_id` + header `X-Order-Access-Token` | Private/order token |
+| GET | `/api/tickets/:id/pdf` | Unduh e-ticket PDF memakai desain Organizer + QR unik | Pemilik tiket/order token |
+| POST | `/api/tickets/:id/email` | Kirim ulang email tiket | Pemilik tiket/order token |
 | POST | `/api/tickets/validate` | Validasi QR tanpa mutasi; wajib izin petugas event | Private (staff) |
 | POST | `/api/tickets/verify` | Verifikasi QR dan catat check-in (`check_ins` + `scan_logs`) secara atomik; 409 bila sudah dipakai | Private (staff) |
+
+Endpoint legacy `POST /api/tickets` sudah dihapus dari `ticketRoutes.js`; tiket hanya
+terbit melalui order yang sudah dibayar.
 
 ### Check-in
 | Method | Endpoint | Deskripsi | Akses |
@@ -151,6 +262,8 @@ backend/
 | GET | `/api/check-ins/events/:eventId/check-ins` | Riwayat check-in event | Private (staff) |
 | POST | `/api/check-ins/sync` | Sinkronisasi antrean check-in offline | Private (staff) |
 | GET | `/api/events/:eventId/attendees` | Daftar peserta/tiket event | Owner/staff |
+| GET | `/api/events/:id/attendees/export` | Export CSV peserta event | Owner/staff dengan izin |
+| GET | `/api/events/:id/orders` | Daftar order event | Owner/staff |
 
 ### Notifikasi dan laporan dukungan
 | Method | Endpoint | Deskripsi | Akses |
@@ -178,6 +291,23 @@ Endpoint simulasi dinonaktifkan secara default. Aktifkan hanya pada environment
 non-produksi dengan `SIMULATED_PAYMENTS_ENABLED=true`; simulasi ini bukan
 integrasi bank atau payment gateway.
 
+### Plans, subscriptions, dan revenue
+| Method | Endpoint | Deskripsi | Akses |
+|--------|----------|-----------|-------|
+| GET | `/api/plans` | Katalog paket aktif | Public |
+| GET | `/api/plans/:id` | Detail paket | Public |
+| GET | `/api/plans/admin/all` | Semua paket termasuk nonaktif | Admin |
+| POST | `/api/plans/admin` | Buat paket | Admin |
+| PUT | `/api/plans/admin/:id` | Ubah paket | Admin |
+| DELETE | `/api/plans/admin/:id` | Hapus paket | Admin |
+| GET | `/api/subscriptions/me` | Langganan Organizer login | Organizer |
+| POST | `/api/subscriptions` | Berlangganan paket | Organizer |
+| POST | `/api/subscriptions/cancel` | Batalkan langganan | Organizer |
+| GET | `/api/subscriptions/payments` | Riwayat pembayaran langganan | Organizer |
+| GET | `/api/revenue/me` | Pendapatan Organizer login | Organizer |
+| GET | `/api/revenue/admin/summary` | Ringkasan pendapatan platform | Admin |
+| GET | `/api/revenue/admin/transactions` | Daftar transaksi platform | Admin |
+
 ## Instalasi
 
 ```bash
@@ -197,7 +327,6 @@ kosong:
 
 ```bash
 npx prisma migrate resolve --applied <nama-migration>   # untuk setiap baseline
-node scripts/apply-db-functions.js --apply              # bila function PL/pgSQL hilang
 npx prisma migrate deploy
 ```
 
@@ -229,10 +358,26 @@ Jangan gunakan `prisma migrate reset` atau `db push` pada database berisi data.
    tersimpan di tabel `profiles` dengan `role = 'admin'` dan hash bcrypt;
    mekanisme login sama dengan `POST /api/auth/login`. `npm start` juga
    menjalankan bootstrap ini bila kedua variabel terisi.
+
+   Bila baris Admin sudah ada tetapi hash tersimpan tidak cocok dengan
+   `ADMIN_PASSWORD`, bootstrap melaporkan `PASSWORD_MISMATCH` (login akan 401
+   `Invalid credentials`). Selaraskan dengan memutar password sekali:
+
+   ```bash
+   # PowerShell
+   $env:ADMIN_RESET_PASSWORD='true'; npm run admin:provision; Remove-Item Env:\ADMIN_RESET_PASSWORD
+   ```
+
 4. Akun Organizer dibuat lewat `POST /api/auth/register` (role selalu
-   organizer). Tidak ada seed akun demo dengan password tetap.
-5. Arahkan Flutter ke API dengan
-   `--dart-define=API_BASE_URL=http://10.0.2.2:5000/api` (emulator Android).
+   organizer). Tidak ada seed akun demo dengan password tetap. Registrasi
+   membuat baris `profiles` **dan** `organizer_profiles` dalam satu transaksi;
+   bila salah satu gagal, keduanya dibatalkan sehingga tidak ada akun tanpa
+   profil Organizer. Akun lama yang terlanjur tanpa profil dapat dirapikan
+   dengan `npm run repair:organizer-profiles` (idempotent, tidak menghapus akun).
+5. Arahkan Flutter ke API. Tanpa `--dart-define=API_BASE_URL`, default mengikuti
+   target: emulator Android `http://10.0.2.2:5000/api`, web/desktop/iOS
+   simulator `http://127.0.0.1:5000/api`. Perangkat fisik tetap memerlukan
+   `--dart-define=API_BASE_URL=http://<IP-LAN-host>:5000/api`.
 
 Email akun Admin bukan "sertifikat" hak akses: role dibaca ulang dari database
 pada setiap request (`authMiddleware`), sehingga perubahan role/disable berlaku
@@ -245,6 +390,16 @@ Staf event disimpan di `event_members` beserta izin granular di
 `event_member_permissions`; undangan memakai `event_invitations` dengan hash
 token dan masa berlaku.
 
+### CORS pada development
+
+`ALLOWED_ORIGINS` tetap menjadi daftar origin utama. Di luar `NODE_ENV=production`,
+semua origin loopback (`http://localhost:<port>`, `http://127.0.0.1:<port>`,
+`http://[::1]:<port>`) diizinkan otomatis. Ini diperlukan karena
+`flutter run -d chrome` memakai port acak; tanpa pengecualian tersebut browser
+memblokir seluruh request login/registrasi. Origin non-loopback tetap ditolak
+(403), dan pada production hanya `ALLOWED_ORIGINS` yang berlaku.
+
+
 ## Variabel Environment (.env)
 
 | Variabel | Deskripsi | Contoh |
@@ -256,9 +411,22 @@ token dan masa berlaku.
 | `DIRECT_URL` | Koneksi langsung untuk migrasi | `postgresql://...` |
 | `JWT_SECRET` | Secret untuk sign JWT | nilai acak panjang |
 | `JWT_EXPIRES_IN` | Masa berlaku token | `7d` |
+| `TICKET_TOKEN_SECRET` | Secret HMAC token QR tiket; fallback ke `JWT_SECRET` bila kosong (produksi wajib terpisah) | nilai acak panjang |
+| `APP_PUBLIC_URL` | URL publik aplikasi untuk `public_url` event dan tautan tiket | `http://localhost:3000` |
 | `ALLOWED_ORIGINS` | Daftar origin CORS dipisah koma | `http://localhost:3000` |
 | `CORS_ORIGIN` | Alias lama CORS (kompatibilitas) | `http://localhost:3000` |
+| `SMTP_HOST` | Host SMTP; bila kosong pengiriman email dinonaktifkan (status `PENDING`) | `smtp.example.test` |
+| `SMTP_PORT` | Port SMTP | `587` |
+| `SMTP_SECURE` | Gunakan TLS langsung | `false` |
+| `SMTP_USER` / `SMTP_PASS` | Kredensial SMTP (hanya di `.env`) | nilai rahasia |
+| `EMAIL_FROM` | Alamat pengirim email tiket | `no-reply@eticket.local` |
+| `RATE_LIMIT_WINDOW_MS` | Jendela rate limit | `900000` |
+| `RATE_LIMIT_AUTH_MAX` / `RATE_LIMIT_SCAN_MAX` / `RATE_LIMIT_GLOBAL_MAX` | Batas request auth/scan/global per jendela | `20` / `600` / `1200` |
+| `MAX_JSON_BODY` | Batas ukuran body JSON | `2mb` |
 | `SIMULATED_PAYMENTS_ENABLED` | Aktifkan simulasi pembayaran non-produksi | `false` |
+| `ALLOW_DESTRUCTIVE_TESTS` | Izinkan harness integrasi destruktif pada DB uji | `false` |
+| `TEST_API_URL` | Base URL API untuk harness integrasi/E2E | `http://127.0.0.1:5000` |
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Legacy `.env.example`; tidak dipakai backend (koneksi lewat `DATABASE_URL`) | — |
 | `ADMIN_EMAIL` | Email akun Admin yang di-bootstrap ke tabel `profiles` | `admin@your-domain.test` |
 | `ADMIN_PASSWORD` | Password awal Admin (minimal 8 karakter, hanya di `.env`) | nilai acak kuat |
 | `ADMIN_NAME` | Nama tampilan Admin | `Administrator Platform` |
@@ -285,7 +453,8 @@ backend, bukan oleh RLS.
 
 ## Integrasi dengan Flutter (Frontend)
 
-Di Flutter (`frontend/lib/`), gunakan `http` atau `dio` untuk memanggil API:
+Di Flutter (`apps/lib/`), gunakan `http` untuk memanggil API (base URL diatur lewat
+`--dart-define=API_BASE_URL=...`):
 
 ```dart
 static const String baseUrl = 'http://10.0.2.2:5000/api'; // Android Emulator

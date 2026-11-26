@@ -275,6 +275,19 @@ test('getAdminOverview: mengembalikan metrik event, pengguna, dan finansial dari
   assert.equal(overview.total_orders, 25);
   assert.equal(overview.financials.gross_amount, 5000000);
   assert.equal(overview.financials.platform_revenue, 312500);
+
+  // Kontrak yang dibaca konsol Admin Flutter
+  // (`PlatformRevenueSummary.fromOverview`). Bila key ini berubah, dashboard
+  // akan kembali menampilkan nol/angka contoh tanpa error — karena itu bentuk
+  // respons dijaga di sini.
+  assert.equal(typeof overview.tickets_sold, 'number');
+  assert.equal(typeof overview.total_participants, 'number');
+  assert.equal(typeof overview.total_check_ins, 'number');
+  assert.ok('pending_review' in overview.events);
+  assert.ok('rejected' in overview.events);
+  assert.ok('draft' in overview.events);
+  assert.ok(Array.isArray(overview.trends));
+  assert.equal(typeof overview.financials.commission_amount, 'number');
 });
 
 test('listAdminSubscriptions: mengembalikan daftar langganan platform', async () => {

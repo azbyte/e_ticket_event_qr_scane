@@ -35,7 +35,7 @@ const createFakeStore = (seed = []) => {
   };
 
   const getOne = async (sql, params = []) => {
-    if (sql.startsWith('SELECT id, role, disabled_at FROM profiles WHERE email')) {
+    if (sql.startsWith('SELECT id, role, disabled_at')) {
       return profiles.find((row) => row.email === params[0]) || null;
     }
     if (sql.startsWith('INSERT INTO profiles')) {
@@ -155,9 +155,10 @@ test('rotasi password hanya terjadi bila diminta eksplisit', async () => {
   ]);
   const service = buildService(store);
 
+  // Password yang dikonfigurasi sama dengan yang tersimpan: tidak ada perubahan.
   const unchanged = await service.ensureAdminAccount({
     email: 'admin@example.test',
-    password: STRONG_PASSWORD,
+    password: 'Old-Password-123!',
     name: 'Administrator Platform',
     username: 'admin',
     rotatePassword: false,
@@ -176,6 +177,48 @@ test('rotasi password hanya terjadi bila diminta eksplisit', async () => {
   assert.notEqual(store.profiles[0].password_hash, oldHash);
   assert.equal(await bcrypt.compare(STRONG_PASSWORD, store.profiles[0].password_hash), true);
   assert.equal(store.insertedCount, 0);
+});
+
+test('password tersimpan yang tidak cocok dilaporkan PASSWORD_MISMATCH tanpa mengubah data', async () => {
+  // Kasus nyata: baris Admin dibuat dengan password lain (mis. lewat skrip seed
+  // manual) sehingga login dengan ADMIN_PASSWORD selalu 401.
+  const storedHash = await bcrypt.hash('Password-Lama-123!', 4);
+  const store = createFakeStore([
+    { id: 'admin-1', email: 'admin@example.test', username: 'admin', role: 'admin', disabled_at: null, password_hash: storedHash },
+  ]);
+  const service = buildService(store);
+
+  const result = await service.ensureAdminAccount({
+    email: 'admin@example.test',
+    password: STRONG_PASSWORD,
+    name: 'Administrator Platform',
+    username: 'admin',
+    rotatePassword: false,
+  });
+
+  assert.equal(result.status, 'PASSWORD_MISMATCH');
+  assert.equal(result.userId, 'admin-1');
+  assert.match(result.message, /ADMIN_RESET_PASSWORD=true/);
+  assert.match(result.message, /admin:provision/);
+  assert.equal(store.profiles[0].password_hash, storedHash, 'hash tidak diubah otomatis');
+  assert.equal(store.insertedCount, 0);
+});
+
+test('baris Admin tanpa password_hash tidak diklaim mismatch', async () => {
+  const store = createFakeStore([
+    { id: 'admin-1', email: 'admin@example.test', username: 'admin', role: 'admin', disabled_at: null },
+  ]);
+  const service = buildService(store);
+
+  const result = await service.ensureAdminAccount({
+    email: 'admin@example.test',
+    password: STRONG_PASSWORD,
+    name: 'Administrator Platform',
+    username: 'admin',
+    rotatePassword: false,
+  });
+
+  assert.equal(result.status, 'UNCHANGED');
 });
 
 test('environment tanpa kredensial Admin menghasilkan SKIPPED, bukan akun default', async () => {

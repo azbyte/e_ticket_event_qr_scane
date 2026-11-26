@@ -4,6 +4,7 @@
 /// sehingga aturan hanya ditulis satu kali dan dapat diuji tanpa widget.
 library;
 
+import '../../models/event/attendee_field_definition.dart';
 import 'organizer_event_contract.dart';
 
 class OrganizerEventValidators {
@@ -83,8 +84,47 @@ class OrganizerEventValidators {
       }
     }
 
-    if (draft.attendeeFields.isEmpty) {
+    final definitions = draft.resolvedAttendeeFieldDefinitions;
+    if (definitions.isEmpty) {
       errors[fieldAttendeeFields] = 'Minimal satu data peserta harus dipilih.';
+    } else {
+      final seen = <String>{};
+      for (final field in definitions) {
+        if (!RegExp(r'^[a-z][a-z0-9_]{0,39}$').hasMatch(field.key)) {
+          errors[fieldAttendeeFields] =
+              'Kunci field "${field.key}" tidak valid. Gunakan huruf kecil, '
+              'angka, atau underscore.';
+          break;
+        }
+        if (!seen.add(field.key)) {
+          errors[fieldAttendeeFields] =
+              'Kunci field "${field.key}" dipakai lebih dari sekali.';
+          break;
+        }
+        if (field.label.trim().isEmpty) {
+          errors[fieldAttendeeFields] =
+              'Label field "${field.key}" tidak boleh kosong.';
+          break;
+        }
+        if (!AttendeeFieldDefinition.supportedTypes.contains(field.type)) {
+          errors[fieldAttendeeFields] =
+              'Tipe field "${field.type}" tidak didukung.';
+          break;
+        }
+        if (field.isSelect && field.options.length < 2) {
+          errors[fieldAttendeeFields] =
+              'Field pilihan "${field.label}" memerlukan minimal 2 opsi.';
+          break;
+        }
+      }
+      // Nama dan email wajib ada karena merupakan kolom `attendees`.
+      for (final required in const <String>['name', 'email']) {
+        if (!seen.contains(required)) {
+          errors[fieldAttendeeFields] =
+              'Field "$required" wajib ada pada data peserta.';
+          break;
+        }
+      }
     }
 
     return errors;

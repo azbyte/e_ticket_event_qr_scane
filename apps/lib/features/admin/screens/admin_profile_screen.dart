@@ -28,7 +28,7 @@ class AdminProfileScreen extends StatelessWidget {
         builder: (context, auth, _) {
           final user = auth.user;
           final name = user?.name ?? 'Super Admin';
-          final email = user?.email ?? 'admin@event.com';
+          final email = user?.email ?? 'Email belum tersedia';
 
           return ListView(
             padding: const EdgeInsets.all(20),
