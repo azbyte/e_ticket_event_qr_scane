@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../models/payment/email_delivery_model.dart';
 import '../../../models/payment/payment_model.dart';
 import '../../events/screens/event_list_screen.dart';
 import '../../tickets/screens/ticket_list_screen.dart';
@@ -13,11 +14,15 @@ class PaymentStatusScreen extends StatelessWidget {
     this.orderId,
     this.isSuccess,
     this.payment,
+    this.emailDelivery = const EmailDeliverySummary(),
   });
 
   final String? orderId;
   final bool? isSuccess;
   final PaymentModel? payment;
+
+  /// Status pengiriman email e-ticket yang sebenarnya dari backend.
+  final EmailDeliverySummary emailDelivery;
 
   String _formatCurrency(double amount) {
     final str = amount.toInt().toString().replaceAllMapped(
@@ -60,6 +65,10 @@ class PaymentStatusScreen extends StatelessWidget {
         ? 'Pesanan ini dibatalkan sehingga tiket tidak diterbitkan.'
         : 'Transaksi simulasi tidak berhasil diselesaikan. Anda dapat mencoba '
               'lagi selama pesanan belum kedaluwarsa.';
+    // Status email hanya ditampilkan bila tiket sudah terbit, dan isinya
+    // mengikuti keadaan sebenarnya (bukan asumsi "berhasil").
+    final showEmailStatus = success && emailDelivery.results.isNotEmpty;
+    final emailDelivered = emailDelivery.delivered;
 
     return Scaffold(
       appBar: AppBar(
@@ -106,6 +115,50 @@ class PaymentStatusScreen extends StatelessWidget {
                   color: Colors.grey.shade600,
                 ),
               ),
+              if (showEmailStatus) ...[
+                const SizedBox(height: 16),
+                Container(
+                  key: const Key('payment-email-status'),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: emailDelivered
+                        ? Colors.green.shade50
+                        : Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: emailDelivered
+                          ? Colors.green.shade200
+                          : Colors.orange.shade200,
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        emailDelivered ? Icons.mark_email_read : Icons.mail_outline,
+                        color: emailDelivered
+                            ? Colors.green.shade700
+                            : Colors.orange.shade800,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          emailDelivery.message,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            height: 1.4,
+                            color: emailDelivered
+                                ? Colors.green.shade800
+                                : Colors.orange.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 28),
 
               // Detail receipt card

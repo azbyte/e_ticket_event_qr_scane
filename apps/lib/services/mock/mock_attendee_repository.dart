@@ -303,6 +303,11 @@ class MockAttendeeRepository {
       status: AppConstants.ticketStatusValid,
       qrCodeData: 'TIS2026-REG-98A1B2C3',
       issuedAt: DateTime(2026, 10, 20, 14, 35),
+      eventTitle: 'Tech Inovasi Summit 2026',
+      ticketTypeName: 'Regular Pass',
+      ticketCode: 'TIS2026-REG-98A1B2C3',
+      eventDate: DateTime(2026, 11, 15, 9, 0),
+      eventLocation: 'Jakarta Convention Center',
     ),
     TicketModel(
       id: 'tkt-001-b',
@@ -317,6 +322,11 @@ class MockAttendeeRepository {
       issuedAt: DateTime(2026, 10, 20, 14, 35),
       checkedInAt: DateTime(2026, 11, 15, 9, 15),
       checkedInByStaffId: 'staff-01',
+      eventTitle: 'Tech Inovasi Summit 2026',
+      ticketTypeName: 'Regular Pass',
+      ticketCode: 'TIS2026-REG-47D5E6F7',
+      eventDate: DateTime(2026, 11, 15, 9, 0),
+      eventLocation: 'Jakarta Convention Center',
     ),
   ];
 
@@ -576,6 +586,13 @@ class MockAttendeeRepository {
           status: AppConstants.ticketStatusValid,
           qrCodeData: token,
           issuedAt: DateTime.now(),
+          // Data event/kategori nyata dari order agar tiket demo menampilkan
+          // nama event yang benar (bukan placeholder).
+          eventTitle: order.eventTitle,
+          ticketTypeName: item.ticketTypeName,
+          ticketCode: token,
+          eventDate: getEventById(order.eventId).startDateTime,
+          eventLocation: getEventById(order.eventId).location,
         );
         _tickets.insert(0, ticket);
       }

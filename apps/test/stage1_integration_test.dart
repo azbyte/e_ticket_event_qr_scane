@@ -421,7 +421,7 @@ void main() {
           orderId: _orderId,
           virtualAccountNumber: '8800112233445566',
         );
-        expect(paid['status'], 'paid');
+        expect(paid.payment['status'], 'paid');
         expect(client.headersByCall['POST /payments/simulate'], {
           'X-Order-Access-Token': _accessToken,
         });

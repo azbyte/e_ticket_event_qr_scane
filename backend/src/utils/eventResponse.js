@@ -1,4 +1,4 @@
-const { parseValidationNote } = require('./eventValidation');
+const { parseValidationNote, normalizeAttendeeFields } = require('./eventValidation');
 
 /**
  * Status yang dianggap tayang. `APPROVED` dipertahankan demi kompatibilitas
@@ -38,7 +38,8 @@ const publicUrlFor = (event) =>
  * tergantung jalur penulisan (insert vs update). Tanpa normalisasi, kolom teks
  * terkirim sebagai string sehingga klien tidak dapat membaca konfigurasi form
  * peserta — form publik jatuh ke form default. Di sini nilai selalu diubah ke
- * array agar kontrak API konsisten.
+ * array bertipe dan `email` (media pengiriman e-ticket) selalu disertakan serta
+ * wajib, agar kontrak API konsisten dan formulir tidak pernah kehilangan email.
  */
 const parseAttendeeFields = (value) => {
   if (value === null || value === undefined) return [];
@@ -54,6 +55,13 @@ const parseAttendeeFields = (value) => {
   return [];
 };
 
+/** `attendee_fields` yang dipakai response API (selalu memuat email wajib). */
+const normalizedAttendeeFields = (value) => {
+  const parsed = parseAttendeeFields(value);
+  if (parsed.length === 0) return normalizeAttendeeFields(null).fields;
+  return normalizeAttendeeFields(parsed).fields;
+};
+
 const serializeEvent = (event) => {
   if (typeof event.status !== 'string' || typeof event.event_format !== 'string') {
     throw new TypeError('Event status and format are required by the API contract');
@@ -67,7 +75,7 @@ const serializeEvent = (event) => {
     start_date_time: event.event_date,
     event_type: event.event_format.toLowerCase(),
     category: category?.name || null,
-    attendee_fields: parseAttendeeFields(event.attendee_fields),
+    attendee_fields: normalizedAttendeeFields(event.attendee_fields),
     status: event.status.toLowerCase(),
     public_url: publicUrlFor(event),
     validation_errors: parseValidationNote(event.review_note),
@@ -77,6 +85,7 @@ const serializeEvent = (event) => {
 module.exports = {
   serializeEvent,
   parseAttendeeFields,
+  normalizedAttendeeFields,
   appPublicUrl,
   buildPublicUrl,
   buildInviteUrl,

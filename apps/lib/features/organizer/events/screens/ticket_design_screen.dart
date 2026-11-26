@@ -15,11 +15,16 @@ class TicketDesignScreen extends StatelessWidget {
     required this.eventId,
     required this.eventTitle,
     this.ticketTypes = const <TicketTypeModel>[],
+    this.initialTicketTypeId,
   });
 
   final String eventId;
   final String eventTitle;
   final List<TicketTypeModel> ticketTypes;
+
+  /// Bila diisi, layar dibuka langsung pada scope kategori tiket tersebut
+  /// (dipakai dari form kategori tiket).
+  final String? initialTicketTypeId;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -38,7 +43,11 @@ class TicketDesignScreen extends StatelessWidget {
           style: TextStyle(fontSize: 12, color: Colors.black54),
         ),
         const SizedBox(height: 12),
-        TicketDesignPanel(eventId: eventId, ticketTypes: ticketTypes),
+        TicketDesignPanel(
+          eventId: eventId,
+          ticketTypes: ticketTypes,
+          initialTicketTypeId: initialTicketTypeId,
+        ),
       ],
     ),
   );

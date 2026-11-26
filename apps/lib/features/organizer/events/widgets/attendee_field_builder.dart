@@ -221,6 +221,11 @@ class _AttendeeFieldDialogState extends State<AttendeeFieldDialog> {
   late bool _required;
   String? _error;
 
+  /// `name`/`email` adalah kolom wajib `attendees`; tipe & status wajibnya
+  /// dikunci agar email penerima tiket tidak pernah hilang atau berubah tipe.
+  bool get _locked =>
+      AttendeeFieldBuilder.lockedKeys.contains(widget.existing?.key);
+
   @override
   void initState() {
     super.initState();
@@ -229,8 +234,10 @@ class _AttendeeFieldDialogState extends State<AttendeeFieldDialog> {
     _labelController = TextEditingController(text: existing?.label ?? '');
     _optionsController =
         TextEditingController(text: existing?.options.join(', ') ?? '');
-    _type = existing?.type ?? AttendeeFieldDefinition.typeText;
-    _required = existing?.required ?? false;
+    _type = _locked
+        ? AttendeeFieldDefinition.typeText
+        : existing?.type ?? AttendeeFieldDefinition.typeText;
+    _required = _locked ? true : existing?.required ?? false;
   }
 
   @override
@@ -273,9 +280,9 @@ class _AttendeeFieldDialogState extends State<AttendeeFieldDialog> {
       AttendeeFieldDefinition(
         key: key,
         label: label,
-        type: _type,
-        required: _required,
-        options: _type == AttendeeFieldDefinition.typeSelect
+        type: _locked ? AttendeeFieldDefinition.typeText : _type,
+        required: _locked ? true : _required,
+        options: !_locked && _type == AttendeeFieldDefinition.typeSelect
             ? options
             : const <String>[],
       ),
@@ -318,9 +325,11 @@ class _AttendeeFieldDialogState extends State<AttendeeFieldDialog> {
                     ),
                   )
                   .toList(growable: false),
-              onChanged: (value) {
-                if (value != null) setState(() => _type = value);
-              },
+              onChanged: _locked
+                  ? null
+                  : (value) {
+                      if (value != null) setState(() => _type = value);
+                    },
             ),
             if (_type == AttendeeFieldDefinition.typeSelect) ...[
               const SizedBox(height: 12),
@@ -336,9 +345,23 @@ class _AttendeeFieldDialogState extends State<AttendeeFieldDialog> {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Wajib diisi'),
+              subtitle: _locked
+                  ? const Text('Selalu wajib: dipakai untuk identitas & pengiriman tiket.')
+                  : null,
               value: _required,
-              onChanged: (value) => setState(() => _required = value),
+              onChanged: _locked
+                  ? null
+                  : (value) => setState(() => _required = value),
             ),
+            if (widget.existing?.key == 'email')
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Email tidak dapat dihapus atau dijadikan opsional karena '
+                  'e-ticket PDF dikirim ke alamat ini.',
+                  style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700),
+                ),
+              ),
             if (_error != null)
               Align(
                 alignment: Alignment.centerLeft,

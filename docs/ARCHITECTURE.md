@@ -95,6 +95,27 @@ terhadap API + PostgreSQL nyata (`cd backend; npm run test:e2e`, 80 pemeriksaan)
 - Form publik (`public_registration_screen.dart`) merender semua tipe dan
   server mengulang validasi wajib/tipe/opsi sebelum order dibuat.
 
+**Pengiriman e-ticket (PDF) melalui email**
+
+- Tiket terbit di dalam transaksi order/pembayaran; pengiriman email
+  **dijadwalkan**, bukan ditunggu. `src/services/emailQueue.js` menjalankan
+  pengiriman pada tick berikutnya (`setImmediate`) dengan penjaga in-flight per
+  tiket sehingga respons pendaftaran/pembayaran tidak bergantung pada kecepatan
+  SMTP dan tidak ada email ganda. Tidak ada dependensi runtime baru.
+- `src/services/emailService.js` menentukan transport dari environment:
+  `smtp` (host nyata + konfigurasi valid), `json` (hanya `NODE_ENV=test`), atau
+  `disabled`. `smtpStatus()` memvalidasi `SMTP_PORT`, pasangan
+  `SMTP_USER`/`SMTP_PASS`, dan `EMAIL_FROM` tanpa mencetak nilai rahasia.
+- Status pengiriman disimpan di `ticket_email_deliveries` dan dibedakan:
+  `PENDING` (belum dikirim/antre), `SENDING` (sedang berjalan), `SENT` (diterima
+  transport), `FAILED` (+`last_error`), serta `NOT_CONFIGURED` pada respons API.
+  Status pembayaran tidak pernah disamakan dengan status pengiriman email.
+- Penerima selalu `attendees.email` pada tiket yang bersangkutan; lampiran PDF
+  memakai desain & orientasi tiket. Retry dibatasi 5 percobaan otomatis,
+  menghormati `next_attempt_at`, dan tersedia lewat worker periodik,
+  `POST /api/admin/email/retry`, `POST /api/tickets/:id/email`, dan
+  `npm run retry:emails` — tanpa membuat tiket/transaksi baru.
+
 **Backend (perbaikan integrasi)**
 
 - `checkInController.assertScanPermission` tidak lagi memilih

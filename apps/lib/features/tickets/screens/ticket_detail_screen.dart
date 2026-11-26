@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_utils.dart' as app_date;
 import '../../../models/ticket/ticket_model.dart';
 import '../../../providers/ticket_provider.dart';
+import '../../../services/ticket/ticket_service.dart';
 import '../widgets/qr_ticket_display.dart';
 
 /// Ticket detail screen — e-ticket with QR code (PRD sections 4.6, 7.2 F).
@@ -26,7 +27,14 @@ class TicketDetailScreen extends StatefulWidget {
 
 class _TicketDetailScreenState extends State<TicketDetailScreen> {
   final TicketProvider _ticketProvider = TicketProvider.instance;
+  final TicketService _ticketService = TicketService();
   late String _effectiveTicketId;
+
+  bool _sendingEmail = false;
+
+  /// Status email terakhir dari backend setelah aksi kirim ulang.
+  String? _emailStatusMessage;
+  bool _emailStatusOk = false;
 
   @override
   void initState() {
@@ -42,6 +50,51 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         _ticketProvider.loadTicket(_effectiveTicketId, orderId: widget.orderId);
       }
     });
+  }
+
+  /// Kirim ulang e-ticket ke email peserta.
+  ///
+  /// Hasil ditampilkan apa adanya: `delivered` hanya true bila backend
+  /// melaporkan email benar-benar terkirim. Pengiriman yang sudah pernah
+  /// berhasil tidak diulang (backend mengembalikan `already_sent`).
+  Future<void> _resendEmail() async {
+    if (_effectiveTicketId.isEmpty || _sendingEmail) return;
+    setState(() {
+      _sendingEmail = true;
+      _emailStatusMessage = null;
+    });
+    try {
+      final result = await _ticketService.resendTicketEmail(
+        _effectiveTicketId,
+        orderId: widget.orderId,
+      );
+      final delivered = result['delivered'] == true;
+      final status = result['delivery_status']?.toString() ?? 'UNKNOWN';
+      final reason = result['reason']?.toString();
+      if (!mounted) return;
+      setState(() {
+        _emailStatusOk = delivered || status == 'SKIPPED';
+        _emailStatusMessage = delivered
+            ? 'E-ticket berhasil dikirim ulang ke email peserta.'
+            : status == 'SKIPPED'
+            ? 'Email sudah pernah terkirim; tidak ada email ganda yang dikirim.'
+            : 'Email belum terkirim (status: $status)'
+                  '${reason == null ? '.' : ': $reason'}';
+      });
+      // Muat ulang status email terbaru dari backend.
+      await _ticketProvider.loadTicket(
+        _effectiveTicketId,
+        orderId: widget.orderId,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _emailStatusOk = false;
+        _emailStatusMessage = 'Gagal mengirim ulang email: $error';
+      });
+    } finally {
+      if (mounted) setState(() => _sendingEmail = false);
+    }
   }
 
   Widget _buildStatusBadge(String status) {
@@ -207,7 +260,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
-                                      ticket.ticketTypeId.toUpperCase(),
+                                      // Nama kategori tiket, bukan UUID.
+                                      ticket.displayTicketType,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         color: Colors.white,
@@ -220,13 +274,25 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                               ],
                             ),
                             const SizedBox(height: 14),
+                            // Nama event dari database (bukan "Event ID").
+                            Text(
+                              ticket.displayEventTitle,
+                              key: const Key('ticket-event-title'),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
                             Text(
                               ticket.attendeeName,
                               textAlign: TextAlign.center,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                             if (ticket.attendeeEmail != null) ...[
@@ -372,18 +438,34 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                               ),
                             const SizedBox(height: 20),
 
-                            // Ticket Details List
-                            _buildDetailRow('Event ID', ticket.eventId),
-                            const SizedBox(height: 8),
-                            _buildDetailRow('Order ID', ticket.orderId),
-                            const SizedBox(height: 8),
-                            if (ticket.issuedAt != null)
+                            // Ticket Details List — data yang bermakna untuk
+                            // peserta (nama event, kategori, jadwal, lokasi,
+                            // kode tiket), bukan UUID internal.
+                            if (ticket.eventDate != null) ...[
+                              _buildDetailRow(
+                                'Jadwal',
+                                app_date.DateUtils.formatDateTime(
+                                  ticket.eventDate,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                            _buildDetailRow('Lokasi', ticket.displayLocation),
+                            // Kode tiket hanya ditampilkan bila tersedia, agar
+                            // tidak menduplikasi teks token QR di layar.
+                            if ((ticket.ticketCode ?? '').trim().isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              _buildDetailRow('Kode Tiket', ticket.ticketCode!),
+                            ],
+                            if (ticket.issuedAt != null) ...[
+                              const SizedBox(height: 8),
                               _buildDetailRow(
                                 'Waktu Diterbitkan',
                                 app_date.DateUtils.formatDateTime(
                                   ticket.issuedAt,
                                 ),
                               ),
+                            ],
                             if (ticket.isCheckedIn &&
                                 ticket.checkedInAt != null) ...[
                               const SizedBox(height: 8),
@@ -400,6 +482,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                     ],
                   ),
                 ),
+
+                const SizedBox(height: 24),
+
+                // Status email e-ticket (nyata, bukan asumsi) + kirim ulang.
+                _buildEmailStatusCard(ticket),
 
                 const SizedBox(height: 24),
 
@@ -452,6 +539,107 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  /// Kartu status email e-ticket + tombol kirim ulang.
+  ///
+  /// Sumber status: `email_delivery` dari backend. Bila belum ada catatan,
+  /// ditampilkan sebagai "belum terkirim" (bukan diklaim berhasil).
+  Widget _buildEmailStatusCard(TicketModel ticket) {
+    final raw = _ticketProvider.selectedTicketRaw?['email_delivery'];
+    final delivery = raw is Map ? Map<String, dynamic>.from(raw) : null;
+    final status = delivery?['status']?.toString();
+    final recipient = delivery?['recipient']?.toString() ??
+        ticket.attendeeEmail;
+    final reason = delivery?['reason']?.toString();
+    final sent = status == 'SENT';
+    final pending =
+        status == 'PENDING' || status == 'SENDING' || status == 'QUEUED';
+    final notConfigured = status == 'NOT_CONFIGURED';
+    final message = _emailStatusMessage ??
+        (sent
+            ? 'E-ticket PDF sudah dikirim ke ${recipient ?? 'email peserta'}.'
+            : status == null
+            ? 'Belum ada catatan pengiriman email untuk tiket ini.'
+            : notConfigured
+            ? 'Email belum terkirim${reason == null ? ': layanan email belum dikonfigurasi di server.' : ': $reason'}'
+            : pending
+            ? (status == 'SENDING'
+                ? 'Email sedang dikirim ke ${recipient ?? 'email peserta'}...'
+                : 'Email belum terkirim${reason == null ? '.' : ': $reason'}')
+            : 'Email gagal terkirim${reason == null ? '.' : ': $reason'}');
+    final ok = _emailStatusMessage != null ? _emailStatusOk : sent;
+    return Container(
+      key: const Key('ticket-email-status'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: ok ? Colors.green.shade50 : Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: ok ? Colors.green.shade200 : Colors.orange.shade200,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Icon(
+                ok ? Icons.mark_email_read : Icons.mail_outline,
+                color: ok ? Colors.green.shade700 : Colors.orange.shade800,
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Status Email Tiket',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: ok ? Colors.green.shade800 : Colors.orange.shade900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      message,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.4,
+                        color: ok ? Colors.green.shade800 : Colors.orange.shade900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (!sent) ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                key: const Key('ticket-resend-email'),
+                onPressed: _sendingEmail ? null : _resendEmail,
+                icon: _sendingEmail
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.send_outlined, size: 18),
+                label: Text(
+                  _sendingEmail ? 'Mengirim...' : 'Kirim ulang email',
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

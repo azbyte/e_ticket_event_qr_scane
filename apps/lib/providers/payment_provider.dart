@@ -4,6 +4,7 @@ library;
 import 'package:flutter/foundation.dart';
 
 import '../core/constants/app_constants.dart';
+import '../models/payment/email_delivery_model.dart';
 import '../models/payment/payment_model.dart';
 import '../services/payment/payment_service.dart';
 
@@ -16,10 +17,14 @@ class PaymentProvider extends ChangeNotifier {
   final PaymentService _paymentService;
 
   PaymentModel? _payment;
+  EmailDeliverySummary _emailDelivery = const EmailDeliverySummary();
   bool _isLoading = false;
   String? _error;
 
   PaymentModel? get payment => _payment;
+
+  /// Status pengiriman email e-ticket terakhir (nyata, bukan simulasi).
+  EmailDeliverySummary get emailDelivery => _emailDelivery;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isPaid => _payment?.status == AppConstants.paymentStatusPaid;
@@ -33,12 +38,13 @@ class PaymentProvider extends ChangeNotifier {
     _setLoading(true);
     _error = null;
     try {
-      final data = await _paymentService.simulatePayment(
+      final result = await _paymentService.simulatePayment(
         orderId: orderId,
         virtualAccountNumber: virtualAccountNumber,
         simulateSuccess: simulateSuccess,
       );
-      _payment = PaymentModel.fromJson(data);
+      _payment = PaymentModel.fromJson(result.payment);
+      _emailDelivery = result.emailDelivery;
       notifyListeners();
       return _payment?.status == AppConstants.paymentStatusPaid;
     } catch (e) {
@@ -67,6 +73,7 @@ class PaymentProvider extends ChangeNotifier {
 
   void clearPayment() {
     _payment = null;
+    _emailDelivery = const EmailDeliverySummary();
     _error = null;
     notifyListeners();
   }

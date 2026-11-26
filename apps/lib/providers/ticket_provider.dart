@@ -16,11 +16,15 @@ class TicketProvider extends ChangeNotifier {
 
   List<TicketModel> _tickets = [];
   TicketModel? _selectedTicket;
+  Map<String, dynamic>? _selectedTicketRaw;
   bool _isLoading = false;
   String? _error;
 
   List<TicketModel> get tickets => _tickets;
   TicketModel? get selectedTicket => _selectedTicket;
+
+  /// Respons mentah tiket terpilih (berisi `email_delivery` bila tersedia).
+  Map<String, dynamic>? get selectedTicketRaw => _selectedTicketRaw;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
@@ -45,6 +49,7 @@ class TicketProvider extends ChangeNotifier {
     _error = null;
     try {
       final data = await _ticketService.getTicket(ticketId, orderId: orderId);
+      _selectedTicketRaw = data;
       _selectedTicket = TicketModel.fromJson(data);
       notifyListeners();
       return true;
@@ -58,6 +63,7 @@ class TicketProvider extends ChangeNotifier {
 
   void clearSelectedTicket() {
     _selectedTicket = null;
+    _selectedTicketRaw = null;
     notifyListeners();
   }
 

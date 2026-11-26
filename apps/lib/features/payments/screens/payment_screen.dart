@@ -89,6 +89,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           orderId: _effectiveOrderId,
           isSuccess: result,
           payment: _paymentProvider.payment,
+          emailDelivery: _paymentProvider.emailDelivery,
         ),
       ),
     );

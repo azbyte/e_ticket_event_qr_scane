@@ -236,10 +236,14 @@ model Event {
   registrationQrUrl String?     @map("registration_qr_url") @db.Text
 
   // Desain tiket default event (PRD §5). Struktur:
-  // { source, file_path, content_type, qr: {x,y,size}, info: {x,y,width,height} }
+  // { source, file_path, content_type, orientation, qr: {x,y,size}, info: {...} }
   // Nilai posisi berupa fraksi 0..1 dari kanvas tiket. Null = desain default
   // yang dirender sistem saat tiket diterbitkan.
   ticketDesign Json? @map("ticket_design")
+
+  // Orientasi kanvas desain tiket: `landscape` (horizontal) atau `portrait`
+  // (vertikal). Null = belum diatur; tiket mengikuti default sistem.
+  ticketDesignOrientation String? @map("ticket_design_orientation") @db.Text
 
   // These two legacy columns are still read and written by the current Express API.
   totalTickets Int?     @default(0) @map("total_tickets")
@@ -370,6 +374,10 @@ model TicketType {
 
   // Desain khusus kategori ini (menimpa desain default event bila terisi).
   ticketDesign Json? @map("ticket_design")
+
+  // Orientasi kanvas desain tiket kategori ini (landscape/portrait).
+  // Null = belum diatur; mewarisi orientasi event.
+  ticketDesignOrientation String? @map("ticket_design_orientation") @db.Text
 
   event      Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
   orderItems OrderItem[]

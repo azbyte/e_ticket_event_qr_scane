@@ -144,6 +144,8 @@ const run = async () => {
       ticket_type_id: typeId,
       content_type: 'image/png',
       image_base64: tplPng.buffer.toString('base64'),
+      // Orientasi wajib: template PNG bawaan berukuran landscape (1200x480).
+      orientation: 'landscape',
       qr: { x: 0.74, y: 0.25, size: 0.5 },
     },
   });
@@ -360,6 +362,19 @@ const run = async () => {
     `${results.length - failed.length}/${results.length} pemeriksaan lulus`,
   );
   if (failed.length) process.exitCode = 1;
+
+  // Bersihkan data sintetis agar database tidak terisi event/akun uji.
+  // Best-effort: kegagalan pembersihan tidak mengubah hasil pengujian.
+  try {
+    const { cleanupE2EData } = require('./cleanup-e2e-data');
+    const { query, pool } = require('../src/config/db');
+    const cleaned = await cleanupE2EData(query);
+    const total = cleaned.reduce((sum, row) => sum + row.removed, 0);
+    console.log(`Pembersihan data E2E: ${total} baris dihapus.`);
+    await pool.end();
+  } catch (error) {
+    console.warn(`Pembersihan data E2E dilewati: ${error.message}`);
+  }
 
   return { organizerToken, event, typeId, orderId, accessToken };
 };

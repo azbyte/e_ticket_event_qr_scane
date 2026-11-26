@@ -90,18 +90,18 @@ class EventModel {
   /// menyimpan array string, lalu dipastikan tetap memuat `name` dan `email`
   /// karena keduanya kolom wajib `attendees` dan divalidasi server.
   List<AttendeeFieldDefinition> get resolvedAttendeeFields {
-    if (attendeeFieldDefinitions.isNotEmpty) return attendeeFieldDefinitions;
+    if (attendeeFieldDefinitions.isNotEmpty) {
+      // Konfigurasi bertipe tetap dihormati, tetapi `name`+`email` dipastikan
+      // ada dan wajib agar tiket selalu punya alamat penerima.
+      return AttendeeFieldDefinition.ensureRequiredFields(
+        attendeeFieldDefinitions,
+      );
+    }
     final fromLegacy = AttendeeFieldDefinition.listFromKeys(attendeeFields);
     if (fromLegacy.isEmpty) {
       return OrganizerAttendeeDefaults.definitions;
     }
-    final merged = <AttendeeFieldDefinition>[...fromLegacy];
-    for (final required in OrganizerAttendeeDefaults.definitions) {
-      if (!merged.any((field) => field.key == required.key)) {
-        merged.add(required);
-      }
-    }
-    return merged;
+    return AttendeeFieldDefinition.ensureRequiredFields(fromLegacy);
   }
 
   /// Alasan validasi yang siap ditampilkan.

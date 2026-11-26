@@ -172,6 +172,10 @@ Menambah endpoint baru: letakkan pada router domain yang sesuai di
 | `scripts/dump-routes.js` | `npm run routes:list` | Cetak tabel 88 route yang terdaftar di Express (read-only) |
 | `scripts/smoke-routes.js` | `npm run test:routes` | Pastikan semua endpoint terdaftar (regresi konsolidasi router) |
 | `scripts/backup-db-json.js` | manual | Backup seluruh tabel sebagai JSON sebelum operasi destruktif |
+| `scripts/verify-email-delivery.js` | `npm run verify:email` | Bukti transmisi SMTP nyata ke sink lokal + cek kesiapan inbox nyata |
+| `scripts/verify-async-email-queue.js` | `npm run verify:email-queue` | Bukti respons tidak menunggu SMTP lambat + antrean mengirim tepat sekali |
+| `scripts/retry-ticket-emails.js` | `npm run retry:emails` | Coba ulang delivery PENDING/FAILED (tanpa tiket/email ganda) |
+| `scripts/repair-email-delivery-status.js` | `npm run repair:email-delivery` | Turunkan catatan `SENT` palsu dari transport json (dry-run default) |
 
 ### Test
 
@@ -182,7 +186,59 @@ Menambah endpoint baru: letakkan pada router domain yang sesuai di
 - `npm run test:registration-flow` menguji alur nyata (registrasi Organizer →
   event → kategori → publikasi → link/QR publik → desain tiket → pendaftaran
   guest → pembayaran simulasi → tiket PDF) terhadap backend yang sedang
-  berjalan. `npm run verify:ticket-pdf` memverifikasi rendering template/tiket.
+  berjalan. `npm run verify:ticket-pdf` memverifikasi rendering template/tiket
+  untuk kedua orientasi (landscape/portrait).
+- `npm run verify:ticket-flow` menguji alur tiket lewat HTTP API + database nyata
+  (nama event pada tiket, penerbitan tiket gratis/berbayar, status email jujur,
+  kirim ulang tanpa duplikasi, orientasi tersimpan & dipakai PDF). Data uji
+  memakai domain `.test` dan dihapus kembali.
+- `npm run verify:email-queue` membuktikan pengiriman tidak lagi memblokir
+  request: SMTP sink sengaja dilambatkan, penjadwalan email selesai jauh lebih
+  cepat daripada percakapan SMTP, status awal `QUEUED/PENDING`, lalu berubah
+  `SENT` setelah antrean selesai tanpa email ganda.
+- `npm run verify:email` membuktikan pengiriman email sungguhan melalui SMTP:
+  skrip menyalakan SMTP sink lokal, mengirim e-ticket, lalu memeriksa penerima,
+  subjek, lampiran PDF, status `SENT`, tidak ada email ganda saat kirim ulang,
+  serta pencatatan `FAILED` + `last_error` saat SMTP mati. Setelah itu skrip
+  memeriksa konfigurasi SMTP nyata di `backend/.env`; bila lengkap dan
+  `VERIFY_EMAIL_TO` diisi, skrip benar-benar mengirim ke alamat tersebut dan
+  mencatat bahwa bukti masuk inbox tetap harus dicek manual. Tanpa kredensial,
+  hasilnya `BLOCKED` (bukan `PASS` palsu).
+
+### Email e-ticket
+
+Konfigurasi SMTP dibaca dari environment (`SMTP_HOST`, `SMTP_PORT`,
+`SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`); lihat `.env.example`.
+Tidak ada kredensial di source code, dan log hanya memuat mode/status.
+
+- Validasi sebelum kirim: `SMTP_PORT` 1–65535, `SMTP_USER`/`SMTP_PASS` harus
+  berpasangan, dan `EMAIL_FROM` wajib berupa alamat valid. Bila salah satu tidak
+  valid, transport `disabled` dengan alasan jelas (tidak ada percobaan kirim).
+- `SMTP_HOST` kosong → email dinonaktifkan secara jujur: catatan
+  `ticket_email_deliveries` berstatus `PENDING` + alasan, dan respons API
+  (`email_delivery.delivered=false`) tidak pernah mengklaim email terkirim.
+- `SMTP_HOST=json` hanya berlaku saat `NODE_ENV=test`; di luar test dianggap
+  nonaktif dan **tidak pernah** dicatat `SENT`.
+- `SMTP_HOST=<host>` → email benar-benar dikirim lewat SMTP; status `SENT` hanya
+  dicatat setelah server SMTP menerima pesan.
+- **Pengiriman asinkron di dalam proses** (`src/services/emailQueue.js`):
+  pendaftaran/pembayaran hanya menerbitkan tiket + mencatat delivery `PENDING`
+  lalu menjadwalkan email pada tick berikutnya. Respons tidak menunggu SMTP.
+  Status `SENDING` ditampilkan selama pekerjaan berjalan; `QUEUED` berarti masih
+  antre. Tidak ada job queue/dependensi runtime baru.
+- Lampiran PDF wajib: bila rendering PDF gagal, email tidak dikirim dan
+  kegagalan dicatat pada `last_error`.
+- Pengiriman bersifat idempoten per tiket/penerima; `POST /api/tickets/:id/email`,
+  `POST /api/admin/email/retry`, dan worker periodik (interval 5 menit saat SMTP
+  aktif) tidak membuat email ganda. Retry dibatasi 5 percobaan otomatis dan
+  menghormati `next_attempt_at`.
+- Catatan lama yang salah berstatus `SENT` karena transport json dapat
+  dinormalisasi dengan `npm run repair:email-delivery -- --apply` (membuat backup
+  JSON lebih dulu; tidak menghapus data).
+- Status yang dibedakan: `PENDING` (belum dikirim/antre), `SENDING` (sedang
+  dikirim), `SENT` (diterima transport), `FAILED` (gagal + `last_error`), dan
+  `NOT_CONFIGURED` (SMTP belum siap). Status pembayaran tidak pernah disamakan
+  dengan status pengiriman email.
 
 ## Endpoint API
 
@@ -213,10 +269,10 @@ koneksi database.
 | GET/POST | `/api/events/:id/ticket-types` | Baca/buat kategori tiket | Public/Organizer |
 | PUT/DELETE | `/api/events/:id/ticket-types/:ticketTypeId` | Ubah/hapus kategori tiket | Organizer |
 | GET | `/api/ticket-types/:id` | Detail kategori tiket | Public |
-| GET | `/api/events/:id/ticket-design` | Desain tiket event + per kategori (posisi QR) | Owner/Admin |
-| PUT | `/api/events/:id/ticket-design` | Unggah desain tiket (`scope=event` atau `scope=ticket_type`) | Owner/Admin |
-| DELETE | `/api/events/:id/ticket-design?scope=` | Hapus desain (kembali ke desain default) | Owner/Admin |
-| GET | `/api/ticket-design-template?format=pdf\|png` | Unduh template desain tiket (ukuran + penanda QR) | Public |
+| GET | `/api/events/:id/ticket-design` | Desain tiket event + per kategori (posisi QR, orientasi) | Owner/Admin |
+| PUT | `/api/events/:id/ticket-design` | Unggah desain / simpan orientasi (`scope=event` atau `scope=ticket_type`) | Owner/Admin |
+| DELETE | `/api/events/:id/ticket-design?scope=` | Hapus desain & orientasi (kembali ke default) | Owner/Admin |
+| GET | `/api/ticket-design-template?format=pdf\|png&orientation=landscape\|portrait` | Unduh template desain tiket (ukuran + penanda QR) | Public |
 | GET | `/api/events/:id/summary` | Ringkasan operasional event | Organizer/Admin |
 | GET | `/api/events/:id/sales` | Seri tiket/check-in 7 hari | Organizer/Admin |
 | GET/POST | `/api/events/:id/members` | Daftar/tambah staf event + izin | Owner |

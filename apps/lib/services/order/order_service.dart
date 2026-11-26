@@ -34,13 +34,29 @@ class OrderService {
         attendeePhone: attendeePhone,
         selectedTicketQuantities: itemsMap,
       );
-      return order.toJson();
+      final json = order.toJson();
+      // Mode demo tidak mengirim email sungguhan: status harus jujur.
+      json['email_delivery'] = <String, dynamic>{
+        'configured': false,
+        'transport': 'disabled',
+        'delivered': false,
+        'queued': false,
+        'status': 'NOT_CONFIGURED',
+        'results': const <dynamic>[],
+      };
+      return json;
     }
 
     final result = await _api.post('/orders', body: payload);
-    final order = result['order'] as Map<String, dynamic>?;
-    if (order == null) {
+    final rawOrder = result['order'] as Map<String, dynamic>?;
+    if (rawOrder == null) {
       throw const FormatException('Respons API tidak berisi data pesanan.');
+    }
+    // Sertakan status pengiriman email pada objek order agar UI dapat
+    // menampilkannya tanpa request tambahan.
+    final order = Map<String, dynamic>.from(rawOrder);
+    if (result['email_delivery'] != null) {
+      order['email_delivery'] = result['email_delivery'];
     }
     final accessToken = result['order_access_token'] as String?;
     if (accessToken != null) {

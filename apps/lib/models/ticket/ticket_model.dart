@@ -13,6 +13,20 @@ class TicketModel {
   final DateTime? checkedInAt;
   final String? checkedInByStaffId;
 
+  /// Nama event asli dari database (bukan UUID/placeholder).
+  final String eventTitle;
+
+  /// Nama kategori tiket (mis. "Reguler", "VIP").
+  final String? ticketTypeName;
+
+  /// Kode tiket yang dicetak pada e-ticket (mis. `TKT-...`).
+  final String? ticketCode;
+
+  /// Jadwal & lokasi event untuk ditampilkan pada tiket.
+  final DateTime? eventDate;
+  final String? eventLocation;
+  final String? eventOnlineUrl;
+
   const TicketModel({
     required this.id,
     required this.orderId,
@@ -26,6 +40,12 @@ class TicketModel {
     this.issuedAt,
     this.checkedInAt,
     this.checkedInByStaffId,
+    this.eventTitle = '',
+    this.ticketTypeName,
+    this.ticketCode,
+    this.eventDate,
+    this.eventLocation,
+    this.eventOnlineUrl,
   });
 
   bool get isValid => status == 'valid' || status == 'active';
@@ -34,7 +54,28 @@ class TicketModel {
   bool get isCancelled => status == 'cancelled';
   bool get isRevoked => status == 'revoked';
 
+  /// Label event untuk UI; jatuh ke placeholder netral bila data kosong.
+  String get displayEventTitle =>
+      eventTitle.trim().isEmpty ? 'Nama event tidak tersedia' : eventTitle;
+
+  /// Label kategori tiket; jatuh ke '-' bila tidak tersedia.
+  String get displayTicketType {
+    final name = ticketTypeName?.trim() ?? '';
+    return name.isEmpty ? '-' : name;
+  }
+
+  /// Lokasi tampilan: lokasi fisik, lalu URL online, lalu '-'.
+  String get displayLocation {
+    final location = eventLocation?.trim() ?? '';
+    if (location.isNotEmpty) return location;
+    final online = eventOnlineUrl?.trim() ?? '';
+    return online.isEmpty ? '-' : online;
+  }
+
   factory TicketModel.fromJson(Map<String, dynamic> json) {
+    final events = json['events'];
+    final eventMap = events is Map ? Map<String, dynamic>.from(events) : null;
+    final eventDateRaw = json['event_date'] ?? eventMap?['event_date'];
     return TicketModel(
       id: json['id'] as String? ?? '',
       orderId: json['order_id'] as String? ?? '',
@@ -52,6 +93,17 @@ class TicketModel {
           ? DateTime.tryParse(json['checked_in_at'] as String)
           : null,
       checkedInByStaffId: json['checked_in_by_staff_id'] as String?,
+      eventTitle:
+          (json['event_title'] ?? eventMap?['title'])?.toString() ?? '',
+      ticketTypeName: json['ticket_type_name']?.toString(),
+      ticketCode: json['ticket_code']?.toString(),
+      eventDate: eventDateRaw is String
+          ? DateTime.tryParse(eventDateRaw)
+          : null,
+      eventLocation: (json['event_location'] ?? eventMap?['location'])
+          ?.toString(),
+      eventOnlineUrl: (json['event_online_url'] ?? eventMap?['online_url'])
+          ?.toString(),
     );
   }
 
@@ -69,6 +121,12 @@ class TicketModel {
       'issued_at': issuedAt?.toIso8601String(),
       'checked_in_at': checkedInAt?.toIso8601String(),
       'checked_in_by_staff_id': checkedInByStaffId,
+      'event_title': eventTitle,
+      'ticket_type_name': ticketTypeName,
+      'ticket_code': ticketCode,
+      'event_date': eventDate?.toIso8601String(),
+      'event_location': eventLocation,
+      'event_online_url': eventOnlineUrl,
     };
   }
 
