@@ -81,6 +81,12 @@ jobs:
       - name: Run Flutter tests
         run: flutter test --dart-define=MOCK_MODE=true
 
+      # Bukti terpisah bahwa mode demo NONAKTIF secara default. Tanpa langkah ini,
+      # suite di atas berjalan dengan MOCK_MODE=true sehingga properti "default
+      # bukan demo" tidak pernah benar-benar diuji di CI.
+      - name: Verify demo mode stays off by default
+        run: flutter test test/core/app_config_test.dart --dart-define=MOCK_MODE=false
+
       - name: Verify API mode does not fall back to mock data
         run: flutter test test/services/api_mode_no_fallback_test.dart --dart-define=MOCK_MODE=false
 

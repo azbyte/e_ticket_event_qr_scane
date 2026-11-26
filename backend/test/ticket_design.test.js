@@ -5,6 +5,13 @@
  * tiket memakai desain kategori/event/default, serta normalisasi
  * `attendee_fields` pada respons event.
  */
+process.env.NODE_ENV = 'test';
+// Unit test normalisasi/validasi desain & rendering: tidak ada koneksi database.
+// Variabel ini hanya memenuhi validasi startup `config/env.js`.
+process.env.DATABASE_URL = 'postgresql://tester:secret@127.0.0.1:5432/e_ticket_test';
+process.env.JWT_SECRET = 'test-only-jwt-secret';
+process.env.TICKET_TOKEN_SECRET = 'test-only-ticket-token-secret';
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

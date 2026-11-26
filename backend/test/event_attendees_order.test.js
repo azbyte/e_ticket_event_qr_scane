@@ -1,5 +1,14 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+
+// Unit test murni: koneksi database tidak pernah dipakai. Variabel ini hanya
+// memenuhi validasi startup `config/env.js` sehingga `require` controller tidak
+// berhenti dengan "Missing required environment variables".
+process.env.NODE_ENV = 'test';
+process.env.DATABASE_URL = 'postgresql://tester:secret@127.0.0.1:5432/e_ticket_test';
+process.env.JWT_SECRET = 'test-only-jwt-secret';
+process.env.TICKET_TOKEN_SECRET = 'test-only-ticket-token-secret';
+
 const db = require('../src/config/db');
 
 const EVENT_ID = '11111111-1111-4111-8111-111111111111';

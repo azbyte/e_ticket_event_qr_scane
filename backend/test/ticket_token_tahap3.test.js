@@ -1,5 +1,35 @@
+process.env.NODE_ENV = 'test';
+// Unit test token tiket: lapisan database di-stub (lihat require.cache di bawah)
+// sehingga tidak ada koneksi PostgreSQL. Variabel ini hanya memenuhi validasi
+// startup `config/env.js` pada modul yang di-require.
+process.env.DATABASE_URL = 'postgresql://tester:secret@127.0.0.1:5432/e_ticket_test';
+process.env.JWT_SECRET = 'test-only-jwt-secret';
+process.env.TICKET_TOKEN_SECRET = 'test-only-ticket-token-secret';
+
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+
+// `presentTicket(includeToken: true)` memastikan `token_hash` tiket tersimpan
+// agar QR milik owner dapat diverifikasi saat check-in. Di unit test ini efek
+// tulis itu diarahkan ke stub in-memory — bukan database — sehingga logika
+// presentasi tetap dieksekusi penuh tanpa menyentuh PostgreSQL.
+const dbPath = require.resolve('../src/config/db');
+const tokenHashWrites = [];
+require.cache[dbPath] = {
+  id: dbPath,
+  filename: dbPath,
+  loaded: true,
+  exports: {
+    pool: { connect: async () => { throw new Error('unit test tidak boleh membuka koneksi database'); } },
+    query: async (sql, params = []) => {
+      tokenHashWrites.push({ sql: sql.replace(/\s+/g, ' ').trim(), params });
+      return [];
+    },
+    getOne: async () => null,
+    supabase: { query: async () => [], getOne: async () => null },
+  },
+};
+
 const ticketTokens = require('../src/services/ticketTokenService');
 
 test('T3-D2-02 & T3-D2-06: ticket token HMAC-SHA256 deterministik dan hash konsisten', async () => {
@@ -33,9 +63,24 @@ test('T3-D2-02: presentTicket menyembunyikan token jika includeToken = false', a
   assert.equal(presentedPublic.token_hash, undefined, 'token_hash tidak pernah dikirim ke klien');
   assert.equal(presentedPublic.attendee_name, 'Budi Test');
 
+  const writesBeforeOwner = tokenHashWrites.length;
   const presentedOwner = await ticketTokens.presentTicket(fakeTicket, { includeToken: true });
   assert.ok(typeof presentedOwner.token === 'string', 'token harus ada untuk owner');
   assert.equal(presentedOwner.token_hash, undefined, 'token_hash tetap tidak dikirim ke owner');
+  // Efek samping penyimpanan hash tetap terjadi (diarahkan ke stub, bukan DB).
+  assert.equal(
+    tokenHashWrites.length - writesBeforeOwner,
+    1,
+    'hash tiket harus dipastikan tersimpan tepat sekali untuk owner',
+  );
+  const ownerWrite = tokenHashWrites[writesBeforeOwner];
+  assert.match(ownerWrite.sql, /^UPDATE tickets SET token_hash = \$1 WHERE id = \$2$/);
+  assert.equal(ownerWrite.params[1], fakeTicket.id);
+  assert.equal(
+    ownerWrite.params[0],
+    ticketTokens.hashToken(presentedOwner.token),
+    'hash yang disimpan harus SHA-256 dari token yang dikirim ke owner',
+  );
 });
 
 test('T3-D2-06: safeEqual membandingkan hash secara constant-time tanpa exception', () => {

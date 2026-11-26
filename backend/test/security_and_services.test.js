@@ -2,6 +2,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 
+process.env.NODE_ENV = 'test';
+// Unit test token/log/email/plan: tidak ada koneksi database. Variabel ini hanya
+// memenuhi validasi startup `config/env.js` pada modul yang di-require.
+process.env.DATABASE_URL = 'postgresql://tester:secret@127.0.0.1:5432/e_ticket_test';
+process.env.JWT_SECRET = 'test-only-jwt-secret';
 process.env.TICKET_TOKEN_SECRET = 'test-only-ticket-token-secret';
 process.env.SMTP_HOST = 'json';
 

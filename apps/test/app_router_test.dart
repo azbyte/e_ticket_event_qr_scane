@@ -8,6 +8,7 @@ import 'package:e_ticket_event_qr_scane/features/admin/screens/admin_profile_scr
 import 'package:e_ticket_event_qr_scane/features/auth/screens/login_screen.dart';
 import 'package:e_ticket_event_qr_scane/features/organizer/membership/team_management_screen.dart';
 import 'package:e_ticket_event_qr_scane/features/organizer/operations/organizer_scanner_screen.dart';
+import 'package:e_ticket_event_qr_scane/services/organizer_operations/organizer_permission.dart';
 import 'package:e_ticket_event_qr_scane/features/organizer/screens/attendee_list_screen.dart';
 import 'package:e_ticket_event_qr_scane/features/organizer/screens/organizer_order_list_screen.dart';
 import 'package:e_ticket_event_qr_scane/features/scanner/screens/scanner_screen.dart';
@@ -119,16 +120,54 @@ void main() {
       await tester.tap(find.text('Open route'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(OrganizerScannerScreen), findsOneWidget);
-      // Mode API: kamera nyata + backend. Mode demo: layar simulasi.
-      expect(
-        find.text(
-          AppConfig.mockMode
-              ? 'Pemindai Tiket QR (demo)'
-              : 'Pemindai QR Tiket',
-        ),
-        findsOneWidget,
+      // Identitas layar: route harus membuka OrganizerScannerScreen milik event
+      // yang diminta, bukan halaman lain atau scanner tanpa konteks event.
+      final organizerScanner = tester.widget<OrganizerScannerScreen>(
+        find.byType(OrganizerScannerScreen),
       );
+      expect(organizerScanner.eventId, 'evt-1001');
+
+      // Perilaku: pemilik event memiliki izin SCAN_TICKET, sehingga yang tampil
+      // adalah pemindai - bukan layar "Akses Ditolak".
+      expect(
+        organizerScanner.contextScope.hasPermission(
+          OrganizerPermission.scanTicket,
+        ),
+        isTrue,
+      );
+      expect(find.text('Akses Ditolak'), findsNothing);
+
+      if (AppConfig.mockMode) {
+        // Mode demo eksplisit: layar simulasi milik OrganizerScannerScreen.
+        expect(find.byType(ScannerScreen), findsNothing);
+        expect(
+          find.descendant(
+            of: find.byType(AppBar),
+            matching: find.text('Pemindai Tiket QR'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Input Kode / Token Tiket QR'),
+          findsOneWidget,
+        );
+      } else {
+        // Mode API (dipakai produksi): OrganizerScannerScreen mendelegasikan ke
+        // ScannerScreen ber-event-id sama, dengan judul nyata tanpa penanda demo
+        // dan input token manual sebagai fallback kamera.
+        final page = tester.widget<ScannerScreen>(find.byType(ScannerScreen));
+        expect(page.eventId, 'evt-1001');
+        expect(
+          find.descendant(
+            of: find.byType(AppBar),
+            matching: find.text('Pemindai QR Tiket'),
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('Input Kode / Token Tiket'), findsOneWidget);
+      }
+      // Penanda demo tidak boleh kembali muncul di mana pun pada layar ini.
+      expect(find.textContaining('(demo)'), findsNothing);
     },
   );
 

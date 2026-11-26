@@ -180,8 +180,8 @@ test('rotasi password hanya terjadi bila diminta eksplisit', async () => {
 });
 
 test('password tersimpan yang tidak cocok dilaporkan PASSWORD_MISMATCH tanpa mengubah data', async () => {
-  // Kasus nyata: baris Admin dibuat dengan password lain (mis. lewat
-  // reset-and-seed-admin) sehingga login dengan ADMIN_PASSWORD selalu 401.
+  // Kasus nyata: baris Admin dibuat dengan password lain (mis. lewat skrip seed
+  // manual) sehingga login dengan ADMIN_PASSWORD selalu 401.
   const storedHash = await bcrypt.hash('Password-Lama-123!', 4);
   const store = createFakeStore([
     { id: 'admin-1', email: 'admin@example.test', username: 'admin', role: 'admin', disabled_at: null, password_hash: storedHash },

@@ -30,8 +30,9 @@ Dibangun dengan **Node.js + Express + JavaScript** dan database **PostgreSQL via
 - Verifikasi schema berlapis: `npm run verify:db-schema` (introspeksi `prisma db
   pull` + `migrate diff` dua arah + perbandingan jumlah index). Hasil terakhir:
   tidak ada perbedaan.
-- Audit read-only: `node scripts/audit-db.js`. Rekonsiliasi function yang hilang
-  pada database lama: `node scripts/apply-db-functions.js --apply`.
+- Audit read-only: `node scripts/audit-db.js`. Rekonsiliasi function PL/pgSQL
+  pada database lama dilakukan lewat migration Prisma (`npx prisma migrate
+  deploy`), bukan skrip terpisah.
 
 ## Struktur Folder
 
@@ -163,20 +164,14 @@ Menambah endpoint baru: letakkan pada router domain yang sesuai di
 | `scripts/provision-admin.js` | `npm run admin:provision` | Bootstrap akun Admin idempotent |
 | `scripts/audit-db.js` | `npm run audit:db` | Audit database read-only |
 | `scripts/verify-schema-sync.js` | `npm run verify:db-schema` | Bandingkan schema Prisma dengan database (read-only) |
-| `scripts/diagnose-db-functions.js` | `node scripts/diagnose-db-functions.js` | Bandingkan definisi function PL/pgSQL (read-only) |
-| `scripts/apply-db-functions.js` | `node scripts/apply-db-functions.js [--apply]` | Rekonsiliasi function PL/pgSQL yang hilang |
 | `scripts/integration/` | `npm run test:integration` | Harness integrasi destruktif (opt-in) |
 | `scripts/e2e-live.js` + `scripts/e2e-live-helpers.js` | `npm run test:e2e` | E2E alur PRD terhadap API + database nyata |
 | `scripts/e2e-auth-live.js` | `npm run test:auth-live` | E2E login & registrasi Organizer terhadap API + database nyata |
 | `scripts/verify-db-state.js` | `npm run verify:auth-db` | Ringkasan akun & profil Organizer di database (read-only) |
 | `scripts/repair-organizer-profiles.js` | `npm run repair:organizer-profiles` | Buat `organizer_profiles` yang hilang (idempotent, tidak menghapus akun) |
-| `scripts/cleanup-e2e-accounts.js` | manual | Hapus akun uji sintetis hasil skrip E2E |
 | `scripts/dump-routes.js` | `npm run routes:list` | Cetak tabel 88 route yang terdaftar di Express (read-only) |
 | `scripts/smoke-routes.js` | `npm run test:routes` | Pastikan semua endpoint terdaftar (regresi konsolidasi router) |
-| `scripts/backup-db-json.js` + `scripts/restore-json-backup.js` | manual | Backup/pulihkan seluruh tabel sebagai JSON |
-| `scripts/reset-and-seed-admin.js` | manual (destruktif) | Reset data transaksional lalu buat satu Admin |
-| `scripts/fill-acceptance-checklist.js` | manual | Isi checklist acceptance dari hasil uji |
-| `scripts/generate-*-migration.js` | historis | Generator migration sekali pakai; migration hasilnya sudah di-commit |
+| `scripts/backup-db-json.js` | manual | Backup seluruh tabel sebagai JSON sebelum operasi destruktif |
 
 ### Test
 
@@ -332,7 +327,6 @@ kosong:
 
 ```bash
 npx prisma migrate resolve --applied <nama-migration>   # untuk setiap baseline
-node scripts/apply-db-functions.js --apply              # bila function PL/pgSQL hilang
 npx prisma migrate deploy
 ```
 

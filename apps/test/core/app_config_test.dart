@@ -41,7 +41,30 @@ void main() {
     });
   });
 
-  test('mode demo tetap nonaktif secara default', () {
-    expect(AppConfig.mockMode, isFalse);
+  group('konfigurasi mode demo', () {
+    test('mockMode hanya mencerminkan --dart-define, tidak pernah hardcoded', () {
+      // Nilai efektif harus identik dengan konfigurasi build. Bila berbeda,
+      // berarti ada nilai hardcoded yang bisa mengaktifkan demo tanpa diminta.
+      const fromBuild = bool.fromEnvironment('MOCK_MODE', defaultValue: false);
+      expect(AppConfig.mockMode, fromBuild);
+    });
+
+    test('mode demo nonaktif ketika build tidak meminta MOCK_MODE', () {
+      // Tanpa --dart-define, mock mode wajib mati: aplikasi memakai backend dan
+      // database asli. Saat suite dijalankan dengan MOCK_MODE=true (alur demo),
+      // properti ini dibuktikan oleh langkah CI terpisah
+      // "Verify demo mode stays off by default" yang menjalankan file ini tanpa
+      // define — bukan dengan melonggarkan assertion di sini.
+      if (AppConfig.mockMode) {
+        expect(
+          const bool.fromEnvironment('MOCK_MODE', defaultValue: false),
+          isTrue,
+          reason:
+              'mockMode hanya boleh aktif bila --dart-define=MOCK_MODE=true diminta eksplisit',
+        );
+        return;
+      }
+      expect(AppConfig.mockMode, isFalse);
+    });
   });
 }

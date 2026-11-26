@@ -1,5 +1,14 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+
+// Unit test murni: seluruh skenario di bawah ditolak pada validasi awal
+// sehingga koneksi database tidak pernah dipakai. Variabel ini hanya memenuhi
+// validasi startup `config/env.js` saat controller di-require.
+process.env.NODE_ENV = 'test';
+process.env.DATABASE_URL = 'postgresql://tester:secret@127.0.0.1:5432/e_ticket_test';
+process.env.JWT_SECRET = 'test-only-jwt-secret';
+process.env.TICKET_TOKEN_SECRET = 'test-only-ticket-token-secret';
+
 const { createOrder, hashAccessToken, getAuthorizedOrder } = require('../src/controllers/orderController');
 
 test('createOrder rejects request with quantity greater than 1 in Tahap 1', async () => {

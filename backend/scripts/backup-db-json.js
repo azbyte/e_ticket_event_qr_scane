@@ -2,8 +2,8 @@
  * Backup JSON seluruh tabel public sebelum operasi destruktif.
  *
  * Pengganti `pg_dump` yang tidak tersedia di environment ini. Hasil ditulis ke
- * `backend/backups/backup-<timestamp>.json` (di-ignore Git) dan dapat dipulihkan
- * dengan `scripts/restore-json-backup.js`.
+ * `backend/backups/backup-<timestamp>.json` (di-ignore Git) sebagai arsip
+ * sebelum operasi destruktif.
  *
  * Pemakaian: node scripts/backup-db-json.js
  */
