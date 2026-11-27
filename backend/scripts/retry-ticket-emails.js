@@ -25,10 +25,10 @@ const parseLimit = () => {
   const status = emailService.smtpStatus();
   console.log(`Mode transport: ${status.mode}`);
   if (status.reason) console.log(`Keterangan: ${status.reason}`);
-  if (status.mode !== 'smtp') {
+  if (status.mode !== 'smtp' && status.mode !== 'brevo' && status.mode !== 'resend') {
     console.log(
-      'Tidak ada pengiriman yang dijalankan: SMTP nyata belum siap. '
-      + 'Lengkapi backend/.env lalu ulangi.',
+      'Tidak ada pengiriman yang dijalankan: layanan email belum siap. '
+      + 'Lengkapi SMTP atau RESEND_API_KEY pada backend/.env lalu ulangi.',
     );
     await pool.end();
     return;

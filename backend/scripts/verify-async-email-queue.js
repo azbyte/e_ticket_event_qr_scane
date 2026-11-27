@@ -114,9 +114,12 @@ const cleanup = async (query) => {
 };
 
 (async () => {
+  process.env.EMAIL_PROVIDER = 'smtp';
   process.env.SMTP_HOST = '127.0.0.1';
   process.env.SMTP_PORT = String(SMTP_PORT);
   process.env.SMTP_SECURE = 'false';
+  // Sink lokal tidak menyediakan STARTTLS; jangan paksa TLS pada pengujian.
+  process.env.SMTP_REQUIRE_TLS = 'false';
   process.env.SMTP_USER = '';
   process.env.SMTP_PASS = '';
   process.env.EMAIL_FROM = 'no-reply@eticket.test';

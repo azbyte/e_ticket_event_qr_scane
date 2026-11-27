@@ -119,13 +119,72 @@ const startServer = async () => {
 
   // Status email (tanpa kredensial): jelas apakah tiket dapat dikirim atau
   // hanya tersedia di aplikasi. Tidak ada nilai rahasia yang dicetak.
-  const smtp = emailService.smtpStatus();
+  const emailConfig = emailService.validateEmailConfig();
   console.log(
-    'Email e-ticket: mode=' + smtp.mode +
-    (smtp.missing.length > 0 ? ' | belum diisi: ' + smtp.missing.join(', ') : '') +
-    (smtp.reason ? ' | ' + smtp.reason : ''),
+    'Email e-ticket: mode=' + emailConfig.mode +
+    (emailConfig.provider ? ' | provider=' + emailConfig.provider : '') +
+    (emailConfig.host ? ' | ' + emailConfig.host + ':' + emailConfig.port
+      + (emailConfig.requireTls ? ' (STARTTLS)' : emailConfig.secure ? ' (TLS)' : '') : '') +
+    (emailConfig.missing.length > 0 ? ' | belum diisi: ' + emailConfig.missing.join(', ') : '') +
+    (emailConfig.from ? ' | from=' + emailConfig.from : '') +
+    (emailConfig.reason ? ' | ' + emailConfig.reason : ''),
   );
+  if (emailConfig.ok && emailConfig.loopback) {
+    // Relay loopback hanya menerima pesan di mesin ini (sink pengujian); email
+    // tidak akan pernah sampai ke inbox peserta.
+    console.warn(
+      'Email e-ticket: SMTP_HOST menunjuk loopback (' + emailConfig.host + '). '
+      + 'Relay ini tidak mengirim ke inbox nyata. Untuk Brevo isi '
+      + 'SMTP_HOST=smtp-relay.brevo.com (atau hapus SMTP_HOST dan set EMAIL_PROVIDER=brevo).',
+    );
+  }
+  if (emailConfig.organizerFromDomains.length > 0) {
+    console.log(
+      'Email e-ticket: From penyelenggara diizinkan untuk domain: '
+      + emailConfig.organizerFromDomains.join(', ')
+      + ' | alamat lain memakai Reply-To penyelenggara.',
+    );
+  } else {
+    console.log(
+      'Email e-ticket: From memakai EMAIL_FROM terverifikasi; email penyelenggara '
+      + 'dipasang sebagai Reply-To. Isi EMAIL_ORGANIZER_FROM_DOMAINS hanya bila '
+      + 'domain penyelenggara sudah diverifikasi di penyedia email.',
+    );
+  }
+  if (!emailConfig.ok) {
+    console.warn(
+      'Email e-ticket: BELUM SIAP. Tiket tetap terbit, tetapi email tidak akan '
+      + 'dikirim sampai konfigurasi di backend/.env (atau environment deployment) '
+      + 'dilengkapi. Lihat backend/README.md bagian "Email e-ticket".',
+    );
+  }
   emailQueue.startRetryWorker();
+
+  // Preflight transport email: pastikan host SMTP benar-benar dapat dijangkau
+  // (banyak jaringan/hosting memblokir port 25/465/587). Tanpa pemeriksaan ini
+  // email hanya akan gagal di dalam antrean tanpa terlihat penyebabnya.
+  emailService
+    .verifyTransport()
+    .then((result) => {
+      if (result.ok) {
+        console.log(
+          'Email e-ticket: transport ' + (result.mode || emailConfig.mode) + ' terhubung'
+          + (result.host ? ' (' + result.host + ':' + result.port + ')' : '')
+          + ' dan kredensial diterima.',
+        );
+      } else if (result.skipped) {
+        console.warn('Email e-ticket: preflight dilewati | ' + result.reason);
+      } else {
+        console.warn(
+          'Email e-ticket: preflight GAGAL pada tahap ' + (result.stage || 'unknown')
+            + ' | ' + result.reason
+            + ' | Tiket tetap terbit; email akan dicoba ulang oleh worker.',
+        );
+      }
+    })
+    .catch((error) => {
+      console.warn('Email e-ticket: preflight error | ' + error.message);
+    });
 
   // Error setelah server hidup tetap harus terlihat dan memberi exit code.
   server.on('error', (error) => {

@@ -71,8 +71,9 @@ class TicketService {
 
   /// Kirim ulang e-ticket ke email peserta.
   ///
-  /// Backend tidak mengirim ganda: bila tiket sudah `SENT`, hasilnya
-  /// `SKIPPED/already_sent` dan tidak ada email baru.
+  /// Backend benar-benar mengirim ulang tiket yang SAMA (nomor tiket dan PDF
+  /// tidak berubah, tidak ada tiket baru). Cooldown singkat mencegah klik
+  /// ganda; hasilnya dilaporkan apa adanya lewat `delivered`/`delivery_status`.
   Future<Map<String, dynamic>> resendTicketEmail(
     String ticketId, {
     String? orderId,

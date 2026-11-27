@@ -75,8 +75,8 @@ const enqueueTicket = async (ticketId, { recipient, force = false, reason } = {}
     to = String(ticket?.attendee_email || '').trim();
   }
 
-  // SMTP belum siap: catat status belum terkirim tanpa mencoba jaringan.
-  if (status.mode === 'disabled') {
+  // SMTP/penyedia belum siap: catat status belum terkirim tanpa mencoba jaringan.
+  if (!status.configured) {
     await emailService.markQueued(ticketId, to, reason || status.reason);
     return {
       ticketId: key,
@@ -150,7 +150,8 @@ const retryPending = async (limit = 20) => {
  */
 const startRetryWorker = ({ intervalMs = 5 * 60 * 1000 } = {}) => {
   const status = emailService.smtpStatus();
-  if (status.mode !== 'smtp') {
+  // Worker hanya berguna bila ada transport yang benar-benar mengirim email.
+  if (!status.configured || status.mode === 'json') {
     logger.warn('ticket_email_retry_worker_skipped', {
       transport: status.mode,
       reason: status.reason,
@@ -194,7 +195,7 @@ const summarize = (results = []) => {
   const notConfigured = results.some((item) => item.status === 'NOT_CONFIGURED');
   const failed = results.some((item) => item.status === 'FAILED');
   return {
-    configured: status.mode === 'smtp',
+    configured: status.configured && status.mode !== 'json',
     transport: status.mode,
     delivered,
     queued,

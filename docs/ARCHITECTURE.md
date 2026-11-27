@@ -103,18 +103,46 @@ terhadap API + PostgreSQL nyata (`cd backend; npm run test:e2e`, 80 pemeriksaan)
   tiket sehingga respons pendaftaran/pembayaran tidak bergantung pada kecepatan
   SMTP dan tidak ada email ganda. Tidak ada dependensi runtime baru.
 - `src/services/emailService.js` menentukan transport dari environment:
-  `smtp` (host nyata + konfigurasi valid), `json` (hanya `NODE_ENV=test`), atau
-  `disabled`. `smtpStatus()` memvalidasi `SMTP_PORT`, pasangan
-  `SMTP_USER`/`SMTP_PASS`, dan `EMAIL_FROM` tanpa mencetak nilai rahasia.
+  **`brevo`** (SMTP relay Brevo `smtp-relay.brevo.com` port 587 + STARTTLS,
+  penyedia aktif), `smtp` (relay generik), `resend` (jalur HTTPS API lama,
+  fallback bila SMTP belum diisi), `json` (hanya `NODE_ENV=test`), atau
+  `disabled`. `smtpStatus()` memvalidasi `EMAIL_PROVIDER`, `SMTP_PORT`, pasangan
+  `SMTP_USER`/`SMTP_PASS`, `EMAIL_FROM`, dan menolak relay non-loopback tanpa
+  kredensial — tanpa mencetak nilai rahasia. Kredensial Brevo (`SMTP_USER` login
+  SMTP, `SMTP_PASS` SMTP key) hanya dibaca dari environment.
+- Kegagalan transport diklasifikasikan per tahap (`dns`, `connect`, `tls`,
+  `auth`, `sender`, `send`) dan saran tindakannya ikut disimpan pada
+  `last_error`, sehingga penyebab seperti SMTP key salah atau `EMAIL_FROM` belum
+  diverifikasi di Brevo tidak tersembunyi.
 - Status pengiriman disimpan di `ticket_email_deliveries` dan dibedakan:
   `PENDING` (belum dikirim/antre), `SENDING` (sedang berjalan), `SENT` (diterima
   transport), `FAILED` (+`last_error`), serta `NOT_CONFIGURED` pada respons API.
   Status pembayaran tidak pernah disamakan dengan status pengiriman email.
-- Penerima selalu `attendees.email` pada tiket yang bersangkutan; lampiran PDF
-  memakai desain & orientasi tiket. Retry dibatasi 5 percobaan otomatis,
-  menghormati `next_attempt_at`, dan tersedia lewat worker periodik,
+- **Anti email ganda lintas proses**: sebelum mengirim, `claimDelivery()`
+  mengambil klaim atomik per `(ticket_id, recipient)` lewat satu `UPDATE`
+  bersyarat + advisory lock. Baris `SENT` tidak pernah diklaim ulang oleh
+  pengiriman otomatis (hanya oleh kirim ulang eksplisit setelah cooldown), baris
+  `PENDING` dalam masa klaim (`EMAIL_SEND_CLAIM_SECONDS`, default 120 detik)
+  dianggap sedang dikirim. Klaim kedaluwarsa otomatis bila proses berhenti di
+  tengah jalan, sehingga worker retry dapat mengambil alih tanpa menggandakan
+  email. Baris `SENT` juga tidak pernah diturunkan menjadi `FAILED`.
+- Penerima selalu `attendees.email` pada tiket yang bersangkutan; alamat
+  penyelenggara diambil dari `events.created_by` → `profiles.email`. `From`
+  memakai alamat penyelenggara hanya bila diizinkan penyedia (sama dengan
+  `SMTP_USER`/`EMAIL_FROM`, atau domainnya ada di
+  `EMAIL_ORGANIZER_FROM_DOMAINS`); selain itu `From` = `EMAIL_FROM` terverifikasi
+  dan penyelenggara menjadi `Reply-To`. Tidak ada kredensial email pribadi
+  penyelenggara yang disimpan.
+- Lampiran PDF memakai desain & orientasi tiket. Retry memakai backoff
+  (`EMAIL_RETRY_BASE_DELAY_MS` × nomor percobaan), dibatasi 5 percobaan
+  otomatis, menghormati `next_attempt_at`, dan tersedia lewat worker periodik,
   `POST /api/admin/email/retry`, `POST /api/tickets/:id/email`, dan
   `npm run retry:emails` — tanpa membuat tiket/transaksi baru.
+- Tombol kirim ulang memakai jalur eksplisit (`force`): mengirim ulang tiket
+  yang sama (nomor tiket & PDF tidak berubah) dengan cooldown
+  `EMAIL_RESEND_COOLDOWN_SECONDS`; kegagalan kirim ulang tidak menurunkan status
+  `SENT` yang sudah ada. `DELIVERED` tidak pernah diklaim karena tidak ada bukti
+  inbox.
 
 **Backend (perbaikan integrasi)**
 

@@ -140,15 +140,24 @@ const getTicketById = asyncHandler(async (req, res) => {
     const delivery = await emailService.emailDeliveryStatusForTicket(ticket.id);
     if (delivery) {
       const sending = delivery.status === 'PENDING' && emailQueue.isSending(ticket.id);
+      // Tabel hanya mengenal PENDING/SENT/FAILED (tanpa perubahan schema), jadi
+      // "belum terkirim karena layanan email belum siap" ditampilkan sebagai
+      // NOT_CONFIGURED pada API — bukan diklaim terkirim.
+      const transport = emailService.smtpStatus();
+      const status = sending
+        ? 'SENDING'
+        : (!transport.configured && delivery.status === 'PENDING'
+          ? 'NOT_CONFIGURED'
+          : delivery.status);
       emailDelivery = {
         recipient: delivery.recipient,
         // `SENDING` hanya dipakai saat pekerjaan benar-benar sedang berjalan;
         // status tersimpan tetap PENDING sampai transport menerima pesan.
-        status: sending ? 'SENDING' : delivery.status,
+        status,
         sending,
         attempt_count: delivery.attempt_count,
         sent_at: delivery.sent_at,
-        reason: delivery.last_error || null,
+        reason: delivery.last_error || transport.reason || null,
       };
     }
   }
@@ -226,17 +235,30 @@ const getTicketPdf = asyncHandler(async (req, res) => {
 /**
  * Tautan pengiriman ulang e-ticket.
  *
- * Tidak menggunakan `force`: pengiriman yang sudah `SENT` tidak diulang, jadi
- * tombol/kirim ulang tidak pernah menghasilkan email atau tiket ganda.
+ * Tombol "Kirim ulang email" memakai `force`: email benar-benar dikirim lagi
+ * dengan tiket & PDF yang SAMA (tidak membuat tiket baru dan tidak mengubah
+ * nomor tiket). Pengiriman otomatis di antrean tetap idempoten, dan cooldown
+ * `EMAIL_RESEND_COOLDOWN_SECONDS` mencegah klik ganda men-spam peserta.
+ *
  * Respons menyatakan status sebenarnya; `success` tetap true karena operasi
  * permintaan berhasil diproses, `delivered` menunjukkan hasil email nyata.
  */
 const resendTicketEmail = asyncHandler(async (req, res) => {
-  const ticket = await getOne('SELECT * FROM tickets WHERE id=$1', [req.params.id]);
+  // `order_id` tidak ada pada tabel tickets; ambil lewat order_items agar
+  // otorisasi pemegang token akses order tetap dapat ditentukan walau klien
+  // tidak mengirim `order_id` (mis. tautan dari email).
+  const ticket = await getOne(
+    `SELECT t.*, oi.order_id AS order_id
+       FROM tickets t
+       LEFT JOIN attendees a ON a.id = t.attendee_id
+       LEFT JOIN order_items oi ON oi.id = a.order_item_id
+      WHERE t.id = $1`,
+    [req.params.id],
+  );
   if (!ticket) { res.status(404); throw new Error('Ticket not found'); }
   const access = await resolveAccess(req, ticket);
   if (!access.allowed) { res.status(404); throw new Error('Ticket not found'); }
-  const result = await emailService.sendTicketEmail(ticket.id);
+  const result = await emailService.sendTicketEmail(ticket.id, { force: true });
   const delivery = result.delivery || await emailService.emailDeliveryStatusForTicket(ticket.id);
   const alreadySent = result.reason === 'already_sent';
   res.json({
@@ -245,12 +267,20 @@ const resendTicketEmail = asyncHandler(async (req, res) => {
     already_sent: alreadySent,
     delivery_status: result.status,
     reason: result.reason || delivery?.last_error || null,
+    // Identitas yang benar-benar dipakai: pengirim terverifikasi/penyelenggara
+    // dan alamat balasan penyelenggara (bukan email peserta).
+    sender: result.sender || null,
+    recipient: delivery?.recipient || null,
+    attempt_count: delivery?.attempt_count ?? null,
+    sent_at: delivery?.sent_at || null,
+    previously_sent: result.previously_sent === true,
     delivery: delivery
       ? {
         recipient: delivery.recipient,
         status: delivery.status,
         attempt_count: delivery.attempt_count,
         sent_at: delivery.sent_at,
+        last_error: delivery.last_error || null,
       }
       : null,
   });
