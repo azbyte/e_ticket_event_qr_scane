@@ -13,6 +13,7 @@ class _FakeTicketDesignService extends TicketDesignService {
   final TicketDesignState _state;
   final List<TicketOrientation> savedOrientations = <TicketOrientation>[];
   final List<String> openedScopes = <String>[];
+  final List<TicketQrPlacement> savedQrPlacements = <TicketQrPlacement>[];
 
   @override
   Future<TicketDesignState> load(String eventId) async => _state;
@@ -30,6 +31,23 @@ class _FakeTicketDesignService extends TicketDesignService {
       filePath: '',
       contentType: 'image/png',
       orientation: orientation,
+    );
+  }
+
+  @override
+  Future<TicketDesignModel> saveQrPlacement({
+    required String eventId,
+    required TicketQrPlacement qr,
+    String scope = 'event',
+    String? ticketTypeId,
+  }) async {
+    savedQrPlacements.add(qr);
+    openedScopes.add(scope);
+    return TicketDesignModel(
+      filePath: '/media/ticket-designs/evt-1/desain.png',
+      contentType: 'image/png',
+      orientation: TicketOrientation.landscape,
+      qr: qr,
     );
   }
 }
@@ -161,6 +179,175 @@ void main() {
         findsNothing);
       expect(find.byKey(const Key('ticket-design-orientation-saved')),
         findsOneWidget);
+    });
+  });
+
+  group('Pengaturan QR Code', () {
+    test('clamped() membatasi nilai ke rentang slider/backend', () {
+      const legacy = TicketQrPlacement(x: 1.4, y: -0.2, size: 0.9);
+      final clamped = legacy.clamped();
+      expect(clamped.x, TicketQrPlacement.maxPosition);
+      expect(clamped.y, TicketQrPlacement.minPosition);
+      expect(clamped.size, TicketQrPlacement.maxSize);
+      // Nilai default sistem tidak berubah karena sudah di dalam rentang.
+      expect(TicketDesignModel.defaultQr.clamped(), TicketDesignModel.defaultQr);
+      expect(
+        TicketDesignModel.defaultPortraitQr.clamped(),
+        TicketDesignModel.defaultPortraitQr,
+      );
+    });
+
+    testWidgets('desain lama dengan ukuran QR 90% tetap tampil tanpa error',
+        (tester) async {
+      final service = _FakeTicketDesignService(
+        TicketDesignState(
+          eventOrientation: TicketOrientation.landscape,
+          eventDesign: const TicketDesignModel(
+            filePath: '/media/ticket-designs/evt-1/desain.png',
+            contentType: 'image/png',
+            orientation: TicketOrientation.landscape,
+            qr: TicketQrPlacement(x: 0.5, y: 0.5, size: 0.9),
+          ),
+        ),
+      );
+      await tester.pumpWidget(_wrap(TicketDesignPanel(
+        eventId: 'evt-1',
+        ticketTypes: const <TicketTypeModel>[],
+        service: service,
+      )));
+      await tester.pumpAndSettle();
+
+      final sizeSlider =
+          tester.widget<Slider>(find.byKey(const Key('ticket-design-qr-size')));
+      expect(sizeSlider.value, TicketQrPlacement.maxSize);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('panel menyediakan slider X, Y, ukuran dan tombol simpan',
+        (tester) async {
+      final service = _FakeTicketDesignService(
+        const TicketDesignState(eventOrientation: TicketOrientation.landscape),
+      );
+      await tester.pumpWidget(_wrap(TicketDesignPanel(
+        eventId: 'evt-1',
+        ticketTypes: const <TicketTypeModel>[],
+        service: service,
+      )));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('ticket-design-qr-x')), findsOneWidget);
+      expect(find.byKey(const Key('ticket-design-qr-y')), findsOneWidget);
+      expect(find.byKey(const Key('ticket-design-qr-size')), findsOneWidget);
+      expect(find.byKey(const Key('ticket-design-qr-save')), findsOneWidget);
+      expect(find.byKey(const Key('ticket-design-qr-reset')), findsOneWidget);
+      // Tanpa desain unggahan, pengaturan QR belum dapat disimpan.
+      expect(find.byKey(const Key('ticket-design-qr-status')), findsOneWidget);
+    });
+
+    testWidgets('tanpa desain unggahan tombol simpan QR tidak mengirim API',
+        (tester) async {
+      final service = _FakeTicketDesignService(
+        const TicketDesignState(eventOrientation: TicketOrientation.landscape),
+      );
+      await tester.pumpWidget(_wrap(TicketDesignPanel(
+        eventId: 'evt-1',
+        ticketTypes: const <TicketTypeModel>[],
+        service: service,
+      )));
+      await tester.pumpAndSettle();
+
+      final saveButton = tester.widget<FilledButton>(
+        find.byKey(const Key('ticket-design-qr-save')),
+      );
+      expect(saveButton.onPressed, isNull);
+      expect(service.savedQrPlacements, isEmpty);
+    });
+
+    testWidgets('menggeser slider vertikal lalu menyimpan mengirim posisi QR',
+        (tester) async {
+      const savedQr = TicketQrPlacement(x: 0.2, y: 0.3, size: 0.35);
+      final service = _FakeTicketDesignService(
+        TicketDesignState(
+          eventOrientation: TicketOrientation.landscape,
+          eventDesign: const TicketDesignModel(
+            filePath: '/media/ticket-designs/evt-1/desain.png',
+            contentType: 'image/png',
+            orientation: TicketOrientation.landscape,
+            qr: savedQr,
+          ),
+        ),
+      );
+      await tester.pumpWidget(_wrap(TicketDesignPanel(
+        eventId: 'evt-1',
+        ticketTypes: const <TicketTypeModel>[],
+        service: service,
+      )));
+      await tester.pumpAndSettle();
+
+      // Pengaturan tersimpan dimuat ke slider (bukan default sistem).
+      final ySlider = find.byKey(const Key('ticket-design-qr-y'));
+      await tester.ensureVisible(ySlider);
+      await tester.pumpAndSettle();
+      expect(tester.widget<Slider>(ySlider).value, closeTo(savedQr.y, 0.001));
+
+      await tester.drag(ySlider, const Offset(120, 0));
+      await tester.pumpAndSettle();
+      final draggedY = tester.widget<Slider>(ySlider).value;
+      expect(draggedY, greaterThan(savedQr.y));
+
+      final saveButtonFinder = find.byKey(const Key('ticket-design-qr-save'));
+      await tester.ensureVisible(saveButtonFinder);
+      await tester.pumpAndSettle();
+      final saveButton = tester.widget<FilledButton>(saveButtonFinder);
+      expect(saveButton.onPressed, isNotNull, reason: 'perubahan QR terdeteksi');
+
+      await tester.tap(saveButtonFinder);
+      await tester.pumpAndSettle();
+
+      expect(service.savedQrPlacements, hasLength(1));
+      expect(service.savedQrPlacements.single.y, closeTo(draggedY, 0.001));
+      expect(service.openedScopes, contains('event'));
+    });
+
+    testWidgets('tombol atur ulang default mengembalikan QR default sistem',
+        (tester) async {
+      final service = _FakeTicketDesignService(
+        TicketDesignState(
+          eventOrientation: TicketOrientation.landscape,
+          eventDesign: const TicketDesignModel(
+            filePath: '/media/ticket-designs/evt-1/desain.png',
+            contentType: 'image/png',
+            orientation: TicketOrientation.landscape,
+            qr: TicketQrPlacement(x: 0.6, y: 0.6, size: 0.5),
+          ),
+        ),
+      );
+      await tester.pumpWidget(_wrap(TicketDesignPanel(
+        eventId: 'evt-1',
+        ticketTypes: const <TicketTypeModel>[],
+        service: service,
+      )));
+      await tester.pumpAndSettle();
+
+      final resetButton = find.byKey(const Key('ticket-design-qr-reset'));
+      await tester.ensureVisible(resetButton);
+      await tester.pumpAndSettle();
+      await tester.tap(resetButton);
+      await tester.pumpAndSettle();
+
+      final defaultQr = TicketDesignModel.defaultQr;
+      expect(
+        tester.widget<Slider>(find.byKey(const Key('ticket-design-qr-x'))).value,
+        closeTo(defaultQr.x, 0.001),
+      );
+      expect(
+        tester.widget<Slider>(find.byKey(const Key('ticket-design-qr-y'))).value,
+        closeTo(defaultQr.y, 0.001),
+      );
+      expect(
+        tester.widget<Slider>(find.byKey(const Key('ticket-design-qr-size'))).value,
+        closeTo(defaultQr.size, 0.001),
+      );
     });
   });
 

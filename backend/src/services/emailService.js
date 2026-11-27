@@ -2,6 +2,8 @@
 const config = require('../config/env');
 const { query, getOne, pool } = require('../config/db');
 const ticketDesignService = require('./ticketDesignService');
+const ticketCodeService = require('./ticketCodeService');
+const { ticketPdfFilename } = require('../utils/ticketFilename');
 const logger = require('../utils/logger');
 
 /*
@@ -1053,9 +1055,19 @@ const claimDelivery = async (ticketId, recipient, { allowResend = false } = {}) 
  * Mengembalikan `{ attachment, error }`. Tiket adalah lampiran WAJIB: bila
  * rendering gagal, email tidak dikirim dan kegagalan dicatat apa adanya
  * (lebih baik gagal jujur daripada mengirim email tanpa tiket).
+ *
+ * Nama file mengikuti format wajib `E-TIKET Nama Peserta.pdf` dan diambil dari
+ * `attendees.name` pada tiket yang sama (bukan kode tiket/UUID).
  */
 const buildPdfAttachment = async (ticketId) => {
   try {
+    // Tiket lama: rapikan ID publik lebih dulu agar PDF & nama file konsisten
+    // dengan format `ETK-XXXXXX` (kegagalan di sini tidak menggagalkan lampiran).
+    try {
+      await ticketCodeService.ensurePublicTicketCode(ticketId);
+    } catch (error) {
+      logger.warn('ticket_public_code_failed', { ticketId, error: error.message });
+    }
     const ticket = await ticketDesignService.loadTicketForPdf(ticketId);
     if (!ticket) return { attachment: null, error: 'data_tiket_tidak_ditemukan' };
     const buffer = await ticketDesignService.buildTicketPdf(ticket);
@@ -1064,7 +1076,7 @@ const buildPdfAttachment = async (ticketId) => {
     }
     return {
       attachment: {
-        filename: `tiket-${ticket.ticket_code || ticketId}.pdf`,
+        filename: ticketPdfFilename(ticket.attendee_name),
         content: buffer,
         contentType: 'application/pdf',
       },
@@ -1099,6 +1111,14 @@ const sendTicketEmail = async (ticketId, { recipient, force = false } = {}) => {
   let resendOfSent = false;
   let ticket = null;
   try {
+    // ID publik tiket (`ETK-XXXXXX`) ditetapkan SEBELUM konteks dimuat agar
+    // subjek, isi email, PDF, dan nama lampiran memakai kode yang sama.
+    // Kegagalan di sini tidak menggagalkan pengiriman (kode lama tetap valid).
+    try {
+      await ticketCodeService.ensurePublicTicketCode(ticketId);
+    } catch (error) {
+      logger.warn('ticket_public_code_failed', { ticketId, error: error.message });
+    }
     ticket = await loadTicketContext(ticketId);
     if (!ticket) return { status: 'SKIPPED', reason: 'ticket_not_found' };
     const sender = resolveSender(ticket);

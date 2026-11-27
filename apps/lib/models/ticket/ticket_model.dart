@@ -19,7 +19,8 @@ class TicketModel {
   /// Nama kategori tiket (mis. "Reguler", "VIP").
   final String? ticketTypeName;
 
-  /// Kode tiket yang dicetak pada e-ticket (mis. `TKT-...`).
+  /// ID publik tiket yang dicetak pada e-ticket (mis. `ETK-7K4P9Q`). Tiket lama
+  /// dapat masih memakai kode panjang `TKT-<uuid>` sampai dirapikan backend.
   final String? ticketCode;
 
   /// Jadwal & lokasi event untuk ditampilkan pada tiket.

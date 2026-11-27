@@ -30,6 +30,7 @@
         "verify:email-queue": "node scripts/verify-async-email-queue.js",
         "verify:ticket-flow": "node scripts/verify-ticket-flow.js",
         "verify:ticket-email-e2e": "node scripts/verify-ticket-email-e2e.js",
+        "tickets:backfill-codes": "node scripts/backfill-ticket-codes.js",
         "retry:emails": "node scripts/retry-ticket-emails.js",
         "repair:email-delivery": "node scripts/repair-email-delivery-status.js",
         "cleanup:e2e-data": "node scripts/cleanup-e2e-data.js",

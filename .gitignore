@@ -59,6 +59,15 @@ backend/_server.err.log
 # Berisi data pribadi peserta (email/telepon) dan tidak boleh masuk repo.
 backend/backups/
 
+# --- Alat validasi manual (Python) ---
+# Cache bytecode dari `backend/tools/*.py` (render/ukur/dekode QR e-tiket).
+__pycache__/
+*.pyc
+
+# Virtual environment alat Python (dibuat lokal, bukan bagian produk).
+.venv/
+venv/
+
 # =============================================================================
 # Catatan:
 # - File sumber (*.dart, *.js, *.md, *.json, *.yaml, *.yml, *.txt) TIDAK diabaikan.

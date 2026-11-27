@@ -21,6 +21,7 @@ function resetDbState(overrides = {}) {
       permissionRows: [],
       ticketByToken: null,
       ticketByCode: null,
+      ticketByLegacyCode: null,
       ticketById: null,
       orderItemRow: null,
       orderRow: null,
@@ -62,6 +63,9 @@ require.cache[dbPath] = {
       }
       if (sql.includes('FROM tickets t') && sql.includes('WHERE t.ticket_code = $1')) {
         return state.ticketByCode;
+      }
+      if (sql.includes('FROM tickets t') && sql.includes('WHERE t.qr_code_data = $1')) {
+        return state.ticketByLegacyCode;
       }
       if (sql.includes('FROM tickets t') && sql.includes('WHERE t.id = $1')) {
         return state.ticketById;
@@ -230,6 +234,35 @@ test('findTicketByIdentifier finds ticket by token hash or ticket_code', async (
   resetDbState({ ticketByToken: null, ticketByCode: dummyTicket });
   const byCode = await findTicketByIdentifier('TK-TECH-001');
   assert.equal(byCode?.id, 't-1');
+});
+
+// 3b. Kompatibilitas tiket lama setelah ID publik dirapikan
+test('kode tiket lama (TKT-<uuid>) tetap ditemukan lewat qr_code_data', async () => {
+  const legacyCode = `TKT-${'a'.repeat(32)}`;
+  const migrated = {
+    id: 't-legacy', ticket_code: 'ETK-7K4P9Q', qr_code_data: legacyCode,
+    event_id: 'evt-1', status: 'active',
+  };
+  resetDbState({ ticketByCode: null, ticketByLegacyCode: migrated });
+
+  // Kode yang sudah tercetak pada tiket lama masih dapat divalidasi.
+  const byLegacy = await findTicketByIdentifier(legacyCode);
+  assert.equal(byLegacy?.id, 't-legacy');
+  assert.equal(byLegacy?.ticket_code, 'ETK-7K4P9Q', 'ID publik baru tetap yang ditampilkan');
+
+  // ID publik baru juga langsung dikenali (tanpa fallback).
+  resetDbState({ ticketByCode: migrated, ticketByLegacyCode: null });
+  assert.equal((await findTicketByIdentifier('ETK-7K4P9Q'))?.id, 't-legacy');
+});
+
+test('salah ketik biasa tidak memicu pencarian kode lama (tanpa scan tabel)', async () => {
+  resetDbState({ ticketByCode: null, ticketByLegacyCode: { id: 't-legacy' } });
+  assert.equal(await findTicketByIdentifier('ETK-7K4P9'), null);
+  assert.equal(await findTicketByIdentifier('tiket saya'), null);
+  const legacyLookup = state.calls.filter(
+    (call) => String(call.sql).includes('WHERE t.qr_code_data = $1'),
+  );
+  assert.equal(legacyLookup.length, 0);
 });
 
 // 4. validateTicket

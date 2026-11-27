@@ -6,6 +6,8 @@ const tokens = require('../services/ticketTokenService');
 const emailService = require('../services/emailService');
 const emailQueue = require('../services/emailQueue');
 const ticketDesignService = require('../services/ticketDesignService');
+const ticketCodeService = require('../services/ticketCodeService');
+const { pdfContentDisposition } = require('../utils/ticketFilename');
 const logger = require('../utils/logger');
 
 const EVENT_SELECT = `t.*, e.id AS events_id, e.title AS events_title,
@@ -220,15 +222,22 @@ const getTicketPdf = asyncHandler(async (req, res) => {
   const access = await resolveAccess(req, ticket);
   if (!access.allowed) { res.status(404); throw new Error('Ticket not found'); }
 
+  // Tiket lama dirapikan ID publiknya lebih dulu agar PDF yang diunduh
+  // menampilkan `ETK-XXXXXX` (bukan kode 36 karakter warisan database).
+  try {
+    await ticketCodeService.ensurePublicTicketCode(ticket.id);
+  } catch (error) {
+    logger.warn('ticket_public_code_failed', { ticketId: ticket.id, error: error.message });
+  }
+
   const full = await ticketDesignService.loadTicketForPdf(ticket.id);
   if (!full) { res.status(404); throw new Error('Ticket not found'); }
   const pdf = await ticketDesignService.buildTicketPdf(full);
 
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader(
-    'Content-Disposition',
-    `attachment; filename="tiket-${full.ticket_code || full.id}.pdf"`,
-  );
+  // Nama file unduhan memakai format yang sama dengan lampiran email:
+  // `E-TIKET Nama Peserta.pdf`.
+  res.setHeader('Content-Disposition', pdfContentDisposition(full.attendee_name));
   res.status(200).send(pdf);
 });
 

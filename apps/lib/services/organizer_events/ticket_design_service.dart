@@ -149,6 +149,41 @@ class TicketDesignService {
     }
   }
 
+  /// Simpan pengaturan posisi & ukuran QR saja, tanpa mengunggah ulang file
+  /// desain. Backend memperbarui `ticket_design.qr` pada desain yang tersimpan
+  /// sehingga tiket berikutnya memakai pengaturan ini.
+  Future<TicketDesignModel> saveQrPlacement({
+    required String eventId,
+    required TicketQrPlacement qr,
+    String scope = 'event',
+    String? ticketTypeId,
+  }) async {
+    if (scope == 'ticket_type' &&
+        (ticketTypeId == null || ticketTypeId.isEmpty)) {
+      throw const TicketDesignException(
+        'Pilih kategori tiket untuk desain khusus kategori.',
+      );
+    }
+    try {
+      final response = await _api.put(
+        '/events/$eventId/ticket-design',
+        body: <String, dynamic>{
+          'scope': scope,
+          'ticket_type_id': ?ticketTypeId,
+          'qr_only': true,
+          'qr': qr.toJson(),
+        },
+      );
+      final design = response['design'];
+      if (design is! Map) {
+        throw const TicketDesignException('Respons desain tiket tidak valid.');
+      }
+      return TicketDesignModel.fromJson(Map<String, dynamic>.from(design));
+    } on AppException catch (error) {
+      throw TicketDesignException(error.message);
+    }
+  }
+
   /// Hapus desain sehingga tiket kembali memakai desain default sistem.
   Future<void> remove({
     required String eventId,

@@ -185,12 +185,61 @@ const saveTicketDesign = asyncHandler(async (req, res) => {
     });
   }
 
+  // Simpan pengaturan QR saja (tanpa mengunggah ulang file desain). Organizer
+  // cukup menggeser posisi/ukuran QR pada pratinjau, lalu menekan "Simpan
+  // pengaturan QR"; file desain dan orientasinya tidak berubah.
+  const qrOnly = req.body?.qr_only === true
+    || (typeof req.body?.image_base64 !== 'string'
+      && req.body?.orientation_only !== true
+      && req.body?.orientation == null
+      && req.body?.qr != null);
+
+  if (qrOnly) {
+    if (!previous) {
+      res.status(400);
+      throw new Error('Unggah desain tiket lebih dulu sebelum mengatur posisi QR.');
+    }
+    const { errors: qrErrors, value: qr } = design.validateQrPlacement(req.body?.qr, {
+      orientation: previousOrientation,
+    });
+    if (qrErrors.length > 0) {
+      res.status(400);
+      throw new Error(qrErrors.join(' '));
+    }
+    const stored = design.applyQrPlacement(previous, {
+      qr,
+      info: req.body?.info && typeof req.body.info === 'object' ? req.body.info : undefined,
+    });
+    if (scope === 'event') {
+      await query(
+        'UPDATE events SET ticket_design = $1::jsonb WHERE id = $2',
+        [JSON.stringify(stored), event.id],
+      );
+    } else {
+      await query(
+        'UPDATE ticket_types SET ticket_design = $1::jsonb WHERE id = $2',
+        [JSON.stringify(stored), ticketType.id],
+      );
+    }
+    logger.info('ticket_design_qr_saved', {
+      eventId: event.id,
+      scope,
+      ticketTypeId: ticketType?.id ?? null,
+      qr,
+    });
+    return res.json({
+      success: true,
+      scope,
+      ticket_type_id: ticketType?.id ?? null,
+      design: { ...stored, url: absoluteUrl(req, stored.file_path) },
+    });
+  }
+
   const { errors, value } = design.validateUploadPayload(req.body);
   if (errors.length > 0) {
     res.status(400);
     throw new Error(errors.join(' '));
   }
-
   // Desain lama pada orientasi berbeda tidak dapat dipakai ulang: rasio file
   // akan berbeda dengan kanvas, sehingga akan terpotong/diregangkan.
   const orientationChanged = previousOrientation !== value.orientation;

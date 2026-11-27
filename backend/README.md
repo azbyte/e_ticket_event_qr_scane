@@ -178,12 +178,19 @@ Menambah endpoint baru: letakkan pada router domain yang sesuai di
 | `scripts/verify-ticket-email-e2e.js` | `npm run verify:ticket-email-e2e` | E2E HTTP nyata: daftar → tiket → PDF+QR → email (gratis & berbayar) |
 | `scripts/verify-async-email-queue.js` | `npm run verify:email-queue` | Bukti respons tidak menunggu SMTP lambat + antrean mengirim tepat sekali |
 | `scripts/retry-ticket-emails.js` | `npm run retry:emails` | Coba ulang delivery PENDING/FAILED (tanpa tiket/email ganda) |
+| `scripts/backfill-ticket-codes.js` | `npm run tickets:backfill-codes` | Rapikan ID tiket lama menjadi `ETK-XXXXXX` (idempotent, tanpa menghapus data) |
 | `scripts/repair-email-delivery-status.js` | `npm run repair:email-delivery` | Turunkan catatan `SENT` palsu dari transport json (dry-run default) |
 
 ### Test
 
 - `npm test` menjalankan seluruh `test/*.test.js` dengan `node --test`.
 - `npm run test:sync-config` memvalidasi validator sinkronisasi konfigurasi.
+- Alat validasi Python di `tools/` (`render_ticket_pdf.py`,
+  `check_qr_scannability.py`, `decode_ticket_qr.py`) dan `_verify-out/make_artwork.py`
+  dijalankan manual dengan virtual environment proyek: `py -3.14 -m venv .venv`
+  lalu `.\.venv\Scripts\python.exe -m pip install -r tools/requirements.txt`
+  (PyMuPDF, opencv-python-headless, numpy, Pillow). Alat ini bukan dependensi
+  runtime backend.
 - `npm run test:integration` dan `npm run test:e2e` memerlukan database/API uji
   serta `ALLOW_DESTRUCTIVE_TESTS=true`; jangan arahkan ke database produksi.
 - `npm run test:registration-flow` menguji alur nyata (registrasi Organizer →
@@ -302,6 +309,12 @@ Brevo**, jika tidak pesan ditolak.
   antre. Tidak ada job queue/dependensi runtime baru.
 - Lampiran PDF wajib: bila rendering PDF gagal, email tidak dikirim dan
   kegagalan dicatat pada `last_error`.
+- **Nama lampiran** mengikuti format wajib `E-TIKET Nama Peserta.pdf`
+  (`src/utils/ticketFilename.js`), diambil dari `attendees.name` tiket yang
+  sama — bukan kode tiket/UUID. Spasi biasa dipakai sebagai pemisah; karakter
+  yang terlarang pada filesystem diganti spasi, dan nama non-Latin tetap utuh
+  lewat `filename*=UTF-8''…`. Nama file unduhan manual
+  (`GET /api/tickets/:id/pdf`) memakai format yang sama.
 - **Anti email ganda** (`claimDelivery`): klaim atomik per `(ticket_id,
   recipient)` dalam satu `UPDATE` bersyarat + advisory lock. Aman terhadap klik
   ganda, retry bersamaan, dan lebih dari satu instance backend. Baris `SENT`
@@ -351,6 +364,54 @@ koneksi database.
 | PUT | `/api/auth/me` | Perbarui nama/avatar | Private |
 | POST | `/api/auth/logout` | Cabut token (revoked_tokens) | Private |
 
+### E-Tiket PDF (dimensi, QR, ID, nama file)
+
+Sumber tunggal rendering ada di `src/services/ticketDesignService.js` dan dipakai
+bersama oleh unduhan manual (`GET /api/tickets/:id/pdf`) serta lampiran email —
+tidak ada jalur rendering kedua untuk event gratis/berbayar.
+
+- **Kanvas tetap per orientasi**: `landscape` 842 × 594 pt (A4 landscape) dan
+  `portrait` 440 × 704 pt. Ukuran halaman TIDAK diturunkan dari rasio file
+  desain, sehingga tiket tidak pernah menjadi pipih dan QR tidak mengecil.
+- **Prinsip desain**: gambar yang diunggah Organizer adalah desain UTAMA tiket;
+  sistem hanya menambahkan informasi dinamis yang sedikit. Tidak ada panel,
+  kartu, atau latar tambahan di atas artwork.
+- **Informasi tiket (7 baris, kiri atas, teks hitam tanpa panel)**:
+  1. `E-TIKET [NAMA EVENT]` 34 pt (auto-fit 34→26 pt; nama panjang dibungkus
+     maksimal 2 baris), 2. `Peserta: [NAMA PESERTA]` 23 pt bold (auto-fit
+     23→17 pt agar nama panjang tetap satu baris), 3. `ID TIKET: [ID TIKET]`
+     16 pt bold, 4. `Kategori: [KATEGORI]` 16 pt, 5. `Jadwal: [TANGGAL & WAKTU]`
+     16 pt (WIB), 6. `Lokasi: [LOKASI]` 16 pt, 7. instruksi singkat penukaran
+     tiket 14 pt. Bila area teks desain kustom lebih pendek, seluruh blok
+     dikecilkan proporsional (hierarki tetap) agar tidak menimpa QR. Nomor
+     registrasi, nomor order, tanggal terbit, dan kartu "berlaku untuk" TIDAK
+     dicetak.
+- **QR Code** default 220 pt (landscape) / 250 pt (portrait) tepat di bawah blok
+  teks, modul putih opaque + quiet zone ≥ 2 modul. Alas putih hanya selebar
+  QR + quiet zone + margin 6 pt (`QR_BACKING_PAD`), bukan kartu/panel.
+  **Organizer dapat mengatur posisi X, posisi Y, dan ukuran QR** (fraksi 0..1);
+  pengaturan disimpan di `ticket_design.qr` (mode `PUT` `qr_only: true`) dan
+  dipakai apa adanya saat render. QR hanya digeser bila akan keluar halaman
+  (ukurannya tidak diperkecil diam-diam) dan dinaikkan ke `QR_MIN_POINTS`
+  (100 pt) bila diatur terlalu kecil agar tetap dapat dipindai.
+- **Desain kustom** (event atau per kategori) digambar `contain` di dalam kanvas
+  (rasio asli dipertahankan, sisa ruang menjadi mat ivory). Desain lama dengan
+  rasio 2.5:1 tetap tercetak utuh; unggahan baru divalidasi mendekati rasio
+  kanvas (landscape 1.25–1.62, portrait 0.50–0.85). Teks & QR memakai posisi
+  `design.info` / `design.qr`.
+- **Prioritas desain**: desain kategori → desain event → desain default sistem.
+  Kandidat yang file-nya hilang dilewati (tidak langsung jatuh ke desain
+  default), sehingga desain unggahan Organizer tetap dipakai bila masih ada.
+- **ID tiket publik** `ETK-XXXXXX` (Crockford Base32 tanpa I/L/O/U) disimpan di
+  `tickets.ticket_code`. `tickets.id` (UUID) tetap menjadi primary key/relasi,
+  sehingga tidak ada perubahan schema. Tiket lama dirapikan otomatis saat
+  tiket dibuka/dikirim, atau sekaligus dengan `npm run tickets:backfill-codes`;
+  kode lama `TKT-<uuid>` tetap dapat divalidasi lewat `tickets.qr_code_data`.
+- **Template desain** (`GET /api/ticket-design-template`) berisi latar/ornamen +
+  penanda tipis area QR (garis putus-putus tanpa alas putih dan tanpa teks
+  contoh) agar teks/alas putih dinamis tidak tercetak dua kali. Regenerasi:
+  `powershell -ExecutionPolicy Bypass -File scripts/generate-ticket-template.ps1`.
+
 ### Events
 | Method | Endpoint | Deskripsi | Akses |
 |--------|----------|-----------|-------|
@@ -367,7 +428,7 @@ koneksi database.
 | PUT/DELETE | `/api/events/:id/ticket-types/:ticketTypeId` | Ubah/hapus kategori tiket | Organizer |
 | GET | `/api/ticket-types/:id` | Detail kategori tiket | Public |
 | GET | `/api/events/:id/ticket-design` | Desain tiket event + per kategori (posisi QR, orientasi) | Owner/Admin |
-| PUT | `/api/events/:id/ticket-design` | Unggah desain / simpan orientasi (`scope=event` atau `scope=ticket_type`) | Owner/Admin |
+| PUT | `/api/events/:id/ticket-design` | Unggah desain / simpan orientasi (`scope=event` atau `scope=ticket_type`); `qr_only: true` untuk menyimpan posisi & ukuran QR saja | Owner/Admin |
 | DELETE | `/api/events/:id/ticket-design?scope=` | Hapus desain & orientasi (kembali ke default) | Owner/Admin |
 | GET | `/api/ticket-design-template?format=pdf\|png&orientation=landscape\|portrait` | Unduh template desain tiket (ukuran + penanda QR) | Public |
 | GET | `/api/events/:id/summary` | Ringkasan operasional event | Organizer/Admin |

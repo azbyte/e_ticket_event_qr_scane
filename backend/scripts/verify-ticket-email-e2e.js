@@ -199,6 +199,12 @@ const pdfExtractText = (buffer) => {
 /** True bila teks PDF memuat potongan teks tertentu. */
 const pdfContainsText = (buffer, needle) => pdfExtractText(buffer).includes(needle);
 
+/** Ukuran halaman pertama PDF (pt) dari MediaBox. */
+const pdfPageSize = (buffer) => {
+  const match = buffer.toString('latin1').match(/\/MediaBox\s*\[\s*0 0 ([\d.]+) ([\d.]+)/);
+  return match ? { width: Number(match[1]), height: Number(match[2]) } : null;
+};
+
 /** Hapus seluruh data uji E2E email berdasarkan pola khusus. */
 const cleanup = async (query) => {
   const emailPattern = '%.e2e.email.%@example.test';
@@ -381,6 +387,22 @@ const cleanup = async (query) => {
       `${attachmentPdf.length} byte`,
     );
 
+    // Nama lampiran WAJIB `E-TIKET Nama Peserta.pdf` (spasi biasa, tanpa prefix
+    // lain). Diambil dari nama peserta di database, bukan kode tiket.
+    check(
+      String(attachment?.filename || '') === 'E-TIKET Peserta Gratis E2E.pdf',
+      'nama lampiran memakai format E-TIKET Nama Peserta.pdf',
+      String(attachment?.filename || ''),
+    );
+
+    // Dimensi halaman PDF: tiket default landscape = 842 x 594 pt.
+    const attachmentPage = pdfPageSize(attachmentPdf);
+    check(
+      attachmentPage?.width === 842 && attachmentPage?.height === 594,
+      'lampiran PDF berukuran 842x594 pt (landscape)',
+      `${attachmentPage?.width}x${attachmentPage?.height}`,
+    );
+
     const attachmentText = attachmentPdf;
     check(pdfContainsText(attachmentText, 'Peserta Gratis E2E'), 'PDF memuat nama peserta');
     check(pdfContainsText(attachmentText, freeTicket.ticket_code),
@@ -523,6 +545,14 @@ const cleanup = async (query) => {
       ? Buffer.from(String(paidAttachment.content), 'base64') : Buffer.alloc(0);
     check(paidPdf.subarray(0, 5).toString() === '%PDF-',
       'lampiran PDF tiket berbayar sah', `${paidPdf.length} byte`);
+    check(
+      String(paidAttachment?.filename || '') === 'E-TIKET Peserta Bayar E2E.pdf',
+      'nama lampiran tiket berbayar memakai format wajib',
+      String(paidAttachment?.filename || ''),
+    );
+    const paidPage = pdfPageSize(paidPdf);
+    check(paidPage?.width === 842 && paidPage?.height === 594,
+      'lampiran PDF berbayar 842x594 pt', `${paidPage?.width}x${paidPage?.height}`);
     const paidText = paidPdf;
     check(pdfContainsText(paidText, 'Peserta Bayar E2E'), 'PDF berbayar memuat nama peserta');
     // Judul panjang dipotong/ dibungkus oleh tata letak tiket, sehingga yang

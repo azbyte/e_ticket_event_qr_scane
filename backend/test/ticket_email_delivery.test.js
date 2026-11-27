@@ -48,19 +48,26 @@ test('nama event kosong tidak menghasilkan "undefined" di email', () => {
 });
 
 test('lampiran PDF wajib muncul pada pesan email', () => {
+  // Nama lampiran mengikuti format wajib `E-TIKET Nama Peserta.pdf`.
   const attachment = {
-    filename: 'tiket-TKT-EMAIL-001.pdf',
+    filename: 'E-TIKET Peserta Email.pdf',
     content: Buffer.from('%PDF-1.4 uji'),
     contentType: 'application/pdf',
   };
   const withAttachment = email.buildMessage(ticketRow, ticketRow.attendee_email, { attachment });
   assert.equal(withAttachment.attachments.length, 1);
   assert.equal(withAttachment.attachments[0].contentType, 'application/pdf');
+  assert.equal(withAttachment.attachments[0].filename, 'E-TIKET Peserta Email.pdf');
   assert.match(withAttachment.text, /terlampir/);
 });
 
 test('mode transport jujur: SMTP_HOST=json hanya aktif di NODE_ENV=test', () => {
   const original = process.env.SMTP_HOST;
+  // `.env` proyek dapat mengunci EMAIL_PROVIDER (mis. `brevo`). Pengujian ini
+  // menguji perilaku yang ditentukan SMTP_HOST, jadi provider eksplisit harus
+  // dilepas dulu lalu dikembalikan seperti semula.
+  const originalProvider = process.env.EMAIL_PROVIDER;
+  delete process.env.EMAIL_PROVIDER;
   process.env.SMTP_HOST = 'json';
   process.env.NODE_ENV = 'test';
   assert.equal(email.transportMode(), 'json');
@@ -77,5 +84,7 @@ test('mode transport jujur: SMTP_HOST=json hanya aktif di NODE_ENV=test', () => 
   assert.equal(email.transportMode(), 'disabled', 'tanpa SMTP_HOST pengiriman dinonaktifkan');
 
   process.env.SMTP_HOST = original;
+  if (originalProvider === undefined) delete process.env.EMAIL_PROVIDER;
+  else process.env.EMAIL_PROVIDER = originalProvider;
   process.env.NODE_ENV = 'test';
 });

@@ -175,6 +175,29 @@ menyimpan `token_hash`. Validasi dan check-in bersifat server-authoritative:
 `REVOKED`. Check-in menulis satu baris `check_ins` + `scan_logs` dalam satu
 transaksi; percobaan kedua tidak menambah baris.
 
+**E-tiket PDF**
+
+Satu renderer (`ticketDesignService.buildTicketPdf`) melayani unduhan manual dan
+lampiran email, untuk event gratis maupun berbayar. Kanvas tetap per orientasi
+(`landscape` 842 × 594 pt, `portrait` 440 × 704 pt). Prinsip desainnya: gambar
+desain Organizer adalah elemen utama, sistem hanya menambahkan tujuh baris
+informasi dinamis di kiri atas (`E-TIKET [NAMA EVENT]` 34 pt auto-fit, `Peserta`
+23 pt, `ID TIKET` 16 pt, `Kategori` 16 pt, `Jadwal` 16 pt, `Lokasi` 16 pt,
+instruksi penukaran 14 pt) dan QR Code default 220/250 pt di bawahnya dengan alas
+putih selebar QR + quiet zone + margin kecil. Nomor registrasi, nomor order,
+tanggal terbit, dan kartu informasi tidak dicetak.
+Posisi X/Y dan ukuran QR dapat diatur Organizer (fraksi kanvas, disimpan di
+`ticket_design.qr` lewat `PUT /api/events/:id/ticket-design` dengan `qr_only:
+true`) dan dipakai apa adanya saat render; QR hanya digeser bila akan keluar
+halaman. Desain dipilih dengan urutan kategori → event → default sistem, dan
+kandidat yang filenya hilang dilewati agar desain unggahan tidak tergantikan
+desain default.
+Desain kustom digambar `contain` sehingga rasio asli terjaga. ID publik tiket
+`ETK-XXXXXX` disimpan pada `tickets.ticket_code` (kolom unik yang sudah ada)
+sementara `tickets.id` tetap primary key, sehingga tidak ada perubahan schema;
+kode lama `TKT-<uuid>` tetap dapat divalidasi lewat `tickets.qr_code_data`. Nama
+lampiran/unduhan mengikuti `E-TIKET Nama Peserta.pdf` dari `attendees.name`.
+
 **Keputusan produk yang ditegakkan**
 
 - C-01: komisi 5% dan fixed fee Rp 5.000 read-only bagi Admin (audit dicatat).

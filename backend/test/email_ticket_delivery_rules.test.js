@@ -20,8 +20,20 @@ const {
 const email = require('../src/services/emailService');
 const emailQueue = require('../src/services/emailQueue');
 
+/**
+ * Jalankan `fn` dengan variabel environment tertentu, lalu pulihkan.
+ *
+ * `EMAIL_PROVIDER` dari `.env` proyek (mis. `brevo`) ikut terhapus bila kasus
+ * uji tidak menyetelnya sendiri. Tanpa ini, uji pemilihan provider otomatis
+ * (`smtp`/`resend`/`disabled`) tidak pernah menguji logika yang dimaksud karena
+ * provider selalu terkunci oleh `.env`.
+ */
 const withEnv = (values, fn) => {
   const previous = {};
+  if (!Object.hasOwn(values, 'EMAIL_PROVIDER')) {
+    previous.EMAIL_PROVIDER = process.env.EMAIL_PROVIDER;
+    delete process.env.EMAIL_PROVIDER;
+  }
   for (const [key, value] of Object.entries(values)) {
     previous[key] = process.env[key];
     if (value === undefined) delete process.env[key];

@@ -67,6 +67,11 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
   /// Orientasi yang dipilih Organizer tetapi belum disimpan ke backend.
   TicketOrientation? _draftOrientation;
 
+  /// Pengaturan QR yang tersimpan di backend untuk scope aktif (null bila belum
+  /// ada desain unggahan). Dipakai untuk mendeteksi perubahan yang belum
+  /// disimpan dan untuk tombol "Atur ulang default".
+  TicketQrPlacement? _savedQr;
+
   @override
   void initState() {
     super.initState();
@@ -86,14 +91,16 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
         _state = state;
         _draftOrientation = null;
         final effective = state.orientationFor(_selectedTicketTypeId);
-        // Posisi QR mengikuti orientasi desain aktif, bukan default landscape.
+        // Posisi QR mengikuti desain tersimpan (bukan default) agar Organizer
+        // melihat pengaturan yang benar-benar dipakai saat tiket dirender.
         final design = _selectedTicketTypeId == null
             ? state.eventDesign
             : state.ticketTypeDesigns[_selectedTicketTypeId];
-        _qr = design?.hasUploadedFile == true &&
-                design!.orientation == effective
-            ? design.qr
-            : TicketDesignModel.defaultQrFor(effective);
+        final saved = design?.hasUploadedFile == true ? design!.qr : null;
+        _savedQr = saved;
+        // Nilai tersimpan lama (mis. ukuran 90%) dirapikan ke batas slider agar
+        // pratinjau & penyimpanan berikutnya konsisten dengan backend.
+        _qr = (saved ?? TicketDesignModel.defaultQrFor(effective)).clamped();
         _loading = false;
       });
     } on TicketDesignException catch (error) {
@@ -111,9 +118,21 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
       ? _state.eventDesign
       : _state.ticketTypeDesigns[_selectedTicketTypeId];
 
+  /// True bila posisi/ukuran QR pada pratinjau belum sama dengan yang tersimpan.
+  bool get _qrDirty => _savedQr != null && _qr != _savedQr;
+
   /// Orientasi yang sedang dipilih/ditampilkan untuk scope aktif.
   TicketOrientation get _orientation =>
       _draftOrientation ?? _state.orientationFor(_selectedTicketTypeId);
+
+  /// Sinkronkan state QR saat scope/orientasi berubah.
+  void _syncQrFromScope() {
+    final effective = _state.orientationFor(_selectedTicketTypeId);
+    final design = _currentDesign;
+    final saved = design?.hasUploadedFile == true ? design!.qr : null;
+    _savedQr = saved;
+    _qr = (saved ?? TicketDesignModel.defaultQrFor(effective)).clamped();
+  }
 
   void _showMessage(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -144,7 +163,13 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
   void _selectOrientation(TicketOrientation orientation) {
     setState(() {
       _draftOrientation = orientation;
-      _qr = TicketDesignModel.defaultQrFor(orientation);
+      // Desain tersimpan hanya berlaku untuk orientasinya sendiri; default QR
+      // dipakai bila desain aktif tidak berada pada orientasi ini.
+      final design = _currentDesign;
+      _qr = (design?.hasUploadedFile == true && design!.orientation == orientation
+              ? design.qr
+              : TicketDesignModel.defaultQrFor(orientation))
+          .clamped();
     });
   }
 
@@ -170,6 +195,51 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// Simpan posisi & ukuran QR saja (file desain tidak diunggah ulang).
+  ///
+  /// Berlaku untuk desain yang sudah diunggah pada scope aktif; backend
+  /// memperbarui `ticket_design.qr` sehingga tiket berikutnya memakai pengaturan
+  /// ini. Bila belum ada desain, Organizer diminta mengunggah desain lebih dulu
+  /// (desain default memakai posisi QR bawaan sistem).
+  Future<void> _saveQrPlacement() async {
+    if (_currentDesign?.hasUploadedFile != true) {
+      _showMessage(
+        'Unggah desain tiket lebih dulu untuk mengatur posisi QR.',
+        isError: true,
+      );
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await _service.saveQrPlacement(
+        eventId: widget.eventId,
+        qr: _qr,
+        scope: _scope,
+        ticketTypeId: _selectedTicketTypeId,
+      );
+      await _load();
+      if (!mounted) return;
+      _showMessage(
+        'Pengaturan QR disimpan: kiri ${(_qr.x * 100).round()}%, '
+        'atas ${(_qr.y * 100).round()}%, '
+        'ukuran ${(_qr.size * 100).round()}%. Tiket berikutnya memakai '
+        'pengaturan ini.',
+      );
+    } on TicketDesignException catch (error) {
+      if (!mounted) return;
+      _showMessage(error.message, isError: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Kembalikan posisi & ukuran QR ke default sistem untuk orientasi aktif.
+  void _resetQrToDefault() {
+    setState(() {
+      _qr = TicketDesignModel.defaultQrFor(_orientation);
+    });
   }
 
   Future<void> _pickAndUpload() async {
@@ -317,15 +387,7 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
                   : (value) => setState(() {
                       _selectedTicketTypeId = value;
                       _draftOrientation = null;
-                      final effective = _state.orientationFor(value);
-                      final design = value == null
-                          ? _state.eventDesign
-                          : _state.ticketTypeDesigns[value];
-                      _qr =
-                          design?.hasUploadedFile == true &&
-                              design!.orientation == effective
-                          ? design.qr
-                          : TicketDesignModel.defaultQrFor(effective);
+                      _syncQrFromScope();
                     }),
             ),
             const SizedBox(height: 12),
@@ -430,10 +492,12 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
           const SizedBox(height: 8),
           Text(
             orientation.isPortrait
-                ? 'Rasio desain portrait: 1 : 1.6 (contoh 440 x 704 px). '
-                      'Desain horizontal akan ditolak agar tidak terpotong.'
-                : 'Rasio desain landscape: 2.5 : 1 (contoh 1080 x 432 px). '
-                      'Desain vertikal akan ditolak agar tidak terpotong.',
+                ? 'Rasio desain portrait: 1 : 1.6 (kanvas 440 x 704 pt, '
+                      'contoh file 880 x 1408 px). Desain horizontal akan '
+                      'ditolak agar tidak terpotong.'
+                : 'Rasio desain landscape: 1.42 : 1 (kanvas 842 x 594 pt, '
+                      'contoh file 1684 x 1188 px). Desain vertikal akan '
+                      'ditolak agar tidak terpotong.',
             style: const TextStyle(fontSize: 11.5, color: Colors.black54),
           ),
           if (pending) ...<Widget>[
@@ -452,7 +516,7 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
                       ? null
                       : () => setState(() {
                           _draftOrientation = null;
-                          _qr = TicketDesignModel.defaultQrFor(saved);
+                          _syncQrFromScope();
                         }),
                   child: const Text('Batal'),
                 ),
@@ -590,11 +654,11 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
             'Posisi QR: kiri ${(_qr.x * 100).round()}%, '
             'atas ${(_qr.y * 100).round()}%, '
             'ukuran ${(_qr.size * 100).round()}% (dari tinggi kanvas).',
+            key: const Key('ticket-design-qr-summary'),
             style: const TextStyle(fontSize: 12, color: Colors.black54),
           ),
-          const SizedBox(height: 4),
           const Text(
-            'Posisi X QR',
+            'Posisi horizontal (X)',
             style: TextStyle(fontSize: 11, color: Colors.black45),
           ),
           Slider(
@@ -609,19 +673,74 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
                 : (value) => setState(() => _qr = _qr.copyWith(x: value)),
           ),
           const Text(
+            'Posisi vertikal (Y)',
+            style: TextStyle(fontSize: 11, color: Colors.black45),
+          ),
+          Slider(
+            key: const Key('ticket-design-qr-y'),
+            value: _qr.y,
+            min: 0,
+            max: 0.95,
+            divisions: 19,
+            label: '${(_qr.y * 100).round()}%',
+            onChanged: _busy
+                ? null
+                : (value) => setState(() => _qr = _qr.copyWith(y: value)),
+          ),
+          const Text(
             'Ukuran QR',
             style: TextStyle(fontSize: 11, color: Colors.black45),
           ),
           Slider(
             key: const Key('ticket-design-qr-size'),
             value: _qr.size,
+            // Batas sama dengan backend (`QR_PLACEMENT_LIMITS`): 15%-60% tinggi
+            // kanvas. Di atas 60% QR menutupi hampir seluruh desain.
             min: 0.15,
-            max: 0.9,
-            divisions: 15,
+            max: 0.6,
+            divisions: 9,
             label: '${(_qr.size * 100).round()}%',
             onChanged: _busy
                 ? null
                 : (value) => setState(() => _qr = _qr.copyWith(size: value)),
+          ),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: <Widget>[
+              FilledButton.tonalIcon(
+                key: const Key('ticket-design-qr-save'),
+                onPressed: _busy || !_qrDirty ? null : _saveQrPlacement,
+                icon: const Icon(Icons.save_outlined, size: 18),
+                label: const Text('Simpan pengaturan QR'),
+              ),
+              TextButton.icon(
+                key: const Key('ticket-design-qr-reset'),
+                onPressed: _busy ? null : _resetQrToDefault,
+                icon: const Icon(Icons.restart_alt, size: 18),
+                label: const Text('Atur ulang default'),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              _currentDesign?.hasUploadedFile == true
+                  ? (_qrDirty
+                      ? 'Pengaturan QR belum disimpan. Tekan "Simpan pengaturan '
+                            'QR" agar dipakai saat tiket diterbitkan.'
+                      : 'Pengaturan QR tersimpan dan dipakai saat tiket '
+                            'diterbitkan.')
+                  : 'Unggah desain lebih dulu untuk mengatur posisi QR. Desain '
+                        'default memakai posisi QR bawaan sistem.',
+              key: const Key('ticket-design-qr-status'),
+              style: TextStyle(
+                fontSize: 11,
+                color: _qrDirty ? AppTheme.primaryColor : Colors.black45,
+              ),
+            ),
           ),
           if (design != null && design.hasUploadedFile)
             Text(

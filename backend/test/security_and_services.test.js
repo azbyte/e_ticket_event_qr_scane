@@ -64,12 +64,12 @@ test('email template includes event/ticket access but never embeds QR bearer tok
 
 test('email template melampirkan PDF e-ticket saat desain tiket dirender', () => {
   const attachment = {
-    filename: 'tiket-TKT-REF-1.pdf',
+    filename: 'E-TIKET Peserta.pdf',
     content: Buffer.from('%PDF-1.4 contoh'),
     contentType: 'application/pdf',
   };
   const message = email.buildMessage({
-    id: 'ticket-1', ticket_code: 'TKT-REF-1', attendee_name: 'Peserta',
+    id: 'ticket-1', ticket_code: 'ETK-7K4P9Q', attendee_name: 'Peserta',
     event_title: 'Event Aman', ticket_type_name: 'Reguler',
     event_date: new Date('2026-11-18T10:00:00.000Z'), location: 'Jakarta',
   }, 'recipient@example.test', { attachment });
