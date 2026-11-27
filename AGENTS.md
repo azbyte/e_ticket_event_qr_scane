@@ -1,20 +1,30 @@
 # Panduan AI dan developer — E-Ticket Event & QR Scanner
 
 Gunakan Bahasa Indonesia untuk komunikasi dan dokumentasi kecuali nama teknis.
-Entry point workflow developer adalah [`task/PEMBAGIAN_TUGAS_FINAL.md`](task/PEMBAGIAN_TUGAS_FINAL.md).
+
+## Folder `task/` adalah arsip — jangan dibaca
+
+`task/` — termasuk `task/archive/` dan `task/AUDIT_PROYEK/` — berisi arsip historis:
+status kerja lama, laporan developer, audit, dan proposal. **Jangan membaca file di
+dalamnya secara default.** Arsip itu tidak diperlukan untuk pekerjaan aplikasi dan
+hanya menghabiskan konteks. Baca `task/` hanya bila pemilik proyek menyebut nama file
+atau tugasnya secara eksplisit.
+
+Seluruh aturan yang masih berlaku sudah diringkas di dokumen ini — protokol eksekusi
+otonom, batas wewenang database, pengecualian FROZEN, batas perubahan, siklus kerja,
+dan aturan keamanan — sehingga pekerjaan aplikasi **tidak** bergantung pada `task/`.
 
 **Perintah tugas dari pemilik proyek adalah otorisasi implementasi.** Untuk
 permintaan berbentuk “Kerjakan Developer N Tahap M”, “Lanjutkan tugas Developer N”,
-atau “Perbaiki bug tahap sebelumnya”, jalankan *Autonomous Execution Protocol* pada
-controller tersebut: identifikasi task, baca konteks seperlunya, ambil keputusan
+atau “Perbaiki bug tahap sebelumnya”, jalankan *Autonomous Execution Protocol*:
+identifikasi pekerjaan, baca konteks seperlunya, ambil keputusan
 teknis sendiri, implementasikan, uji, perbaiki error, audit, lalu laporkan. Jangan
 meminta approval teknis/kedua, jangan menanyakan lokasi test atau pendekatan
 implementasi, dan jangan berhenti setelah menghasilkan analisis/audit/GAP report.
-Baca hanya task, ownership, integration contract, laporan sebelumnya dan source
-relevan; jangan membaca seluruh repository atau `task/archive/` / `archive/` secara
-default. Mode read-only hanya berlaku bila pemilik proyek secara eksplisit meminta
-audit/review/investigasi tanpa perubahan. Handover T03 lama dipindahkan ke
-`task/archive/HANDOVER_AI_T03.md` dan hanya untuk sejarah, bukan entry point.
+Baca hanya source dan dokumentasi aktif yang relevan (`README.md`, `PRD.md`,
+`docs/`, `.agents/skills/`); jangan membaca seluruh repository. Mode read-only hanya
+berlaku bila pemilik proyek secara eksplisit meminta audit/review/investigasi tanpa
+perubahan.
 
 **Pengecualian: Developer 1 Tahap 1 berstatus FROZEN.** Task, status, approval,
 laporan, dan Amendment A-1 miliknya dipertahankan apa adanya; jangan mengerjakan
@@ -84,7 +94,8 @@ asumsi yang perlu konfirmasi pada laporan.
   konfigurasi/seed database, atau SQL langsung. Kebutuhan perubahan dilaporkan
   sebagai proposal untuk FINISHING. Hanya penanggung jawab FINISHING yang telah
   ditetapkan dan setelah gate FINISHING dibuka boleh mengimplementasikan DB;
-  Developer 4 tidak otomatis berwenang. Rincian di `task/FINISHING_AUTHORITY.md`.
+  Developer 4 tidak otomatis berwenang. Aturan ini berlaku penuh dan tidak
+  memerlukan pembacaan dokumen lain di `task/`.
   Batas ini **tidak menghentikan task**: selesaikan seluruh bagian yang tidak
   memerlukan DB, catat proposalnya, dan lanjutkan.
 - Jangan pernah menaruh secret, `.env`, service role key, atau token ke kode,

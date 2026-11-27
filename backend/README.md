@@ -14,7 +14,7 @@ Dibangun dengan **Node.js + Express + JavaScript** dan database **PostgreSQL via
 - Migration Prisma **sudah diterapkan** pada database yang dikonfigurasi
   `DATABASE_URL` dan tercatat di `_prisma_migrations` (9 migration, terakhir
   `20261118000400_restore_payment_status_enum_cast`). Bukti pemeriksaan ada di
-  [`../task/DATABASE_AUDIT_FINAL.md`](../task/DATABASE_AUDIT_FINAL.md).
+  `../task/DATABASE_AUDIT_FINAL.md` (arsip).
 - `npx prisma migrate diff --from-schema-datasource prisma/schema.prisma
   --to-schema-datamodel prisma/schema.prisma --script` menghasilkan
   `-- This is an empty migration.` yang berarti struktur database aktual sesuai
@@ -185,12 +185,17 @@ Menambah endpoint baru: letakkan pada router domain yang sesuai di
 
 - `npm test` menjalankan seluruh `test/*.test.js` dengan `node --test`.
 - `npm run test:sync-config` memvalidasi validator sinkronisasi konfigurasi.
+- `test/ticket_qr_scannability.test.js` memverifikasi ukuran modul, quiet zone, dan
+  alas putih QR secara analitis dari geometri `ticketDesignService`, sehingga
+  kelayakan pindai QR ikut dijaga `npm test` tanpa Python.
 - Alat validasi Python di `tools/` (`render_ticket_pdf.py`,
-  `check_qr_scannability.py`, `decode_ticket_qr.py`) dan `_verify-out/make_artwork.py`
+  `decode_ticket_qr.py`)
   dijalankan manual dengan virtual environment proyek: `py -3.14 -m venv .venv`
   lalu `.\.venv\Scripts\python.exe -m pip install -r tools/requirements.txt`
-  (PyMuPDF, opencv-python-headless, numpy, Pillow). Alat ini bukan dependensi
-  runtime backend.
+  (PyMuPDF, opencv-python-headless, numpy). Alat ini bukan dependensi
+  runtime backend, sehingga `.venv` tidak perlu aktif di terminal; panggil
+  interpreter secara eksplisit, mis.
+  `.\.venv\Scripts\python.exe tools/decode_ticket_qr.py <file.pdf>`.
 - `npm run test:integration` dan `npm run test:e2e` memerlukan database/API uji
   serta `ALLOW_DESTRUCTIVE_TESTS=true`; jangan arahkan ke database produksi.
 - `npm run test:registration-flow` menguji alur nyata (registrasi Organizer →
@@ -670,7 +675,7 @@ memeriksa tabel, kolom, constraint, index, enum, function, RLS, dan riwayat
 migrasi. Ringkasan relasi ada di `docs/DATABASE.md`.
 
 Catatan keamanan (verifikasi read-only 23 November 2026, lihat
-`../task/DATABASE_AUDIT_FINAL.md`): RLS aktif pada **32/32** tabel aplikasi dengan
+`../task/DATABASE_AUDIT_FINAL.md` (arsip)): RLS aktif pada **32/32** tabel aplikasi dengan
 **0 policy** (deny-by-default untuk akses REST langsung) dan **0 grant** untuk
 `anon`/`authenticated`; hanya `service_role` memiliki privilege. Pemilik tabel
 adalah `postgres` (juga role koneksi backend), sehingga aktivasi RLS tidak

@@ -2,9 +2,11 @@
 #
 # Dipakai hanya oleh skrip manual validasi e-tiket:
 #   - tools/render_ticket_pdf.py      (render PDF -> PNG)
-#   - tools/check_qr_scannability.py  (ukur modul & quiet zone QR)
 #   - tools/decode_ticket_qr.py       (bukti QR dapat dipindai, memakai OpenCV)
-#   - _verify-out/make_artwork.py     (artwork uji bergaya desain penyelenggara)
+#
+# Pemeriksaan ukuran modul & quiet zone QR TIDAK lagi memakai Python: sudah
+# dipindahkan ke `test/ticket_qr_scannability.test.js` yang berjalan pada
+# `npm test` tanpa virtual environment.
 #
 # Pasang di virtual environment proyek (bukan global) dari folder `backend/`:
 #   py -3.14 -m venv .venv
@@ -15,12 +17,9 @@
 #     tersedia sebagai nama lama. Kode di folder ini memakai `pymupdf` karena
 #     API yang dipakai (Matrix, Pixmap) berasal dari PyMuPDF versi tersebut.
 #   - paket `opencv-python-headless` -> `import cv2`.
-#   - paket `Pillow`      -> `import PIL` (dipakai `_verify-out/make_artwork.py`
-#     untuk membuat artwork uji sebelum PDF dirender/diperiksa visual).
 #
 # PyMuPDF 2.x = API 1.28 (distribusi 2.2 memasang modul 1.28.6); rentang di
 # bawah menerima keduanya tanpa mengubah nama import.
 PyMuPDF>=1.24,<3
 opencv-python-headless>=4.10,<6
 numpy>=1.26
-Pillow>=10,<14

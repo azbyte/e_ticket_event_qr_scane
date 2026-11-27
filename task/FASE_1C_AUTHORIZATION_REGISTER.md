@@ -153,7 +153,7 @@ Snapshot remains dirty/unpublished. No stage/add/commit/push was performed. Revi
 
 ### Optional (pemilik memilih)
 
-- `AUDIT_REPORT.md`, `AUDIT_PEMBERSIHAN_REPOSITORY.md`, `task/AUDIT_PROYEK/`: snapshot audit, bukan otoritas terbaru.
+- `task/archive/AUDIT_REPORT.md`, `task/archive/AUDIT_PEMBERSIHAN_REPOSITORY.md`, `task/AUDIT_PROYEK/`: snapshot audit, bukan otoritas terbaru.
 - `task/archive/` reports/handover. If retained, explicitly historical. T03 source files currently appear as deleted plus untracked archive copies; review rename pairing and history before staging.
 
 ### Arsip

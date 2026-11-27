@@ -2,40 +2,30 @@
 
 ## Panduan developer dan AI
 
-- Titik masuk AI dan pembagian tugas aktif:
-  [`task/PEMBAGIAN_TUGAS_FINAL.md`](task/PEMBAGIAN_TUGAS_FINAL.md). Instruksi singkat
-  yang didukung: “Kerjakan Developer 1/2/3 Tahap 1/2/3”, “Lanjutkan tugas
-  Developer N”, “Perbaiki bug tahap sebelumnya”. Perintah pemilik proyek adalah
-  otorisasi implementasi: AI mengerjakan task secara autonomous sampai selesai
-  (context → analisis → keputusan teknis → implementasi → test → self-repair →
-  audit → laporan) tanpa approval tambahan. Archive T03 bersifat historis.
-  Developer 1 Tahap 1 dikecualikan dan berstatus FROZEN.
+- Instruksi AI utama: [`AGENTS.md`](AGENTS.md). Instruksi singkat yang didukung:
+  “Kerjakan Developer 1/2/3 Tahap 1/2/3”, “Lanjutkan tugas Developer N”, “Perbaiki
+  bug tahap sebelumnya”. Perintah pemilik proyek adalah otorisasi implementasi: AI
+  mengerjakan task secara autonomous sampai selesai (context → analisis → keputusan
+  teknis → implementasi → test → self-repair → audit → laporan) tanpa approval
+  tambahan. Developer 1 Tahap 1 dikecualikan dan berstatus FROZEN.
+- **Folder `task/` adalah arsip historis dan tidak dibaca AI secara default.** Aturan
+  yang masih berlaku sudah diringkas di [`AGENTS.md`](AGENTS.md); buka `task/` hanya
+  bila pemilik proyek menyebut nama file tertentu.
 - Satu-satunya PRD aktif: [`PRD.md`](PRD.md). Keputusan produk yang ditandai
   OPEN DECISION tidak menghentikan pekerjaan: AI memilih interpretasi paling aman
   dan konsisten PRD, mengimplementasikannya, lalu mencatatnya sebagai asumsi pada
   laporan developer untuk koreksi pemilik.
-- Database authority dan proses FINISHING:
-  [`task/FINISHING_AUTHORITY.md`](task/FINISHING_AUTHORITY.md).
-- Referensi teknis dan historis berikut **NON-BLOCKING**: isinya tidak lagi menjadi
-  syarat mulai bekerja, dan status gate/approval di dalamnya digantikan oleh
-  [`task/PEMBAGIAN_TUGAS_FINAL.md`](task/PEMBAGIAN_TUGAS_FINAL.md). Matriks PRD,
-  status technical gate, dan proposal database (tetap menjadi jalur eskalasi
-  perubahan DB, bukan izin): [`task/PRD_TRACEABILITY_MATRIX.md`](task/PRD_TRACEABILITY_MATRIX.md),
-  [`task/TECHNICAL_GATE_CLOSURE.md`](task/TECHNICAL_GATE_CLOSURE.md),
-  [`task/DB_CHANGE_PROPOSAL.md`](task/DB_CHANGE_PROPOSAL.md).
-- Product decision register dan usulan kontrak teknis Fase 1C (referensi, bukan
-  gate): [`task/FASE_1C_AUTHORIZATION_REGISTER.md`](task/FASE_1C_AUTHORIZATION_REGISTER.md).
-- Catatan authorization/unblocking Fase 1D (referensi historis, bukan gate):
-  [`task/FASE_1D_AUTHORIZATION_AND_UNBLOCKING.md`](task/FASE_1D_AUTHORIZATION_AND_UNBLOCKING.md).
-- Ownership lintas tahap dan finalisasi task system Fase 1E (referensi, bukan gate):
-  [`task/FASE_1E_OWNERSHIP_AND_EXECUTION_LEDGER.md`](task/FASE_1E_OWNERSHIP_AND_EXECUTION_LEDGER.md),
-  [`task/FASE_1E_TASK_SYSTEM_FINALIZATION.md`](task/FASE_1E_TASK_SYSTEM_FINALIZATION.md).
-- Instruksi utama: [`AGENTS.md`](AGENTS.md); katalog skill: [`SKILL.md`](SKILL.md).
-- Arsitektur dan workflow lokal: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+- Database authority dan proses FINISHING diringkas di [`AGENTS.md`](AGENTS.md)
+  bagian “Batas perubahan”: hanya penanggung jawab FINISHING yang ditetapkan setelah
+  gate FINISHING dibuka boleh mengimplementasikan perubahan DB.
+- Seluruh dokumen di `task/` (matriks PRD, status technical gate, proposal database,
+  register Fase 1C/1D/1E, laporan developer) adalah **arsip historis NON-BLOCKING**.
+  Bukan syarat mulai bekerja dan tidak dibaca AI kecuali diminta eksplisit; aturan
+  yang masih berlaku ada di [`AGENTS.md`](AGENTS.md).
+- Katalog skill: [`SKILL.md`](SKILL.md). Arsitektur dan workflow lokal:
+  [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 - Kontribusi dan pemeriksaan sebelum PR: [`CONTRIBUTING.md`](CONTRIBUTING.md).
-- Status kerja dan dependency: [`task/PEMBAGIAN_TUGAS_FINAL.md`](task/PEMBAGIAN_TUGAS_FINAL.md);
-  riwayat pengerjaan: [`task/archive/LAPORAN_PENYELESAIAN.md`](task/archive/LAPORAN_PENYELESAIAN.md).
-- Laporan terdahulu dan dokumen prototype lama berada di `task/archive/`;
+- Status kerja terkini dan riwayat pengerjaan tersimpan di `task/` sebagai arsip;
   bukan referensi aktif kecuali penelusuran sejarah memang diperlukan.
 - GitHub Actions menjalankan pemeriksaan backend dan Flutter pada setiap push
   dan pull request, lalu menerbitkan status `PR Quality Gate` sebagai satu
