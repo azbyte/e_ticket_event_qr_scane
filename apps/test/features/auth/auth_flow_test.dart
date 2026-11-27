@@ -482,6 +482,45 @@ void main() {
       expect(service.registerRequests, hasLength(1));
       expect(service.registerRequests.single['email'], 'organizer@example.test');
     });
+
+    testWidgets('ikon mata men-toggle visibilitas kata sandi dan verifikasi kata sandi', (tester) async {
+      final service = _FakeAuthService(registerResult: _organizerPayload());
+      final auth = AuthProvider(service);
+      addTearDown(auth.dispose);
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<AuthProvider>.value(
+          value: auth,
+          child: const MaterialApp(home: RegisterScreen()),
+        ),
+      );
+
+      EditableText passwordInput() => tester.widget<EditableText>(
+            find.descendant(
+              of: find.byKey(const Key('register-password-field')),
+              matching: find.byType(EditableText),
+            ),
+          );
+      EditableText confirmInput() => tester.widget<EditableText>(
+            find.descendant(
+              of: find.byKey(const Key('register-confirm-password-field')),
+              matching: find.byType(EditableText),
+            ),
+          );
+
+      expect(passwordInput().obscureText, isTrue);
+      expect(confirmInput().obscureText, isTrue);
+
+      await tester.tap(find.byKey(const Key('register-password-visibility-toggle')));
+      await tester.pump();
+      expect(passwordInput().obscureText, isFalse);
+      expect(confirmInput().obscureText, isTrue);
+
+      await tester.tap(find.byKey(const Key('register-confirm-password-visibility-toggle')));
+      await tester.pump();
+      expect(passwordInput().obscureText, isFalse);
+      expect(confirmInput().obscureText, isFalse);
+    });
   });
 }
 

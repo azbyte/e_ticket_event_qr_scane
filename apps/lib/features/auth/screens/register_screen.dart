@@ -18,6 +18,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _confirmPassword = TextEditingController();
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   @override
   void dispose() {
@@ -114,11 +116,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       TextFormField(
                         key: const Key('register-password-field'),
                         controller: _password,
-                        obscureText: true,
+                        obscureText: _obscurePassword,
                         textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Kata sandi',
-                          prefixIcon: Icon(Icons.lock_outline, color: AppTheme.primaryColor),
+                          prefixIcon: const Icon(Icons.lock_outline, color: AppTheme.primaryColor),
+                          suffixIcon: IconButton(
+                            key: const Key('register-password-visibility-toggle'),
+                            tooltip: _obscurePassword
+                                ? 'Tampilkan kata sandi'
+                                : 'Sembunyikan kata sandi',
+                            icon: Icon(
+                              _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                              color: AppTheme.slateGray,
+                            ),
+                            onPressed: () =>
+                                setState(() => _obscurePassword = !_obscurePassword),
+                          ),
                         ),
                         validator: InputValidator.password,
                       ),
@@ -126,12 +140,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       TextFormField(
                         key: const Key('register-confirm-password-field'),
                         controller: _confirmPassword,
-                        obscureText: true,
+                        obscureText: _obscureConfirmPassword,
                         textInputAction: TextInputAction.done,
                         onFieldSubmitted: (_) => _submit(),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Verifikasi kata sandi',
-                          prefixIcon: Icon(Icons.lock_outline, color: AppTheme.primaryColor),
+                          prefixIcon: const Icon(Icons.lock_outline, color: AppTheme.primaryColor),
+                          suffixIcon: IconButton(
+                            key: const Key('register-confirm-password-visibility-toggle'),
+                            tooltip: _obscureConfirmPassword
+                                ? 'Tampilkan verifikasi kata sandi'
+                                : 'Sembunyikan verifikasi kata sandi',
+                            icon: Icon(
+                              _obscureConfirmPassword
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                              color: AppTheme.slateGray,
+                            ),
+                            onPressed: () => setState(
+                              () => _obscureConfirmPassword = !_obscureConfirmPassword,
+                            ),
+                          ),
                         ),
                         validator: (value) => InputValidator.confirmPassword(
                           value,
