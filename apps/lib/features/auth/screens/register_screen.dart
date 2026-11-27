@@ -17,12 +17,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
 
   @override
   void dispose() {
     _name.dispose();
     _email.dispose();
     _password.dispose();
+    _confirmPassword.dispose();
     super.dispose();
   }
 
@@ -87,6 +89,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 20),
                       TextFormField(
+                        key: const Key('register-name-field'),
                         controller: _name,
                         decoration: const InputDecoration(
                           labelText: 'Nama lengkap',
@@ -97,6 +100,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 14),
                       TextFormField(
+                        key: const Key('register-email-field'),
                         controller: _email,
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.next,
@@ -108,15 +112,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 14),
                       TextFormField(
+                        key: const Key('register-password-field'),
                         controller: _password,
                         obscureText: true,
-                        textInputAction: TextInputAction.done,
-                        onFieldSubmitted: (_) => _submit(),
+                        textInputAction: TextInputAction.next,
                         decoration: const InputDecoration(
                           labelText: 'Kata sandi',
                           prefixIcon: Icon(Icons.lock_outline, color: AppTheme.primaryColor),
                         ),
                         validator: InputValidator.password,
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        key: const Key('register-confirm-password-field'),
+                        controller: _confirmPassword,
+                        obscureText: true,
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => _submit(),
+                        decoration: const InputDecoration(
+                          labelText: 'Verifikasi kata sandi',
+                          prefixIcon: Icon(Icons.lock_outline, color: AppTheme.primaryColor),
+                        ),
+                        validator: (value) => InputValidator.confirmPassword(
+                          value,
+                          _password.text,
+                        ),
                       ),
                       const SizedBox(height: 20),
                       Consumer<AuthProvider>(
@@ -131,6 +151,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               const SizedBox(height: 12),
                             ],
                             FilledButton(
+                              key: const Key('register-submit-button'),
                               style: FilledButton.styleFrom(
                                 backgroundColor: AppTheme.primaryColor,
                                 foregroundColor: AppTheme.pureWhite,

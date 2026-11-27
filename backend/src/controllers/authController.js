@@ -37,11 +37,17 @@ async function buildUniqueUsername(client, normalizedEmail) {
  * @access  Public
  */
 const registerUser = asyncHandler(async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, confirm_password: confirmPassword, password_confirmation: passwordConfirmation } = req.body;
 
   if (!name || !email || !password) {
     res.status(400);
     throw new Error('Please provide name, email, and password');
+  }
+
+  const submittedConfirmation = confirmPassword !== undefined ? confirmPassword : passwordConfirmation;
+  if (submittedConfirmation !== undefined && submittedConfirmation !== password) {
+    res.status(400);
+    throw new Error('Password confirmation does not match');
   }
 
   const trimmedName = String(name).trim();

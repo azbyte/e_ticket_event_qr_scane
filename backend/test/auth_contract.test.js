@@ -195,6 +195,20 @@ test('register menolak field wajib yang hilang, email invalid, dan password pend
   }
 });
 
+test('register menolak ketika confirm_password atau password_confirmation dikirim tetapi tidak cocok', async () => {
+  for (const body of [
+    { name: 'Mismatch 1', email: 'm1@example.test', password: 'rahasia123', confirm_password: 'beda' },
+    { name: 'Mismatch 2', email: 'm2@example.test', password: 'rahasia123', password_confirmation: 'beda' },
+  ]) {
+    resetState();
+    const res = createResponse();
+    const { error } = await run(registerUser, { body }, res);
+    assert.equal(res.statusCode, 400);
+    assert.match(error.message, /Password confirmation does not match/i);
+    assert.equal(state.calls.some((call) => call.sql.includes('INSERT INTO profiles')), false);
+  }
+});
+
 test('login valid mengembalikan token dengan role dari database', async () => {
   const passwordHash = await authService.hashPassword('rahasia123');
   resetState({

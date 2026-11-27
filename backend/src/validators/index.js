@@ -13,6 +13,22 @@ const registerValidator = [
   body('name').notEmpty().withMessage('Name is required'),
   body('email').isEmail().withMessage('Valid email is required'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('confirm_password')
+    .optional()
+    .custom((value, { req }) => {
+      if (value !== req.body.password) {
+        throw new Error('Password confirmation does not match');
+      }
+      return true;
+    }),
+  body('password_confirmation')
+    .optional()
+    .custom((value, { req }) => {
+      if (value !== req.body.password) {
+        throw new Error('Password confirmation does not match');
+      }
+      return true;
+    }),
 ];
 
 const loginValidator = [
