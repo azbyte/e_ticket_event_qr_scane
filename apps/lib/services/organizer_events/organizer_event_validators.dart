@@ -147,20 +147,79 @@ class OrganizerEventValidators {
     return null;
   }
 
+  /// Mengurai input teks harga tiket dan menolak pemisah ribuan (titik/koma)
+  /// agar input seperti `50.000` tidak terbaca keliru sebagai `50`.
+  static ({double? price, String? error}) parseTicketPriceInput(String? raw) {
+    final text = raw?.trim() ?? '';
+    if (text.isEmpty) {
+      return (
+        price: null,
+        error: 'Harga wajib diisi (isi 0 untuk tiket gratis).',
+      );
+    }
+    if (text.contains(',')) {
+      return (
+        price: null,
+        error: 'Masukkan angka harga tanpa pemisah koma (contoh: 50000).',
+      );
+    }
+    if (RegExp(r'^\d+(\.\d{3})+$').hasMatch(text)) {
+      return (
+        price: null,
+        error:
+            'Masukkan angka harga tanpa pemisah ribuan titik (contoh: 50000).',
+      );
+    }
+    final parsed = double.tryParse(text);
+    if (parsed == null || !parsed.isFinite) {
+      return (price: null, error: 'Harga harus berupa angka.');
+    }
+    return (price: parsed, error: null);
+  }
+
+  /// Validasi aturan harga kategori tiket: non-negatif, tidak berubah setelah
+  /// dibuat, dan tidak mencampur tiket gratis (`0`) dengan berbayar (`> 0`).
+  static String? validateTicketPrice({
+    required double price,
+    Iterable<double> existingSiblingPrices = const <double>[],
+    double? initialPrice,
+  }) {
+    if (price < 0) {
+      return 'Harga tidak boleh negatif.';
+    }
+    if (initialPrice != null && (price - initialPrice).abs() > 0.001) {
+      return 'Harga kategori tiket tidak dapat diubah setelah dibuat.';
+    }
+    final hasFree = existingSiblingPrices.any((p) => p == 0);
+    final hasPaid = existingSiblingPrices.any((p) => p > 0);
+    if (hasFree && price > 0) {
+      return 'Event gratis tidak boleh memiliki kategori tiket berbayar.';
+    }
+    if (hasPaid && price == 0) {
+      return 'Event berbayar tidak boleh memiliki kategori tiket gratis.';
+    }
+    return null;
+  }
+
   /// Validasi form kategori tiket.
   static Map<String, String> validateTicketTypeDraft(
     OrganizerTicketTypeDraft draft, {
     int sold = 0,
     int held = 0,
+    Iterable<double> existingSiblingPrices = const <double>[],
+    double? initialPrice,
   }) {
     final errors = <String, String>{};
 
     final nameError = _required(draft.name, 'Nama kategori tiket');
     if (nameError != null) errors[fieldTicketName] = nameError;
 
-    if (draft.price < 0) {
-      errors[fieldTicketPrice] = 'Harga tidak boleh negatif.';
-    }
+    final priceError = validateTicketPrice(
+      price: draft.price,
+      existingSiblingPrices: existingSiblingPrices,
+      initialPrice: initialPrice,
+    );
+    if (priceError != null) errors[fieldTicketPrice] = priceError;
 
     final quotaError =
         validateQuotaChange(newQuota: draft.quota, sold: sold, held: held);

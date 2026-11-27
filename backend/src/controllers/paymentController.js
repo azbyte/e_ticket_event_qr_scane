@@ -35,7 +35,9 @@ const getPayment = asyncHandler(async (req, res) => {
  * Semua efek samping ini bersifat best-effort dan tidak membatalkan pembayaran.
  */
 const simulatePayment = asyncHandler(async (req, res) => {
-  if (config.nodeEnv !== 'test' && !config.simulatedPaymentsEnabled) {
+  // Izinkan simulasi di luar produksi secara default agar demo/dev lokal tidak
+  // terblokir saat env belum menyetel flag; di produksi wajib eksplisit true.
+  if (config.nodeEnv === 'production' && !config.simulatedPaymentsEnabled) {
     res.status(404);
     throw new Error('Simulated payments are disabled');
   }

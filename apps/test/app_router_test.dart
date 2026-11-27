@@ -6,6 +6,7 @@ import 'package:e_ticket_event_qr_scane/app_router.dart';
 import 'package:e_ticket_event_qr_scane/core/config/app_config.dart';
 import 'package:e_ticket_event_qr_scane/features/admin/screens/admin_profile_screen.dart';
 import 'package:e_ticket_event_qr_scane/features/auth/screens/login_screen.dart';
+import 'package:e_ticket_event_qr_scane/features/organizer/screens/event_form_screen.dart';
 import 'package:e_ticket_event_qr_scane/features/organizer/membership/team_management_screen.dart';
 import 'package:e_ticket_event_qr_scane/features/organizer/operations/organizer_scanner_screen.dart';
 import 'package:e_ticket_event_qr_scane/services/organizer_operations/organizer_permission.dart';
@@ -21,6 +22,7 @@ import 'package:e_ticket_event_qr_scane/features/staff/screens/staff_dashboard_s
 import 'package:e_ticket_event_qr_scane/models/user/user_model.dart';
 import 'package:e_ticket_event_qr_scane/models/user/user_role.dart';
 import 'package:e_ticket_event_qr_scane/providers/auth_provider.dart';
+import 'package:e_ticket_event_qr_scane/routes/app_routes.dart';
 import 'package:e_ticket_event_qr_scane/services/auth/auth_service.dart';
 import 'helpers/test_mock_server.dart';
 
@@ -313,5 +315,44 @@ void main() {
     );
     expect(screen.eventId, isEmpty);
     expect(screen.eventId, isNot('evt-1001'));
+  });
+
+  testWidgets('Navigator.pushNamed<bool> ke /organizer/events/create membuka EventFormScreen', (
+    tester,
+  ) async {
+    final auth = AuthProvider(_NoopAuthService())
+      ..setUser(
+        UserModel(
+          name: 'Organizer Uji',
+          email: 'org@example.com',
+          role: UserRole.organizer,
+        ),
+      );
+    await tester.pumpWidget(
+      ChangeNotifierProvider<AuthProvider>.value(
+        value: auth,
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: FloatingActionButton(
+                onPressed: () {
+                  Navigator.pushNamed<bool>(
+                    context,
+                    AppRoutes.organizerEventCreate,
+                  );
+                },
+                child: const Icon(Icons.add),
+              ),
+            ),
+          ),
+          onGenerateRoute: AppRouter.generateRoute,
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(FloatingActionButton));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EventFormScreen), findsOneWidget);
   });
 }

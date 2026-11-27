@@ -447,7 +447,13 @@ class MockOrganizerEventRepository implements OrganizerEventRepository {
         '${event.statusLabel}.',
       );
     }
-    final errors = OrganizerEventValidators.validateTicketTypeDraft(draft);
+    final siblingPrices = _ticketTypes
+        .where((t) => t.eventId == eventId)
+        .map((t) => t.price);
+    final errors = OrganizerEventValidators.validateTicketTypeDraft(
+      draft,
+      existingSiblingPrices: siblingPrices,
+    );
     if (errors.isNotEmpty) {
       throw OrganizerEventValidationException(errors);
     }
@@ -488,10 +494,15 @@ class MockOrganizerEventRepository implements OrganizerEventRepository {
     _requireOwned(ownerId, eventId);
     final existing = _requireTicketType(eventId, ticketTypeId);
 
+    final siblingPrices = _ticketTypes
+        .where((t) => t.eventId == eventId && t.id != ticketTypeId)
+        .map((t) => t.price);
     final errors = OrganizerEventValidators.validateTicketTypeDraft(
       draft,
       sold: existing.sold,
       held: existing.held,
+      existingSiblingPrices: siblingPrices,
+      initialPrice: existing.price,
     );
     if (errors.isNotEmpty) {
       throw OrganizerEventValidationException(errors);

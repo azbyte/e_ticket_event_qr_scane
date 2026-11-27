@@ -261,59 +261,68 @@ class AppRouter {
         }
     }
 
+    Widget guardedBuilder(BuildContext context) {
+      final auth = context.read<AuthProvider>();
+      final role = auth.user?.role.name;
+      // Identitas owner untuk layar yang butuh konteks membership Organizer.
+      _authUserId = auth.user?.id;
+      _authUserName = auth.user?.name;
+      final adminRoute =
+          path == AppRoutes.adminDashboard || path.startsWith('/admin/');
+      final organizerRoute =
+          path == AppRoutes.organizerDashboard ||
+          path.startsWith('/organizer/');
+
+      // Public / non-auth routes (D1-1)
+      if (_isPublicPath(path)) {
+        if ((path == AppRoutes.login || path == AppRoutes.register) &&
+            auth.isAuthenticated) {
+          return role == 'admin'
+              ? const RoleGuard(admin: true)
+              : const RoleGuard(admin: false);
+        }
+        // Undangan panitia memerlukan login; setelah login pengguna kembali
+        // ke halaman penerimaan undangan (K3).
+        if (_isInvitationPath(path) && !auth.isAuthenticated) {
+          return LoginScreen(redirectRoute: path);
+        }
+        return page;
+      }
+
+      // Must be authenticated for other routes
+      if (!auth.isAuthenticated) {
+        return const LoginScreen();
+      }
+
+      // Admin route guard
+      if (adminRoute && role != 'admin') {
+        return AccessDeniedScreen(
+          reason: 'Halaman ini khusus untuk Administrator Platform.',
+          returnRoute: _homeRouteForRole(role),
+        );
+      }
+
+      // Organizer route guard
+      if (organizerRoute && role != 'organizer') {
+        return AccessDeniedScreen(
+          reason: 'Halaman ini khusus untuk Penyelenggara Acara (Organizer).',
+          returnRoute: _homeRouteForRole(role),
+        );
+      }
+
+      return page;
+    }
+
+    if (page is EventFormScreen) {
+      return MaterialPageRoute<bool>(
+        settings: settings,
+        builder: guardedBuilder,
+      );
+    }
+
     return MaterialPageRoute<void>(
       settings: settings,
-      builder: (context) {
-        final auth = context.read<AuthProvider>();
-        final role = auth.user?.role.name;
-        // Identitas owner untuk layar yang butuh konteks membership Organizer.
-        _authUserId = auth.user?.id;
-        _authUserName = auth.user?.name;
-        final adminRoute =
-            path == AppRoutes.adminDashboard || path.startsWith('/admin/');
-        final organizerRoute =
-            path == AppRoutes.organizerDashboard ||
-            path.startsWith('/organizer/');
-
-        // Public / non-auth routes (D1-1)
-        if (_isPublicPath(path)) {
-          if ((path == AppRoutes.login || path == AppRoutes.register) &&
-              auth.isAuthenticated) {
-            return role == 'admin'
-                ? const RoleGuard(admin: true)
-                : const RoleGuard(admin: false);
-          }
-          // Undangan panitia memerlukan login; setelah login pengguna kembali
-          // ke halaman penerimaan undangan (K3).
-          if (_isInvitationPath(path) && !auth.isAuthenticated) {
-            return LoginScreen(redirectRoute: path);
-          }
-          return page;
-        }
-
-        // Must be authenticated for other routes
-        if (!auth.isAuthenticated) {
-          return const LoginScreen();
-        }
-
-        // Admin route guard
-        if (adminRoute && role != 'admin') {
-          return AccessDeniedScreen(
-            reason: 'Halaman ini khusus untuk Administrator Platform.',
-            returnRoute: _homeRouteForRole(role),
-          );
-        }
-
-        // Organizer route guard
-        if (organizerRoute && role != 'organizer') {
-          return AccessDeniedScreen(
-            reason: 'Halaman ini khusus untuk Penyelenggara Acara (Organizer).',
-            returnRoute: _homeRouteForRole(role),
-          );
-        }
-
-        return page;
-      },
+      builder: guardedBuilder,
     );
   }
 

@@ -1144,9 +1144,9 @@ Widget _buildTiket(EventModel event) {
       const SizedBox(height: 12),
       const OrganizerInfoBanner(
         message:
-            'Harga pada order lama disimpan sebagai snapshot, sehingga '
-            'perubahan harga hanya berlaku untuk order baru. Kuota tidak '
-            'boleh lebih kecil dari jumlah terjual + tertahan.',
+            'Harga kategori tiket dikunci setelah dibuat dan tidak dapat '
+            'mencampur kategori gratis dengan berbayar dalam satu event. '
+            'Kuota tidak boleh lebih kecil dari jumlah terjual + tertahan.',
       ),
       const SizedBox(height: 12),
       if (types.isEmpty)
