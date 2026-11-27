@@ -188,3 +188,45 @@ Virtual environment tetap berfungsi bila dipanggil eksplisit:
 | `npm run validate:skills` | **PASS** |
 | Referensi `check_qr_scannability` di dokumen aktif | **0** — tidak ada tautan putus |
 
+---
+
+## I. Guard agar `task/` tidak dibaca AI (hemat token)
+
+Sejak pekerjaan aplikasi tidak lagi bergantung pada `task/`, folder itu dijadikan
+**arsip eksplisit** agar assistant tidak menghabiskan konteks membuka 66 file historis.
+
+### I.1 Yang diubah
+
+| File | Perubahan |
+|---|---|
+| `AGENTS.md` | Menghapus "Entry point workflow developer adalah `task/PEMBAGIAN_TUGAS_FINAL.md`" dan menggantinya dengan bagian **“Folder `task/` adalah arsip — jangan dibaca”**. Rujukan `task/FINISHING_AUTHORITY.md` diganti pernyataan bahwa aturan DB berlaku penuh tanpa membaca `task/`. Instruksi baca diubah menjadi `README.md`, `PRD.md`, `docs/`, `.agents/skills/`. |
+| `SKILL.md` | Bagian "Eksekusi tugas developer" tidak lagi menautkan `task/PEMBAGIAN_TUGAS_FINAL.md`; protocol diringkas dan ditautkan ke `AGENTS.md` + catatan arsip. |
+| `README.md` | Titik masuk AI diarahkan ke `AGENTS.md`; 9 tautan `task/*` pada bagian "Panduan developer dan AI" diganti ringkasan aturan + pernyataan arsip. |
+| `task/README.md` | **Baru.** Papan penunjuk: menyatakan folder ini arsip, melarang AI membaca default, dan mendaftar sumber aktif. |
+| `docs/DATABASE.md`, `docs/ARCHITECTURE.md`, `backend/README.md` | Pointer FINISHING diarahkan ke `AGENTS.md`; rujukan audit/proposal historis ditandai `(arsip)`. |
+
+### I.2 Yang **tidak** diubah (agar tidak merusak)
+
+- Isi 66 file di `task/**` — tidak satu pun dihapus atau dipindahkan.
+- `.agents/skills/*/SKILL.md` — diverifikasi **nol** referensi `task/`, jadi skill tidak
+  pernah menarik AI ke arsip.
+- `.github/sync-config.yaml` — hanya mengatur hierarki branch, tidak mengunci isi
+  `AGENTS.md`; `validate-sync-config` tidak menyentuh file dokumentasi.
+- Logika bisnis, API, schema, dan test — tidak ada perubahan.
+
+### I.3 Verifikasi
+
+| Pemeriksaan | Hasil |
+|---|---|
+| `npm run validate:skills` | **PASS** — 7 skill, link `AGENTS.md` valid |
+| `npm run format:check` | **PASS** |
+| `npm run check` | **PASS** — 60 file |
+| `npm test` | **PASS** — 308 test |
+| `flutter analyze` | **PASS** — `No issues found!` |
+| Grep `task/` di `AGENTS.md`, `SKILL.md`, `README.md`, `.agents/skills/**` | Hanya kalimat **larangan/arsip**, tidak ada lagi instruksi membuka `task/` |
+
+**Batas yang perlu diketahui:** `AGENTS.md` adalah instruksi, bukan sandbox. Assistant
+yang mengabaikan instruksi tetap secara teknis dapat membuka `task/`; yang dijamin
+adalah tidak ada lagi perintah, tautan, atau "entry point" yang mengarahkan ke sana.
+
+

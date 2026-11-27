@@ -39,8 +39,11 @@ yang harus seluruhnya dijalankan pada setiap tugas.
 
 Untuk perintah berbentuk “Kerjakan Developer N Tahap M”, “Lanjutkan tugas
 Developer N”, atau “Perbaiki bug tahap sebelumnya”, ikuti *Autonomous Execution
-Protocol* pada [`task/PEMBAGIAN_TUGAS_FINAL.md`](task/PEMBAGIAN_TUGAS_FINAL.md):
-perintah pemilik proyek adalah otorisasi implementasi, keputusan teknis diambil
-mandiri tanpa approval tambahan, dan skill di atas dipilih sesuai cakupan
-pekerjaan. Mode read-only hanya bila diminta eksplisit. Pengecualian: Developer 1
-Tahap 1 berstatus FROZEN dan tidak dikerjakan ulang.
+Protocol* yang diringkas di [`AGENTS.md`](AGENTS.md): perintah pemilik proyek adalah
+otorisasi implementasi, keputusan teknis diambil mandiri tanpa approval tambahan,
+dan skill di atas dipilih sesuai cakupan pekerjaan. Mode read-only hanya bila
+diminta eksplisit. Pengecualian: Developer 1 Tahap 1 berstatus FROZEN dan tidak
+dikerjakan ulang.
+
+Folder `task/` berstatus arsip historis dan tidak dibaca secara default; jangan
+membuka file di dalamnya kecuali pemilik proyek menyebutnya eksplisit.

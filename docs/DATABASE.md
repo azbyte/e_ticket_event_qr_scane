@@ -18,8 +18,8 @@
   konfigurasi DB atau menjalankan perintah mutasi DB. Kebutuhan perubahan
   diajukan sebagai proposal. Hanya penanggung jawab FINISHING yang ditetapkan
   setelah gate FINISHING dibuka boleh mengimplementasikan perubahan yang
-  disetujui; Developer 4 tidak otomatis berwenang. Prosedur ada di
-  `../task/FINISHING_AUTHORITY.md`.
+  disetujui; Developer 4 tidak otomatis berwenang. Aturan ini diringkas di
+  `../AGENTS.md` (folder `task/` bersifat arsip dan tidak dibaca default).
 - Backend tidak memakai Prisma Client maupun Supabase JS untuk query runtime;
   API Express memakai koneksi PostgreSQL langsung (`pg`) melalui
   `src/config/db.js`. Modul `src/config/supabase.js` hanya alias kompatibilitas
@@ -46,10 +46,10 @@
     memutuskan apakah/di mana ia dijalankan; jangan menyatakan semuanya tidak
     diperlukan. Satu-satunya objek yang belum tercakup migration Prisma adalah
     unique index `lower(username)` (`profiles_username_lower_unique`); lihat
-    proposal DP-05 pada `../task/DB_CHANGE_PROPOSAL.md`.
+    proposal DP-05 pada `../task/DB_CHANGE_PROPOSAL.md` (arsip).
 - Kredensial DB dan `JWT_SECRET` telah dikonfirmasi dirotasi. Jangan menyalin
   nilainya ke log, issue, atau dokumentasi. Status RLS/grants aktual (verifikasi
-  read-only 23 November 2026, lihat `../task/DATABASE_AUDIT_FINAL.md`):
+  read-only 23 November 2026, lihat arsip `../task/DATABASE_AUDIT_FINAL.md`):
   **32/32 tabel aplikasi mengaktifkan RLS dengan 0 policy** (deny-by-default) dan
   **0 grant untuk role `anon`/`authenticated`**; hanya `service_role` yang
   memiliki privilege. Pemilik tabel adalah `postgres` (juga role koneksi

@@ -210,7 +210,8 @@ lampiran/unduhan mengikuti `E-TIKET Nama Peserta.pdf` dari `attendees.name`.
 1. Baca `AGENTS.md`, PRD, README dan modul terdampak. Periksa status/diff Git.
 2. Hindari perubahan bisnis, database dan dependency saat tugas hanya tooling.
    Developer 1–3 tidak mengubah atau menjalankan perubahan DB; proposal kebutuhan
-   database diserahkan kepada FINISHING sesuai `task/FINISHING_AUTHORITY.md`.
+   database diserahkan kepada FINISHING sesuai aturan di `AGENTS.md` (folder `task/`
+   bersifat arsip, tidak dibaca default).
 3. Gunakan fixtures sintetis; jalankan test demo dengan
    `flutter test --dart-define=MOCK_MODE=true`. Tes API tanpa fallback dijalankan
    dengan `flutter test test/services/api_mode_no_fallback_test.dart

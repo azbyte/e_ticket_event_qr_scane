@@ -14,7 +14,7 @@ Dibangun dengan **Node.js + Express + JavaScript** dan database **PostgreSQL via
 - Migration Prisma **sudah diterapkan** pada database yang dikonfigurasi
   `DATABASE_URL` dan tercatat di `_prisma_migrations` (9 migration, terakhir
   `20261118000400_restore_payment_status_enum_cast`). Bukti pemeriksaan ada di
-  [`../task/DATABASE_AUDIT_FINAL.md`](../task/DATABASE_AUDIT_FINAL.md).
+  `../task/DATABASE_AUDIT_FINAL.md` (arsip).
 - `npx prisma migrate diff --from-schema-datasource prisma/schema.prisma
   --to-schema-datamodel prisma/schema.prisma --script` menghasilkan
   `-- This is an empty migration.` yang berarti struktur database aktual sesuai
@@ -675,7 +675,7 @@ memeriksa tabel, kolom, constraint, index, enum, function, RLS, dan riwayat
 migrasi. Ringkasan relasi ada di `docs/DATABASE.md`.
 
 Catatan keamanan (verifikasi read-only 23 November 2026, lihat
-`../task/DATABASE_AUDIT_FINAL.md`): RLS aktif pada **32/32** tabel aplikasi dengan
+`../task/DATABASE_AUDIT_FINAL.md` (arsip)): RLS aktif pada **32/32** tabel aplikasi dengan
 **0 policy** (deny-by-default untuk akses REST langsung) dan **0 grant** untuk
 `anon`/`authenticated`; hanya `service_role` memiliki privilege. Pemilik tabel
 adalah `postgres` (juga role koneksi backend), sehingga aktivasi RLS tidak
