@@ -173,14 +173,24 @@ Menambah endpoint baru: letakkan pada router domain yang sesuai di
 | `scripts/smoke-routes.js` | `npm run test:routes` | Pastikan semua endpoint terdaftar (regresi konsolidasi router) |
 | `scripts/backup-db-json.js` | manual | Backup seluruh tabel sebagai JSON sebelum operasi destruktif |
 | `scripts/verify-email-delivery.js` | `npm run verify:email` | Bukti transmisi SMTP nyata ke sink lokal + cek kesiapan inbox nyata |
+| `scripts/verify-brevo-smtp.js` | `npm run verify:brevo` | Preflight bertahap Brevo (DNS/TCP/STARTTLS/AUTH) + uji kirim nyata & pemisahan bukti inbox |
+| `scripts/verify-email-api-transport.js` | `npm run verify:email-api` | Bukti transport HTTPS API (attachment PDF base64, anti email ganda, kegagalan jujur) |
+| `scripts/verify-ticket-email-e2e.js` | `npm run verify:ticket-email-e2e` | E2E HTTP nyata: daftar → tiket → PDF+QR → email (gratis & berbayar) |
 | `scripts/verify-async-email-queue.js` | `npm run verify:email-queue` | Bukti respons tidak menunggu SMTP lambat + antrean mengirim tepat sekali |
 | `scripts/retry-ticket-emails.js` | `npm run retry:emails` | Coba ulang delivery PENDING/FAILED (tanpa tiket/email ganda) |
+| `scripts/backfill-ticket-codes.js` | `npm run tickets:backfill-codes` | Rapikan ID tiket lama menjadi `ETK-XXXXXX` (idempotent, tanpa menghapus data) |
 | `scripts/repair-email-delivery-status.js` | `npm run repair:email-delivery` | Turunkan catatan `SENT` palsu dari transport json (dry-run default) |
 
 ### Test
 
 - `npm test` menjalankan seluruh `test/*.test.js` dengan `node --test`.
 - `npm run test:sync-config` memvalidasi validator sinkronisasi konfigurasi.
+- Alat validasi Python di `tools/` (`render_ticket_pdf.py`,
+  `check_qr_scannability.py`, `decode_ticket_qr.py`) dan `_verify-out/make_artwork.py`
+  dijalankan manual dengan virtual environment proyek: `py -3.14 -m venv .venv`
+  lalu `.\.venv\Scripts\python.exe -m pip install -r tools/requirements.txt`
+  (PyMuPDF, opencv-python-headless, numpy, Pillow). Alat ini bukan dependensi
+  runtime backend.
 - `npm run test:integration` dan `npm run test:e2e` memerlukan database/API uji
   serta `ALLOW_DESTRUCTIVE_TESTS=true`; jangan arahkan ke database produksi.
 - `npm run test:registration-flow` menguji alur nyata (registrasi Organizer →
@@ -204,23 +214,94 @@ Menambah endpoint baru: letakkan pada router domain yang sesuai di
   `VERIFY_EMAIL_TO` diisi, skrip benar-benar mengirim ke alamat tersebut dan
   mencatat bahwa bukti masuk inbox tetap harus dicek manual. Tanpa kredensial,
   hasilnya `BLOCKED` (bukan `PASS` palsu).
+- `npm run email:test -- --to=alamat@domain.com` mengirim SATU email uji nyata
+  memakai konfigurasi aktif (tanpa data tiket). Exit code 0 hanya bila penyedia
+  menerima pesan; masuk inbox/spam tetap diperiksa manual.
+- `npm run verify:brevo` memverifikasi jalur Brevo secara bertahap: konfigurasi →
+  DNS → TCP `smtp-relay.brevo.com:587` → STARTTLS + autentikasi
+  (`transporter.verify()`) → (opsional) kirim nyata → (opsional) event Brevo API.
+  Skrip mencetak pemisahan tegas antara **"Brevo menerima pesan" (250 queued)**
+  dan **"email diterima di inbox"** yang tetap harus diperiksa manual. Dengan
+  `--ticket=<uuid>` skrip mengirim e-ticket asli (PDF + QR) ke email peserta pada
+  database. Kredensial tidak pernah dicetak dan `.env` tidak diubah.
+  Opsi penerima diterima dalam dua bentuk, `--to=alamat@domain.com` maupun
+  `--to alamat@domain.com`; `--dry-run` hanya menampilkan argumen yang terbaca
+  tanpa menghubungi SMTP. Di PowerShell, `npm` dijalankan lewat `npm.ps1` yang
+  membuang token `--` sehingga `--to=...` dibaca npm sebagai konfigurasinya
+  sendiri (argv skrip kosong); skrip menutup kasus itu dengan membaca cadangan
+  `npm_config_to` dan melaporkannya sebagai `INFO sumber argumen`. Bila masih
+  ragu, `npm.cmd run verify:brevo -- --to=alamat@domain.com` meneruskan argumen
+  apa adanya.
 
 ### Email e-ticket
 
-Konfigurasi SMTP dibaca dari environment (`SMTP_HOST`, `SMTP_PORT`,
-`SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`); lihat `.env.example`.
-Tidak ada kredensial di source code, dan log hanya memuat mode/status.
+Konfigurasi email dibaca dari environment; lihat `.env.example`. Tidak ada
+kredensial di source code, dan log hanya memuat mode/status/host.
 
-- Validasi sebelum kirim: `SMTP_PORT` 1–65535, `SMTP_USER`/`SMTP_PASS` harus
-  berpasangan, dan `EMAIL_FROM` wajib berupa alamat valid. Bila salah satu tidak
+**Penyedia aktif: Brevo SMTP** (`smtp-relay.brevo.com`) melalui Nodemailer.
+Port `587` memakai STARTTLS (`SMTP_SECURE=false`, `SMTP_REQUIRE_TLS=true`);
+port `465` memakai TLS implisit (`SMTP_SECURE=true`).
+
+Setup singkat (detail ada di `.env.example`):
+
+1. Dashboard Brevo → **SMTP & API → SMTP**: salin host, login SMTP
+   (`xxxxx@smtp-brevo.com`), buat **SMTP key**.
+2. Dashboard Brevo → **Senders & IP → Senders**: verifikasi `EMAIL_FROM`.
+   Brevo menolak (`550`) alamat `From` yang belum terverifikasi.
+3. Isi `SMTP_USER`, `SMTP_PASS` (SMTP key, bukan password akun), `EMAIL_FROM`
+   pada `backend/.env` lokal atau environment deployment. Jangan commit `.env`.
+4. Verifikasi: `npm run verify:brevo` (preflight) lalu
+   `npm run verify:brevo -- --to=inbox-anda@domain.com` (kirim nyata).
+   Bentuk `--to inbox-anda@domain.com` juga diterima. Tambahkan `--dry-run` untuk
+   memastikan alamat terbaca tanpa mengirim email.
+
+Aplikasi memilih transport dengan urutan prioritas:
+
+1. **`EMAIL_PROVIDER`** bila diisi: `brevo` (default profil Brevo), `smtp`
+   (relay generik), `resend` (jalur HTTPS API lama), atau `none`.
+2. Tanpa `EMAIL_PROVIDER`: **SMTP/Brevo** bila host tersedia → **`RESEND_API_KEY`**
+   (jalur HTTPS API lama, fallback) → nonaktif.
+3. Tidak ada transport aktif → email dinonaktifkan secara jujur: catatan
+   `ticket_email_deliveries` berstatus `PENDING` + alasan, dan respons API
+   (`email_delivery.delivered=false`) tidak pernah mengklaim email terkirim.
+
+`EMAIL_FROM` wajib berupa alamat valid dan **terverifikasi sebagai sender di
+Brevo**, jika tidak pesan ditolak.
+
+
+**Identitas pengirim & penerima**
+
+- Penerima selalu email peserta pada data pendaftaran (`attendees.email`), bukan
+  alamat dari payload/klien.
+- Alamat penyelenggara diambil dari database: akun pembuat event
+  (`events.created_by` → `profiles.email`) beserta `events.organizer_name`.
+- `From` memakai alamat penyelenggara **hanya bila penyedia mengizinkannya**:
+  sama dengan `SMTP_USER` terautentikasi, sama dengan `EMAIL_FROM` terverifikasi,
+  atau domainnya terdaftar pada `EMAIL_ORGANIZER_FROM_DOMAINS` (domain yang sudah
+  diverifikasi di penyedia). Selain itu `From` memakai `EMAIL_FROM` dan alamat
+  penyelenggara dipasang sebagai `Reply-To` (`EMAIL_REPLY_TO_ORGANIZER=false`
+  untuk mematikan). Tidak ada spoofing dan tidak ada password email pribadi
+  penyelenggara yang diminta/disimpan.
+- Log pengiriman mencatat `eventId`, `ticketId`, `ticketCode`, penerima, alamat
+  pengirim, `Reply-To`, mode transport, status, jumlah percobaan, dan
+  `last_error` tanpa pernah menulis password/API key.
+- `DELIVERED` tidak pernah dicatat: tidak ada bukti/konfirmasi inbox. `SENT`
+  berarti penyedia **menerima** pesan (`2xx`), bukan jaminan masuk inbox.
+
+- Validasi sebelum kirim: `EMAIL_PROVIDER` harus dikenal, `SMTP_PORT` 1–65535,
+  `SMTP_USER`/`SMTP_PASS` harus berpasangan, relay non-loopback wajib memakai
+  kredensial (relay lokal dapat diizinkan dengan `SMTP_ALLOW_LOCAL_RELAY=true`),
+  dan `EMAIL_FROM` wajib valid. Brevo (port 587) memaksa STARTTLS sehingga
+  kredensial tidak pernah terkirim pada koneksi polos. Bila salah satu tidak
   valid, transport `disabled` dengan alasan jelas (tidak ada percobaan kirim).
-- `SMTP_HOST` kosong → email dinonaktifkan secara jujur: catatan
-  `ticket_email_deliveries` berstatus `PENDING` + alasan, dan respons API
-  (`email_delivery.delivered=false`) tidak pernah mengklaim email terkirim.
+- Kegagalan transport diklasifikasikan (`dns`, `connect`, `tls`, `auth`,
+  `sender`, `send`) dan saran tindakannya disimpan pada `last_error` — mis.
+  SMTP key Brevo salah (`auth`) atau `EMAIL_FROM` belum diverifikasi (`sender`).
+  Password/SMTP key tidak pernah ditulis ke log maupun `last_error`.
 - `SMTP_HOST=json` hanya berlaku saat `NODE_ENV=test`; di luar test dianggap
   nonaktif dan **tidak pernah** dicatat `SENT`.
-- `SMTP_HOST=<host>` → email benar-benar dikirim lewat SMTP; status `SENT` hanya
-  dicatat setelah server SMTP menerima pesan.
+- Status `SENT` hanya dicatat setelah penyedia email menerima pesan (respons
+  SMTP `2xx` atau HTTP `2xx` dari API).
 - **Pengiriman asinkron di dalam proses** (`src/services/emailQueue.js`):
   pendaftaran/pembayaran hanya menerbitkan tiket + mencatat delivery `PENDING`
   lalu menjadwalkan email pada tick berikutnya. Respons tidak menunggu SMTP.
@@ -228,17 +309,46 @@ Tidak ada kredensial di source code, dan log hanya memuat mode/status.
   antre. Tidak ada job queue/dependensi runtime baru.
 - Lampiran PDF wajib: bila rendering PDF gagal, email tidak dikirim dan
   kegagalan dicatat pada `last_error`.
-- Pengiriman bersifat idempoten per tiket/penerima; `POST /api/tickets/:id/email`,
-  `POST /api/admin/email/retry`, dan worker periodik (interval 5 menit saat SMTP
-  aktif) tidak membuat email ganda. Retry dibatasi 5 percobaan otomatis dan
-  menghormati `next_attempt_at`.
+- **Nama lampiran** mengikuti format wajib `E-TIKET Nama Peserta.pdf`
+  (`src/utils/ticketFilename.js`), diambil dari `attendees.name` tiket yang
+  sama — bukan kode tiket/UUID. Spasi biasa dipakai sebagai pemisah; karakter
+  yang terlarang pada filesystem diganti spasi, dan nama non-Latin tetap utuh
+  lewat `filename*=UTF-8''…`. Nama file unduhan manual
+  (`GET /api/tickets/:id/pdf`) memakai format yang sama.
+- **Anti email ganda** (`claimDelivery`): klaim atomik per `(ticket_id,
+  recipient)` dalam satu `UPDATE` bersyarat + advisory lock. Aman terhadap klik
+  ganda, retry bersamaan, dan lebih dari satu instance backend. Baris `SENT`
+  tidak pernah diklaim ulang maupun diturunkan menjadi `FAILED`. Klaim
+  kedaluwarsa setelah `EMAIL_SEND_CLAIM_SECONDS` (default 120) sehingga tiket
+  yang tertinggal saat proses berhenti tetap terkirim oleh worker retry.
+- Retry memakai backoff (`EMAIL_RETRY_BASE_DELAY_MS` × nomor percobaan),
+  dibatasi 5 percobaan otomatis, menghormati `next_attempt_at`, dan tersedia
+  lewat `POST /api/tickets/:id/email`, `POST /api/admin/email/retry`, worker
+  periodik (interval 5 menit), serta `npm run retry:emails`.
+- **Kirim ulang eksplisit** (tombol "Kirim ulang email") memakai `force`:
+  email benar-benar dikirim lagi dengan nomor tiket dan PDF yang sama (tidak ada
+  tiket baru, tidak ada perubahan nomor tiket), dibatasi
+  `EMAIL_RESEND_COOLDOWN_SECONDS` (default 60 detik; `recently_sent` bila masih
+  dalam jeda). Pengiriman otomatis tetap idempoten (`already_sent`).
+  Respons memuat `sender`, `recipient`, `attempt_count`, `sent_at`, dan
+  `previously_sent` (true bila kirim ulang gagal padahal pengiriman sebelumnya
+  sudah SENT — status SENT tidak diturunkan).
+- Alamat penerima divalidasi sebelum klaim; alamat tidak valid dicatat `FAILED`
+  dengan alasan jelas tanpa memanggil penyedia. Tiket berstatus
+  `cancelled`/`revoked` tidak dikirim ulang.
 - Catatan lama yang salah berstatus `SENT` karena transport json dapat
   dinormalisasi dengan `npm run repair:email-delivery -- --apply` (membuat backup
   JSON lebih dulu; tidak menghapus data).
 - Status yang dibedakan: `PENDING` (belum dikirim/antre), `SENDING` (sedang
   dikirim), `SENT` (diterima transport), `FAILED` (gagal + `last_error`), dan
-  `NOT_CONFIGURED` (SMTP belum siap). Status pembayaran tidak pernah disamakan
-  dengan status pengiriman email.
+  `NOT_CONFIGURED` (layanan email belum siap). Status pembayaran tidak pernah
+  disamakan dengan status pengiriman email.
+- Preflight saat startup (`verifyTransport`): server mencetak apakah penyedia
+  email benar-benar dapat dihubungi beserta tahap kegagalannya (DNS, koneksi,
+  TLS, autentikasi), sehingga masalah jaringan/port/kredensial terlihat tanpa
+  harus menunggu pendaftaran pertama. `SMTP_HOST` yang menunjuk loopback
+  (sisa relay uji) diperingatkan secara eksplisit karena tidak akan sampai ke
+  inbox peserta.
 
 ## Endpoint API
 
@@ -253,6 +363,54 @@ koneksi database.
 | GET | `/api/auth/me` | Profil pengguna login | Private |
 | PUT | `/api/auth/me` | Perbarui nama/avatar | Private |
 | POST | `/api/auth/logout` | Cabut token (revoked_tokens) | Private |
+
+### E-Tiket PDF (dimensi, QR, ID, nama file)
+
+Sumber tunggal rendering ada di `src/services/ticketDesignService.js` dan dipakai
+bersama oleh unduhan manual (`GET /api/tickets/:id/pdf`) serta lampiran email —
+tidak ada jalur rendering kedua untuk event gratis/berbayar.
+
+- **Kanvas tetap per orientasi**: `landscape` 842 × 594 pt (A4 landscape) dan
+  `portrait` 440 × 704 pt. Ukuran halaman TIDAK diturunkan dari rasio file
+  desain, sehingga tiket tidak pernah menjadi pipih dan QR tidak mengecil.
+- **Prinsip desain**: gambar yang diunggah Organizer adalah desain UTAMA tiket;
+  sistem hanya menambahkan informasi dinamis yang sedikit. Tidak ada panel,
+  kartu, atau latar tambahan di atas artwork.
+- **Informasi tiket (7 baris, kiri atas, teks hitam tanpa panel)**:
+  1. `E-TIKET [NAMA EVENT]` 34 pt (auto-fit 34→26 pt; nama panjang dibungkus
+     maksimal 2 baris), 2. `Peserta: [NAMA PESERTA]` 23 pt bold (auto-fit
+     23→17 pt agar nama panjang tetap satu baris), 3. `ID TIKET: [ID TIKET]`
+     16 pt bold, 4. `Kategori: [KATEGORI]` 16 pt, 5. `Jadwal: [TANGGAL & WAKTU]`
+     16 pt (WIB), 6. `Lokasi: [LOKASI]` 16 pt, 7. instruksi singkat penukaran
+     tiket 14 pt. Bila area teks desain kustom lebih pendek, seluruh blok
+     dikecilkan proporsional (hierarki tetap) agar tidak menimpa QR. Nomor
+     registrasi, nomor order, tanggal terbit, dan kartu "berlaku untuk" TIDAK
+     dicetak.
+- **QR Code** default 220 pt (landscape) / 250 pt (portrait) tepat di bawah blok
+  teks, modul putih opaque + quiet zone ≥ 2 modul. Alas putih hanya selebar
+  QR + quiet zone + margin 6 pt (`QR_BACKING_PAD`), bukan kartu/panel.
+  **Organizer dapat mengatur posisi X, posisi Y, dan ukuran QR** (fraksi 0..1);
+  pengaturan disimpan di `ticket_design.qr` (mode `PUT` `qr_only: true`) dan
+  dipakai apa adanya saat render. QR hanya digeser bila akan keluar halaman
+  (ukurannya tidak diperkecil diam-diam) dan dinaikkan ke `QR_MIN_POINTS`
+  (100 pt) bila diatur terlalu kecil agar tetap dapat dipindai.
+- **Desain kustom** (event atau per kategori) digambar `contain` di dalam kanvas
+  (rasio asli dipertahankan, sisa ruang menjadi mat ivory). Desain lama dengan
+  rasio 2.5:1 tetap tercetak utuh; unggahan baru divalidasi mendekati rasio
+  kanvas (landscape 1.25–1.62, portrait 0.50–0.85). Teks & QR memakai posisi
+  `design.info` / `design.qr`.
+- **Prioritas desain**: desain kategori → desain event → desain default sistem.
+  Kandidat yang file-nya hilang dilewati (tidak langsung jatuh ke desain
+  default), sehingga desain unggahan Organizer tetap dipakai bila masih ada.
+- **ID tiket publik** `ETK-XXXXXX` (Crockford Base32 tanpa I/L/O/U) disimpan di
+  `tickets.ticket_code`. `tickets.id` (UUID) tetap menjadi primary key/relasi,
+  sehingga tidak ada perubahan schema. Tiket lama dirapikan otomatis saat
+  tiket dibuka/dikirim, atau sekaligus dengan `npm run tickets:backfill-codes`;
+  kode lama `TKT-<uuid>` tetap dapat divalidasi lewat `tickets.qr_code_data`.
+- **Template desain** (`GET /api/ticket-design-template`) berisi latar/ornamen +
+  penanda tipis area QR (garis putus-putus tanpa alas putih dan tanpa teks
+  contoh) agar teks/alas putih dinamis tidak tercetak dua kali. Regenerasi:
+  `powershell -ExecutionPolicy Bypass -File scripts/generate-ticket-template.ps1`.
 
 ### Events
 | Method | Endpoint | Deskripsi | Akses |
@@ -270,7 +428,7 @@ koneksi database.
 | PUT/DELETE | `/api/events/:id/ticket-types/:ticketTypeId` | Ubah/hapus kategori tiket | Organizer |
 | GET | `/api/ticket-types/:id` | Detail kategori tiket | Public |
 | GET | `/api/events/:id/ticket-design` | Desain tiket event + per kategori (posisi QR, orientasi) | Owner/Admin |
-| PUT | `/api/events/:id/ticket-design` | Unggah desain / simpan orientasi (`scope=event` atau `scope=ticket_type`) | Owner/Admin |
+| PUT | `/api/events/:id/ticket-design` | Unggah desain / simpan orientasi (`scope=event` atau `scope=ticket_type`); `qr_only: true` untuk menyimpan posisi & ukuran QR saja | Owner/Admin |
 | DELETE | `/api/events/:id/ticket-design?scope=` | Hapus desain & orientasi (kembali ke default) | Owner/Admin |
 | GET | `/api/ticket-design-template?format=pdf\|png&orientation=landscape\|portrait` | Unduh template desain tiket (ukuran + penanda QR) | Public |
 | GET | `/api/events/:id/summary` | Ringkasan operasional event | Organizer/Admin |
@@ -471,11 +629,23 @@ memblokir seluruh request login/registrasi. Origin non-loopback tetap ditolak
 | `APP_PUBLIC_URL` | URL publik aplikasi untuk `public_url` event dan tautan tiket | `http://localhost:3000` |
 | `ALLOWED_ORIGINS` | Daftar origin CORS dipisah koma | `http://localhost:3000` |
 | `CORS_ORIGIN` | Alias lama CORS (kompatibilitas) | `http://localhost:3000` |
-| `SMTP_HOST` | Host SMTP; bila kosong pengiriman email dinonaktifkan (status `PENDING`) | `smtp.example.test` |
-| `SMTP_PORT` | Port SMTP | `587` |
-| `SMTP_SECURE` | Gunakan TLS langsung | `false` |
-| `SMTP_USER` / `SMTP_PASS` | Kredensial SMTP (hanya di `.env`) | nilai rahasia |
-| `EMAIL_FROM` | Alamat pengirim email tiket | `no-reply@eticket.local` |
+| `EMAIL_PROVIDER` | Penyedia aktif: `brevo` (default), `smtp`, `resend` (lama), `none`. Kosong = otomatis (SMTP/Brevo lalu Resend) | `brevo` |
+| `SMTP_HOST` | Host SMTP. Brevo: `smtp-relay.brevo.com`. Bila kosong dan `RESEND_API_KEY` juga kosong, email dinonaktifkan (status `PENDING` + alasan) | `smtp-relay.brevo.com` |
+| `SMTP_PORT` | Port SMTP (Brevo: `587` STARTTLS, `465` TLS implisit) | `587` |
+| `SMTP_SECURE` | Gunakan TLS langsung (port 465) | `false` |
+| `SMTP_REQUIRE_TLS` | Wajibkan STARTTLS pada port non-secure (default aktif untuk Brevo) | `true` |
+| `SMTP_USER` / `SMTP_PASS` | Kredensial SMTP Brevo: login SMTP (`xxxxx@smtp-brevo.com`) dan **SMTP key**, bukan password akun (hanya di `.env`) | nilai rahasia |
+| `SMTP_ALLOW_LOCAL_RELAY` | Izinkan relay lokal tanpa autentikasi (uji) | `false` |
+| `RESEND_API_KEY` | Kunci HTTPS API lama; hanya fallback bila SMTP belum dikonfigurasi | nilai rahasia |
+| `EMAIL_FROM` | Alamat pengirim terverifikasi (wajib untuk transport nyata) | `no-reply@domain-anda.test` |
+| `EMAIL_FROM_NAME` | Nama tampilan pengirim | `E-Ticket Event` |
+| `EMAIL_ORGANIZER_FROM_DOMAINS` | Domain penyelenggara yang boleh dipakai sebagai `From` (dipisah koma; harus terverifikasi di penyedia). Kosong = penyelenggara hanya `Reply-To` | `eventku.com` |
+| `EMAIL_REPLY_TO_ORGANIZER` | `false` untuk mematikan Reply-To dinamis ke penyelenggara | `true` |
+| `EMAIL_RESEND_COOLDOWN_SECONDS` | Jeda minimal kirim ulang eksplisit | `60` |
+| `EMAIL_SEND_CLAIM_SECONDS` | Masa klaim anti email ganda | `120` |
+| `EMAIL_RETRY_BASE_DELAY_MS` | Jeda dasar backoff retry | `60000` |
+| `VERIFY_EMAIL_TO` | Alamat inbox untuk `npm run verify:email` / `npm run verify:brevo` | `inbox-anda@domain.test` |
+| `BREVO_API_KEY` | Opsional: API key Brevo untuk membaca event `delivered`/bounce pada `verify:brevo` | nilai rahasia |
 | `RATE_LIMIT_WINDOW_MS` | Jendela rate limit | `900000` |
 | `RATE_LIMIT_AUTH_MAX` / `RATE_LIMIT_SCAN_MAX` / `RATE_LIMIT_GLOBAL_MAX` | Batas request auth/scan/global per jendela | `20` / `600` / `1200` |
 | `MAX_JSON_BODY` | Batas ukuran body JSON | `2mb` |

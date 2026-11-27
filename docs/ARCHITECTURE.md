@@ -103,18 +103,46 @@ terhadap API + PostgreSQL nyata (`cd backend; npm run test:e2e`, 80 pemeriksaan)
   tiket sehingga respons pendaftaran/pembayaran tidak bergantung pada kecepatan
   SMTP dan tidak ada email ganda. Tidak ada dependensi runtime baru.
 - `src/services/emailService.js` menentukan transport dari environment:
-  `smtp` (host nyata + konfigurasi valid), `json` (hanya `NODE_ENV=test`), atau
-  `disabled`. `smtpStatus()` memvalidasi `SMTP_PORT`, pasangan
-  `SMTP_USER`/`SMTP_PASS`, dan `EMAIL_FROM` tanpa mencetak nilai rahasia.
+  **`brevo`** (SMTP relay Brevo `smtp-relay.brevo.com` port 587 + STARTTLS,
+  penyedia aktif), `smtp` (relay generik), `resend` (jalur HTTPS API lama,
+  fallback bila SMTP belum diisi), `json` (hanya `NODE_ENV=test`), atau
+  `disabled`. `smtpStatus()` memvalidasi `EMAIL_PROVIDER`, `SMTP_PORT`, pasangan
+  `SMTP_USER`/`SMTP_PASS`, `EMAIL_FROM`, dan menolak relay non-loopback tanpa
+  kredensial — tanpa mencetak nilai rahasia. Kredensial Brevo (`SMTP_USER` login
+  SMTP, `SMTP_PASS` SMTP key) hanya dibaca dari environment.
+- Kegagalan transport diklasifikasikan per tahap (`dns`, `connect`, `tls`,
+  `auth`, `sender`, `send`) dan saran tindakannya ikut disimpan pada
+  `last_error`, sehingga penyebab seperti SMTP key salah atau `EMAIL_FROM` belum
+  diverifikasi di Brevo tidak tersembunyi.
 - Status pengiriman disimpan di `ticket_email_deliveries` dan dibedakan:
   `PENDING` (belum dikirim/antre), `SENDING` (sedang berjalan), `SENT` (diterima
   transport), `FAILED` (+`last_error`), serta `NOT_CONFIGURED` pada respons API.
   Status pembayaran tidak pernah disamakan dengan status pengiriman email.
-- Penerima selalu `attendees.email` pada tiket yang bersangkutan; lampiran PDF
-  memakai desain & orientasi tiket. Retry dibatasi 5 percobaan otomatis,
-  menghormati `next_attempt_at`, dan tersedia lewat worker periodik,
+- **Anti email ganda lintas proses**: sebelum mengirim, `claimDelivery()`
+  mengambil klaim atomik per `(ticket_id, recipient)` lewat satu `UPDATE`
+  bersyarat + advisory lock. Baris `SENT` tidak pernah diklaim ulang oleh
+  pengiriman otomatis (hanya oleh kirim ulang eksplisit setelah cooldown), baris
+  `PENDING` dalam masa klaim (`EMAIL_SEND_CLAIM_SECONDS`, default 120 detik)
+  dianggap sedang dikirim. Klaim kedaluwarsa otomatis bila proses berhenti di
+  tengah jalan, sehingga worker retry dapat mengambil alih tanpa menggandakan
+  email. Baris `SENT` juga tidak pernah diturunkan menjadi `FAILED`.
+- Penerima selalu `attendees.email` pada tiket yang bersangkutan; alamat
+  penyelenggara diambil dari `events.created_by` → `profiles.email`. `From`
+  memakai alamat penyelenggara hanya bila diizinkan penyedia (sama dengan
+  `SMTP_USER`/`EMAIL_FROM`, atau domainnya ada di
+  `EMAIL_ORGANIZER_FROM_DOMAINS`); selain itu `From` = `EMAIL_FROM` terverifikasi
+  dan penyelenggara menjadi `Reply-To`. Tidak ada kredensial email pribadi
+  penyelenggara yang disimpan.
+- Lampiran PDF memakai desain & orientasi tiket. Retry memakai backoff
+  (`EMAIL_RETRY_BASE_DELAY_MS` × nomor percobaan), dibatasi 5 percobaan
+  otomatis, menghormati `next_attempt_at`, dan tersedia lewat worker periodik,
   `POST /api/admin/email/retry`, `POST /api/tickets/:id/email`, dan
   `npm run retry:emails` — tanpa membuat tiket/transaksi baru.
+- Tombol kirim ulang memakai jalur eksplisit (`force`): mengirim ulang tiket
+  yang sama (nomor tiket & PDF tidak berubah) dengan cooldown
+  `EMAIL_RESEND_COOLDOWN_SECONDS`; kegagalan kirim ulang tidak menurunkan status
+  `SENT` yang sudah ada. `DELIVERED` tidak pernah diklaim karena tidak ada bukti
+  inbox.
 
 **Backend (perbaikan integrasi)**
 
@@ -146,6 +174,29 @@ menyimpan `token_hash`. Validasi dan check-in bersifat server-authoritative:
 `VALID`, `ALREADY_USED`, `WRONG_EVENT`, `PAYMENT_REQUIRED`, `CANCELLED`,
 `REVOKED`. Check-in menulis satu baris `check_ins` + `scan_logs` dalam satu
 transaksi; percobaan kedua tidak menambah baris.
+
+**E-tiket PDF**
+
+Satu renderer (`ticketDesignService.buildTicketPdf`) melayani unduhan manual dan
+lampiran email, untuk event gratis maupun berbayar. Kanvas tetap per orientasi
+(`landscape` 842 × 594 pt, `portrait` 440 × 704 pt). Prinsip desainnya: gambar
+desain Organizer adalah elemen utama, sistem hanya menambahkan tujuh baris
+informasi dinamis di kiri atas (`E-TIKET [NAMA EVENT]` 34 pt auto-fit, `Peserta`
+23 pt, `ID TIKET` 16 pt, `Kategori` 16 pt, `Jadwal` 16 pt, `Lokasi` 16 pt,
+instruksi penukaran 14 pt) dan QR Code default 220/250 pt di bawahnya dengan alas
+putih selebar QR + quiet zone + margin kecil. Nomor registrasi, nomor order,
+tanggal terbit, dan kartu informasi tidak dicetak.
+Posisi X/Y dan ukuran QR dapat diatur Organizer (fraksi kanvas, disimpan di
+`ticket_design.qr` lewat `PUT /api/events/:id/ticket-design` dengan `qr_only:
+true`) dan dipakai apa adanya saat render; QR hanya digeser bila akan keluar
+halaman. Desain dipilih dengan urutan kategori → event → default sistem, dan
+kandidat yang filenya hilang dilewati agar desain unggahan tidak tergantikan
+desain default.
+Desain kustom digambar `contain` sehingga rasio asli terjaga. ID publik tiket
+`ETK-XXXXXX` disimpan pada `tickets.ticket_code` (kolom unik yang sudah ada)
+sementara `tickets.id` tetap primary key, sehingga tidak ada perubahan schema;
+kode lama `TKT-<uuid>` tetap dapat divalidasi lewat `tickets.qr_code_data`. Nama
+lampiran/unduhan mengikuti `E-TIKET Nama Peserta.pdf` dari `attendees.name`.
 
 **Keputusan produk yang ditegakkan**
 

@@ -8,6 +8,7 @@ const {
   splitCustomFieldAnswers,
 } = require('../utils/eventValidation');
 const { ensureOrderTokenHashes } = require('../services/ticketTokenService');
+const { ensureOrderPublicTicketCodes } = require('../services/ticketCodeService');
 const emailQueue = require('../services/emailQueue');
 const logger = require('../utils/logger');
 
@@ -345,6 +346,16 @@ const createOrder = asyncHandler(async (req, res) => {
       await ensureOrderTokenHashes(order.id);
     } catch (error) {
       logger.error('ticket_token_backfill_failed', {
+        orderId: order.id,
+        error: error.message,
+      });
+    }
+    // ID publik ringkas (`ETK-XXXXXX`) ditetapkan sebelum email/PDF dibuat agar
+    // kode pada tiket, email, dan nama file selalu sama.
+    try {
+      await ensureOrderPublicTicketCodes(order.id);
+    } catch (error) {
+      logger.error('ticket_public_code_backfill_failed', {
         orderId: order.id,
         error: error.message,
       });

@@ -30,12 +30,18 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
  * dilaporkan agar pengguna tahu apa yang harus dilengkapi.
  */
 const REAL_SMTP = {
+  EMAIL_PROVIDER: process.env.EMAIL_PROVIDER || '',
   SMTP_HOST: process.env.SMTP_HOST || '',
   SMTP_PORT: process.env.SMTP_PORT || '',
   SMTP_SECURE: process.env.SMTP_SECURE || '',
+  SMTP_REQUIRE_TLS: process.env.SMTP_REQUIRE_TLS || '',
   SMTP_USER: process.env.SMTP_USER || '',
   SMTP_PASS: process.env.SMTP_PASS || '',
   EMAIL_FROM: process.env.EMAIL_FROM || '',
+  // Identitas penyelenggara pada pengujian memakai domain `.test`; jangan
+  // sampai nilai uji ini terbawa ke pengiriman nyata.
+  EMAIL_ORGANIZER_FROM_DOMAINS: process.env.EMAIL_ORGANIZER_FROM_DOMAINS || '',
+  EMAIL_RESEND_COOLDOWN_SECONDS: process.env.EMAIL_RESEND_COOLDOWN_SECONDS || '',
 };
 const REAL_RECIPIENT = String(process.env.VERIFY_EMAIL_TO || '').trim();
 
@@ -138,17 +144,25 @@ const cleanup = async (db, extraEmail = null) => {
   await db.query(`DELETE FROM ticket_types WHERE event_id IN (
      SELECT id FROM events WHERE title = $1)`, [EVENT_TITLE]);
   await db.query('DELETE FROM events WHERE title = $1', [EVENT_TITLE]);
+  await db.query("DELETE FROM profiles WHERE lower(email) LIKE 'org.verify.%@example.test'");
 };
 
 (async () => {
   // Konfigurasi SMTP diarahkan ke sink lokal SEBELUM service dimuat, sehingga
   // transportMode() memakai 'smtp' nyata (bukan json).
+  process.env.EMAIL_PROVIDER = 'smtp';
   process.env.SMTP_HOST = '127.0.0.1';
   process.env.SMTP_PORT = String(SMTP_PORT);
   process.env.SMTP_SECURE = 'false';
+  // Sink lokal tidak menyediakan STARTTLS; jangan paksa TLS pada pengujian.
+  process.env.SMTP_REQUIRE_TLS = 'false';
   process.env.SMTP_USER = '';
   process.env.SMTP_PASS = '';
   process.env.EMAIL_FROM = 'no-reply@eticket.test';
+  // Domain penyelenggara dianggap sudah diverifikasi di penyedia.
+  process.env.EMAIL_ORGANIZER_FROM_DOMAINS = 'example.test';
+  // Kirim ulang eksplisit tidak perlu menunggu cooldown pada pengujian.
+  process.env.EMAIL_RESEND_COOLDOWN_SECONDS = '0';
   process.env.APP_PUBLIC_URL = 'http://localhost:3100';
 
   const { query, getOne, pool } = require('../src/config/db');
@@ -161,11 +175,19 @@ const cleanup = async (db, extraEmail = null) => {
   await cleanup({ query });
 
   // --- Siapkan data uji sintetis (event, kategori, order, peserta, tiket) ---
+  const organizer = await getOne(
+    `INSERT INTO profiles (id, name, email, role)
+     VALUES (gen_random_uuid(), 'Organizer Verifikasi', $1, 'organizer')
+     RETURNING id, email`,
+    [`org.verify.${Date.now()}@example.test`],
+  );
   const event = await getOne(
-    `INSERT INTO events (title, event_date, location, status, is_public, event_format)
-     VALUES ($1, NOW() + INTERVAL '30 days', 'Jakarta', 'PUBLISHED', true, 'OFFLINE')
+    `INSERT INTO events (title, event_date, location, status, is_public, event_format,
+       organizer_name, created_by)
+     VALUES ($1, NOW() + INTERVAL '30 days', 'Jakarta', 'PUBLISHED', true, 'OFFLINE',
+       'Organizer Verifikasi', $2)
      RETURNING id, title`,
-    [EVENT_TITLE],
+    [EVENT_TITLE, organizer.id],
   );
   const ticketType = await getOne(
     `INSERT INTO ticket_types (event_id, name, price, quota)
@@ -211,6 +233,15 @@ const cleanup = async (db, extraEmail = null) => {
   check(raw.toLowerCase().includes(RECIPIENT), 'RCPT TO memakai email peserta', RECIPIENT);
   check(/subject:\s*E-Ticket/i.test(raw), 'subjek email adalah E-Ticket');
   check(
+    new RegExp(`^From:.*${organizer.email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'im').test(raw),
+    'From memakai email penyelenggara dari database',
+    organizer.email,
+  );
+  check(
+    new RegExp(`^Reply-To:.*${organizer.email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'im').test(raw),
+    'Reply-To menunjuk email penyelenggara',
+  );
+  check(
     decoded.includes(EVENT_TITLE) || /filename\*?=/.test(raw),
     'pesan memuat data event/lampiran tiket',
   );
@@ -239,10 +270,53 @@ const cleanup = async (db, extraEmail = null) => {
   );
   check(captured.length === 1, 'tidak ada pesan kedua pada SMTP sink', `jumlah=${captured.length}`);
 
+  // --- 6b: tombol kirim ulang eksplisit benar-benar mengirim lagi ---
+  const resend = await emailService.sendTicketEmail(ticket.id, { force: true });
+  check(resend?.status === 'SENT', 'kirim ulang eksplisit mengirim email lagi',
+    String(resend?.status));
+  check(captured.length === 2, 'SMTP sink menerima pesan kirim ulang',
+    `jumlah=${captured.length}`);
+  const resendRaw = captured[1] || '';
+  check(
+    /subject:\s*E-Ticket/i.test(resendRaw)
+      && resendRaw.includes(ticket.ticket_code),
+    'kirim ulang memakai nomor tiket yang sama',
+    ticket.ticket_code,
+  );
+  check(
+    /Content-Type:\s*application\/pdf/i.test(resendRaw),
+    'kirim ulang tetap melampirkan PDF tiket',
+  );
+  const resendRows = await getOne(
+    `SELECT count(*)::int AS total, max(attempt_count)::int AS attempt
+       FROM ticket_email_deliveries WHERE ticket_id = $1`,
+    [ticket.id],
+  );
+  check(resendRows?.total === 1, 'kirim ulang tidak membuat catatan delivery ganda',
+    `jumlah=${resendRows?.total}`);
+  check(Number(resendRows?.attempt) >= 2, 'jumlah percobaan bertambah sesuai kiriman',
+    `attempt=${resendRows?.attempt}`);
+
   // --- 7..8: kegagalan SMTP dicatat, tiket tetap ada ---
+  // Skenario ini memakai tiket BARU: catatan yang sudah SENT tidak boleh
+  // diturunkan menjadi FAILED (peserta sudah menerima tiketnya). Menguji pada
+  // tiket yang sama akan mengaburkan kedua jaminan tersebut.
+  const attendee2 = await getOne(
+    `INSERT INTO attendees (order_item_id, name, email)
+     VALUES ($1, 'Peserta Uji Gagal', $2) RETURNING id, email`,
+    [item.id, RECIPIENT],
+  );
+  const ticket2 = await getOne(
+    `INSERT INTO tickets (ticket_code, event_id, ticket_type_id, attendee_id,
+       qr_code_data, status, purchased_at, issued_at)
+     VALUES ($1, $2, $3, $4, $1, 'active', NOW(), NOW())
+     RETURNING id, ticket_code`,
+    [`TKT-VERIFY-FAIL-${Date.now()}`, event.id, ticketType.id, attendee2.id],
+  );
+
   await new Promise((resolve) => server.close(resolve));
   emailService.resetTransport();
-  const failed = await emailService.sendTicketEmail(ticket.id, { force: true });
+  const failed = await emailService.sendTicketEmail(ticket2.id);
   check(
     failed?.status === 'FAILED',
     'kegagalan SMTP dicatat FAILED (tidak diklaim terkirim)',
@@ -251,12 +325,25 @@ const cleanup = async (db, extraEmail = null) => {
   const failedRow = await getOne(
     `SELECT status, last_error FROM ticket_email_deliveries
       WHERE ticket_id = $1 ORDER BY created_at DESC LIMIT 1`,
-    [ticket.id],
+    [ticket2.id],
   );
   check(
     failedRow?.status === 'FAILED' && Boolean(failedRow?.last_error),
     'alasan kegagalan tersimpan pada last_error',
     String(failedRow?.last_error || '').slice(0, 60),
+  );
+
+  // Jaminan tambahan: tiket yang sudah terkirim tetap tercatat SENT walau ada
+  // percobaan kirim ulang yang gagal (tidak ada data valid yang rusak).
+  const stillSent = await getOne(
+    `SELECT status, sent_at FROM ticket_email_deliveries
+      WHERE ticket_id = $1 ORDER BY created_at DESC LIMIT 1`,
+    [ticket.id],
+  );
+  check(
+    stillSent?.status === 'SENT' && Boolean(stillSent?.sent_at),
+    'catatan SENT tidak diturunkan oleh kegagalan kirim ulang',
+    String(stillSent?.status || ''),
   );
   const stillThere = await getOne('SELECT id FROM tickets WHERE id = $1', [ticket.id]);
   check(Boolean(stillThere?.id), 'tiket tetap terbit walau email gagal');
@@ -286,18 +373,21 @@ const cleanup = async (db, extraEmail = null) => {
   }
   if (realStatus.reason) console.log(`Alasan: ${realStatus.reason}`);
 
-  if (realStatus.mode !== 'smtp') {
+  if (realStatus.mode !== 'smtp' && realStatus.mode !== 'brevo' && realStatus.mode !== 'resend') {
     blockedCount += 1;
-    console.log('BLOCKED  pengiriman ke inbox nyata :: SMTP nyata belum siap.');
-    console.log('         Lengkapi backend/.env: SMTP_HOST, SMTP_PORT, SMTP_USER,');
-    console.log('         SMTP_PASS, EMAIL_FROM lalu jalankan ulang npm run verify:email.');
+    console.log('BLOCKED  pengiriman ke inbox nyata :: layanan email belum siap.');
+    console.log('         Isi pada backend/.env (penyedia aktif: Brevo SMTP):');
+    console.log('         EMAIL_PROVIDER=brevo, SMTP_HOST=smtp-relay.brevo.com, SMTP_PORT=587,');
+    console.log('         SMTP_USER (login SMTP Brevo), SMTP_PASS (SMTP key), EMAIL_FROM terverifikasi.');
+    console.log('         Jalur lama RESEND_API_KEY + EMAIL_FROM tetap didukung sebagai fallback.');
+    console.log('         Lalu jalankan ulang: npm run verify:email');
   } else if (!REAL_RECIPIENT) {
     blockedCount += 1;
     console.log('BLOCKED  pengiriman ke inbox nyata :: VERIFY_EMAIL_TO belum diisi.');
     console.log('         Set VERIFY_EMAIL_TO=alamat-inbox-anda pada backend/.env,');
     console.log('         lalu jalankan ulang npm run verify:email.');
   } else {
-    // Kirim benar-benar melalui SMTP yang dikonfigurasi ke alamat verifikasi.
+    // Kirim benar-benar memakai transport aktif (SMTP atau HTTPS API).
     const realAttendee = await getOne(
       `INSERT INTO attendees (order_item_id, name, email)
        VALUES ($1, 'Peserta Verifikasi Inbox', $2) RETURNING id, email`,
@@ -313,13 +403,13 @@ const cleanup = async (db, extraEmail = null) => {
     const realSend = await emailService.sendTicketEmail(realTicket.id);
     check(
       realSend?.status === 'SENT',
-      'SMTP nyata menerima pesan untuk alamat verifikasi',
+      'layanan email menerima pesan untuk alamat verifikasi',
       `${realSend?.status}/${String(realSend?.reason || '').slice(0, 80)}`,
     );
     if (realSend?.status === 'SENT') {
       console.log(
-        'CATATAN  Bukti "SENT" berarti server SMTP menerima pesan. Pastikan '
-        + `email benar-benar masuk ke inbox ${REAL_RECIPIENT} (termasuk folder spam).`,
+        `CATATAN  Bukti "SENT" berarti penyedia email (mode=${realStatus.mode}) menerima pesan. `
+        + `Pastikan email benar-benar masuk ke inbox ${REAL_RECIPIENT} (termasuk folder spam).`,
       );
     }
   }

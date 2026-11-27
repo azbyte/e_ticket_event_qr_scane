@@ -40,16 +40,10 @@ module.exports = {
   seedDemoAccounts: process.env.SEED_DEMO_ACCOUNTS === 'true',
   // URL publik aplikasi, dipakai untuk tautan e-ticket di email.
   appPublicUrl: (process.env.APP_PUBLIC_URL || 'http://localhost:5000').replace(/\/$/, ''),
-  // Email (SMTP). Bila host kosong, pengiriman email dinonaktifkan secara jujur
-  // (delivery dicatat PENDING dengan alasan, bukan diklaim terkirim).
-  smtp: {
-    host: process.env.SMTP_HOST || '',
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_SECURE === 'true',
-    user: process.env.SMTP_USER || '',
-    pass: process.env.SMTP_PASS || '',
-    from: process.env.EMAIL_FROM || 'no-reply@eticket.local',
-  },
+  // Konfigurasi email TIDAK dibaca di sini: `src/services/emailService.js`
+  // membacanya langsung dari environment setiap kali dipakai, sehingga
+  // perubahan .env tidak "nyangkut" dan tidak ada alamat pengirim default
+  // palsu yang dapat dipakai tanpa sengaja.
   rateLimit: {
     windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
     authMax: Number(process.env.RATE_LIMIT_AUTH_MAX || 20),

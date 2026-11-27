@@ -3,10 +3,33 @@ const { query, getOne } = require('../config/db');
 const { getAuthorizedOrder, loadOrderById, hashAccessToken } = require('./orderController');
 const { serializePayment } = require('../utils/orderResponse');
 const { ensureOrderTokenHashes } = require('../services/ticketTokenService');
+const { ensureOrderPublicTicketCodes } = require('../services/ticketCodeService');
 const emailQueue = require('../services/emailQueue');
 const { notify } = require('../services/notificationService');
 const config = require('../config/env');
 const logger = require('../utils/logger');
+
+/**
+ * Jalankan efek samping "best-effort" setelah pembayaran tersimpan.
+ *
+ * Kegagalan hanya dicatat pada log dan TIDAK membatalkan pembayaran/tiket yang
+ * sudah terbit di database. Dikumpulkan dalam satu helper agar blok `try/catch`
+ * berulang tidak lagi ditulis manual (sumber kesalahan kurung/try yang hilang)
+ * sementara perilaku, label log, dan urutan eksekusi tetap sama.
+ *
+ * @param {string} label nama event log saat tugas gagal
+ * @param {() => Promise<any>} task tugas yang dijalankan
+ * @param {object} context field tambahan pada log (mis. `{ orderId }`)
+ * @returns {Promise<any|null>} hasil `task`, atau `null` bila gagal
+ */
+const runBestEffort = async (label, task, context = {}) => {
+  try {
+    return await task();
+  } catch (error) {
+    logger.error(label, { ...context, error: error.message });
+    return null;
+  }
+};
 
 const getPayment = asyncHandler(async (req, res) => {
   const accessToken = req.get('X-Order-Access-Token') || req.body?.order_access_token;
@@ -79,18 +102,25 @@ const simulatePayment = asyncHandler(async (req, res) => {
 
   let emailResults = [];
   if (payment.status === 'PAID') {
-    try {
-      await ensureOrderTokenHashes(orderId);
-    } catch (error) {
-      logger.error('ticket_token_backfill_failed', { orderId, error: error.message });
-    }
-    try {
-      // Dijadwalkan, bukan ditunggu: respons pembayaran tidak boleh menunggu
-      // SMTP. Tiket sudah terbit pada transaksi pembayaran di database.
-      emailResults = await emailQueue.enqueueOrder(orderId);
-    } catch (error) {
-      logger.error('ticket_email_dispatch_failed', { orderId, error: error.message });
-    }
+    // Token QR (hash) disiapkan lebih dulu agar email/PDF memakai token final.
+    await runBestEffort(
+      'ticket_token_backfill_failed',
+      () => ensureOrderTokenHashes(orderId),
+      { orderId },
+    );
+    // ID publik ringkas (`ETK-XXXXXX`) ditetapkan sebelum email/PDF dibuat.
+    await runBestEffort(
+      'ticket_public_code_backfill_failed',
+      () => ensureOrderPublicTicketCodes(orderId),
+      { orderId },
+    );
+    // Dijadwalkan, bukan ditunggu: respons pembayaran tidak boleh menunggu
+    // SMTP. Tiket sudah terbit pada transaksi pembayaran di database.
+    emailResults = await runBestEffort(
+      'ticket_email_dispatch_failed',
+      () => emailQueue.enqueueOrder(orderId),
+      { orderId },
+    ) ?? [];
     const latest = await loadOrderById(orderId);
     if (latest?.purchaser_id) {
       await notify({

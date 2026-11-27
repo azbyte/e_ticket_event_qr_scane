@@ -71,13 +71,19 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       final delivered = result['delivered'] == true;
       final status = result['delivery_status']?.toString() ?? 'UNKNOWN';
       final reason = result['reason']?.toString();
+      final previouslySent = result['previously_sent'] == true;
       if (!mounted) return;
       setState(() {
         _emailStatusOk = delivered || status == 'SKIPPED';
         _emailStatusMessage = delivered
             ? 'E-ticket berhasil dikirim ulang ke email peserta.'
+            : status == 'SKIPPED' && reason == 'recently_sent'
+            ? 'Email baru saja dikirim. Tunggu sebentar sebelum mengirim ulang lagi.'
             : status == 'SKIPPED'
-            ? 'Email sudah pernah terkirim; tidak ada email ganda yang dikirim.'
+            ? 'Email belum dikirim ulang: ${reason ?? 'tiket tidak dapat dikirim'}.'
+            : previouslySent
+            ? 'Pengiriman ulang gagal, tetapi email sebelumnya sudah terkirim'
+                  '${reason == null ? '.' : ': $reason'}'
             : 'Email belum terkirim (status: $status)'
                   '${reason == null ? '.' : ': $reason'}';
       });
@@ -619,26 +625,26 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               ),
             ],
           ),
-          if (!sent) ...[
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                key: const Key('ticket-resend-email'),
-                onPressed: _sendingEmail ? null : _resendEmail,
-                icon: _sendingEmail
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.send_outlined, size: 18),
-                label: Text(
-                  _sendingEmail ? 'Mengirim...' : 'Kirim ulang email',
-                ),
+          // Tombol tersedia juga setelah email pernah terkirim: peserta yang
+          // kehilangan email (mis. masuk spam) dapat meminta kirim ulang.
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              key: const Key('ticket-resend-email'),
+              onPressed: _sendingEmail ? null : _resendEmail,
+              icon: _sendingEmail
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.send_outlined, size: 18),
+              label: Text(
+                _sendingEmail ? 'Mengirim...' : 'Kirim ulang email',
               ),
             ),
-          ],
+          ),
         ],
       ),
     );

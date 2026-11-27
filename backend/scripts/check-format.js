@@ -3,7 +3,10 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const extensions = new Set(['.js', '.json']);
-const excludedDirs = new Set(['node_modules', '.git']);
+// `.venv`/`venv`/`__pycache__` adalah environment Python lokal (alat validasi
+// e-tiket), bukan sumber proyek: di dalamnya ada berkas JS milik paket pihak
+// ketiga yang tidak boleh ikut diperiksa.
+const excludedDirs = new Set(['node_modules', '.git', '.venv', 'venv', '__pycache__']);
 const failures = [];
 
 function collectFiles(directory) {

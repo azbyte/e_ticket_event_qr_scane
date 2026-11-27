@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const { query, getOne, pool } = require('../config/db');
 const ticketTokens = require('../services/ticketTokenService');
+const ticketCodes = require('../services/ticketCodeService');
 
 const SCAN_RESULTS = {
   VALID: 'VALID',
@@ -99,6 +100,16 @@ const assertOrderPermission = (eventId, user) =>
   assertMemberPermission(eventId, user, ['VIEW_ORDERS']);
 
 const findTicketByToken = (rawToken) => ticketTokens.findTicketByRawToken(rawToken);
+
+/** Query dasar pencarian tiket dari kode yang di-scan/diketik staf. */
+const TICKET_BY_IDENTIFIER_SELECT = `SELECT t.*,
+            a.name AS attendee_name, a.email AS attendee_email, a.phone AS attendee_phone,
+            a.order_item_id AS attendee_order_item_id,
+            tt.name AS ticket_type_name
+     FROM tickets t
+     LEFT JOIN attendees a ON a.id = t.attendee_id
+     LEFT JOIN ticket_types tt ON tt.id = t.ticket_type_id`;
+
 const findTicketByIdentifier = async (rawTokenOrCode) => {
   if (typeof rawTokenOrCode !== 'string' || !rawTokenOrCode.trim()) return null;
   const trimmed = rawTokenOrCode.trim();
@@ -107,19 +118,26 @@ const findTicketByIdentifier = async (rawTokenOrCode) => {
   const byToken = await ticketTokens.findTicketByRawToken(trimmed);
   if (byToken) return byToken;
 
-  // 2. Coba cari via kode tiket human-readable (entri manual oleh staf)
+  // 2. Coba cari via ID tiket human-readable (entri manual oleh staf):
+  //    `ETK-XXXXXX` untuk tiket baru, kode lama tetap cocok selama belum dirapikan.
   const byCode = await getOne(
-    `SELECT t.*,
-            a.name AS attendee_name, a.email AS attendee_email, a.phone AS attendee_phone,
-            a.order_item_id AS attendee_order_item_id,
-            tt.name AS ticket_type_name
-     FROM tickets t
-     LEFT JOIN attendees a ON a.id = t.attendee_id
-     LEFT JOIN ticket_types tt ON tt.id = t.ticket_type_id
-     WHERE t.ticket_code = $1`,
+    `${TICKET_BY_IDENTIFIER_SELECT} WHERE t.ticket_code = $1`,
     [trimmed]
   );
-  return byCode;
+  if (byCode) return byCode;
+
+  // 3. Kompatibilitas tiket lama: kode `TKT-<uuid>` yang sudah dirapikan menjadi
+  //    ID publik tetap tercatat pada kolom legacy `qr_code_data` (diisi RPC
+  //    database saat tiket terbit), sehingga kode yang sudah tercetak pada
+  //    tiket lama masih dapat divalidasi. Pola dibatasi agar tidak memicu
+  //    pemindaian tabel untuk salah ketik biasa.
+  if (ticketCodes.isLegacyTicketCode(trimmed)) {
+    return getOne(
+      `${TICKET_BY_IDENTIFIER_SELECT} WHERE t.qr_code_data = $1`,
+      [trimmed]
+    );
+  }
+  return null;
 };
 
 const orderOfTicket = async (ticket) => {

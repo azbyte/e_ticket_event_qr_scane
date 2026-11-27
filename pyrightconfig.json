@@ -1,0 +1,30 @@
+{
+  // Konfigurasi Pyright/Pylance untuk repository ini — SATU-SATUNYA sumber
+  // pengaturan analisis Python. VS Code (`settings.json`) hanya menyimpan
+  // pemilihan interpreter, karena Pylance menolak `python.analysis.extraPaths`
+  // dan `python.analysis.exclude` ketika berkas ini ada.
+  //
+  // Skrip validasi e-tiket memakai paket yang TIDAK termasuk dependensi runtime
+  // backend: `pymupdf` (PyMuPDF), `cv2` (opencv-python-headless), `numpy`, dan
+  // `PIL` (Pillow). Semua dipasang di virtual environment `backend/.venv`
+  // sesuai `backend/tools/requirements.txt`.
+  "venvPath": "backend",
+  "venv": ".venv",
+  // `backend` mencakup tools/*.py dan skrip validasi di _verify-out (mis.
+  // make_artwork.py) agar import-nya benar-benar dianalisis.
+  "include": ["backend"],
+  "exclude": [
+    "**/node_modules",
+    "**/.venv",
+    "**/__pycache__",
+    "**/.dart_tool",
+    "**/build"
+  ],
+  // Dipertahankan dari konfigurasi VS Code sebelumnya: modul lokal di `backend`
+  // dapat diimpor langsung oleh skrip validasi.
+  "extraPaths": ["backend"],
+  "pythonVersion": "3.14",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "error",
+  "reportMissingModuleSource": "warning"
+}
