@@ -87,6 +87,8 @@ class OrganizerShellService {
               'title': event.title,
               'category': event.category ?? '',
               'status': event.status,
+              'poster_url': event.posterUrl ?? '',
+              'event_type': event.eventType,
               'start_date': event.startDateTime
                   .toLocal()
                   .toString()

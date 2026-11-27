@@ -20,6 +20,7 @@ import '../../../routes/app_routes.dart';
 import '../../../services/organizer_events/organizer_event_contract.dart';
 import '../../../services/organizer_events/organizer_event_fixtures.dart';
 import '../../../services/organizer_shell/organizer_shell_service.dart';
+import '../events/widgets/organizer_event_poster.dart';
 import '../events/widgets/organizer_event_status_chip.dart';
 import '../events/widgets/organizer_feedback_view.dart';
 import '../shell/organizer_content_frame.dart';
@@ -301,129 +302,166 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
     final eventId = event['id'] as String? ?? '';
     final title = (event['title'] as String?)?.trim() ?? '';
     final location = (event['location'] as String?)?.trim() ?? '';
+    final category = (event['category'] as String?)?.trim() ?? '';
+    final posterUrl = (event['poster_url'] as String?)?.trim() ?? '';
+    final rawEventType = (event['event_type'] as String?)?.trim() ?? '';
+    final eventType = rawEventType.isEmpty
+        ? OrganizerEventFormat.offline
+        : rawEventType;
     final date = core.DateUtils.formatDate(
       DateTime.tryParse(event['start_date'] as String? ?? ''),
     );
     final ticketsSold = event['tickets_sold'] as int? ?? 0;
     final participants = event['participants'] as int? ?? 0;
 
+    // Tampilan kartu disamakan dengan kartu "Jelajahi Event": poster di atas,
+    // lalu judul, tanggal, lokasi, dan footer aksi.
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.antiAlias,
       color: const Color(0xFFFFFFFF),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFFE2E2E2), width: 1),
-      ),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         key: Key('dashboard-event-$eventId'),
         onTap: () => _openEvent(eventId),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            OrganizerEventPoster(
+              posterUrl: posterUrl,
+              eventType: eventType,
+              category: category,
+              height: 120,
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Expanded(
-                    child: Text(
-                      title.isEmpty ? 'Tanpa judul' : title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF181818),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Expanded(
+                        child: Text(
+                          title.isEmpty ? 'Tanpa judul' : title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            height: 1.25,
+                            color: const Color(0xFF181818),
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      OrganizerEventStatusChip(
+                        status:
+                            event['status'] as String? ??
+                            OrganizerEventStatus.draft,
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  OrganizerEventStatusChip(
-                    status:
-                        event['status'] as String? ??
-                        OrganizerEventStatus.draft,
+                  const SizedBox(height: 10),
+                  Row(
+                    children: <Widget>[
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 15,
+                        color: AppTheme.primaryColor,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          date,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.slateGray,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: <Widget>[
+                      Icon(
+                        eventType == OrganizerEventFormat.offline
+                            ? Icons.location_on_outlined
+                            : Icons.videocam_outlined,
+                        size: 16,
+                        color: AppTheme.primaryDarkColor,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          location.isEmpty ? '-' : location,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.slateGray,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: <Widget>[
+                      const Icon(
+                        Icons.confirmation_number_outlined,
+                        size: 14,
+                        color: AppTheme.slateGray,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '$ticketsSold tiket',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.slateGray,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Icon(
+                        Icons.people_outline,
+                        size: 14,
+                        color: AppTheme.slateGray,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          '$participants peserta',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.slateGray,
+                          ),
+                        ),
+                      ),
+                      const Text(
+                        'Kelola',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primaryColor,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      const Icon(
+                        Icons.arrow_forward_ios,
+                        size: 12,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ],
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              _buildMetaRow(
-                icon: Icons.event_outlined,
-                primary: date,
-                secondary: location,
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: <Widget>[
-                  const Icon(
-                    Icons.confirmation_number_outlined,
-                    size: 14,
-                    color: Color(0xFF7A7A7A),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '$ticketsSold tiket',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF7A7A7A)),
-                  ),
-                  const SizedBox(width: 12),
-                  const Icon(
-                    Icons.people_outline,
-                    size: 14,
-                    color: Color(0xFF7A7A7A),
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      '$participants peserta',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF7A7A7A),
-                      ),
-                    ),
-                  ),
-                  const Icon(
-                    Icons.chevron_right,
-                    size: 18,
-                    color: Color(0xFF7A7A7A),
-                  ),
-                ],
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
-    );
-  }
-
-  Widget _buildMetaRow({
-    required IconData icon,
-    required String primary,
-    String? secondary,
-  }) {
-    const style = TextStyle(fontSize: 12, color: Color(0xFF7A7A7A));
-    final hasSecondary = secondary != null && secondary.isNotEmpty;
-    return Row(
-      children: <Widget>[
-        Icon(icon, size: 14, color: const Color(0xFF7A7A7A)),
-        const SizedBox(width: 4),
-        Text(primary, style: style),
-        if (hasSecondary) ...<Widget>[
-          const Text(
-            ' • ',
-            style: TextStyle(fontSize: 12, color: Color(0xFF7A7A7A)),
-          ),
-          Expanded(
-            child: Text(
-              secondary,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: style,
-            ),
-          ),
-        ],
-      ],
     );
   }
 }

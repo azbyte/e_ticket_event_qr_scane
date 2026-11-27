@@ -1,14 +1,18 @@
 /// Kartu event pada halaman "Event Saya" (PRD 5.3).
 ///
-/// Menampilkan nama, tanggal, status, tiket terjual, peserta, dan status
-/// moderasi. Aksi yang tersedia mengikuti status event (PRD 5.3 + 5.4 aturan).
+/// Tampilan mengikuti kartu "Jelajahi Event": poster di bagian atas, chip
+/// kategori & format, judul, tanggal, dan lokasi. Informasi khusus Organizer
+/// (status moderasi, tiket terjual, peserta) tetap ditampilkan. Aksi yang
+/// tersedia mengikuti status event (PRD 5.3 + 5.4 aturan).
 library;
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/date_utils.dart' as core;
 import '../../../../models/event/event_model.dart';
 import '../../../../services/organizer_events/organizer_event_contract.dart';
+import 'organizer_event_poster.dart';
 import 'organizer_event_status_chip.dart';
 
 class OrganizerEventCard extends StatelessWidget {
@@ -42,101 +46,167 @@ class OrganizerEventCard extends StatelessWidget {
     final location = event.needsPhysicalLocation
         ? (event.location ?? 'Lokasi belum diisi')
         : (event.onlineUrl ?? 'Tautan online belum diisi');
-    final statusColor = OrganizerEventStatusChip.colorFor(event.status);
+    final locationIcon = event.needsPhysicalLocation
+        ? Icons.location_on_outlined
+        : Icons.videocam_outlined;
 
+    // Susunan visual mengikuti kartu "Jelajahi Event": poster, judul, tanggal,
+    // lokasi, lalu footer aksi. Informasi khusus Organizer (status moderasi,
+    // tiket terjual, peserta) tetap tampil sebagai chip di bawah lokasi.
     return Card(
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         key: Key('organizer-event-card-${event.id}'),
         onTap: onOpen,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            OrganizerEventPoster(
+              posterUrl: event.posterUrl,
+              eventType: event.eventType,
+              category: event.category,
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  CircleAvatar(
-                    backgroundColor: statusColor.withValues(alpha: 0.15),
-                    child: Icon(Icons.event, color: statusColor),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Expanded(
+                        child: Text(
                           event.title,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${core.DateUtils.formatDateTime(event.startDateTime)}'
-                          ' • ${event.formatLabel}',
                           style: const TextStyle(
-                            fontSize: 12.5,
-                            color: Colors.black54,
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            height: 1.25,
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
+                      ),
+                      _buildActions(context),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: <Widget>[
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 15,
+                        color: AppTheme.primaryColor,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          core.DateUtils.formatDateTime(event.startDateTime),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.slateGray,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: <Widget>[
+                      Icon(
+                        locationIcon,
+                        size: 16,
+                        color: AppTheme.primaryDarkColor,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
                           location,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 12.5,
-                            color: Colors.black54,
+                            fontSize: 13,
+                            color: AppTheme.slateGray,
                           ),
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: <Widget>[
+                      OrganizerEventStatusChip(status: event.status),
+                      _MetaChip(
+                        icon: Icons.confirmation_number_outlined,
+                        label: 'Terjual ${ticketsSold ?? 0}',
+                      ),
+                      _MetaChip(
+                        icon: Icons.people_outline,
+                        label: 'Peserta ${participants ?? 0}',
+                      ),
+                    ],
+                  ),
+                  if (event.reviewNote != null &&
+                      (event.isRevisionRequested || event.isRejected)) ...<Widget>[
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        'Catatan moderator: ${event.reviewNote}',
+                        style: const TextStyle(fontSize: 12, height: 1.35),
+                      ),
                     ),
+                  ],
+                  const SizedBox(height: 12),
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: Text(
+                          event.isPublishedLike
+                              ? 'Tayang di halaman publik'
+                              : 'Belum tayang di halaman publik',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: event.isPublishedLike
+                                ? Colors.green.shade700
+                                : AppTheme.slateGray,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Kelola Event',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primaryColor,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      const Icon(
+                        Icons.arrow_forward_ios,
+                        size: 12,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ],
                   ),
-                  _buildActions(context),
                 ],
               ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: <Widget>[
-                  OrganizerEventStatusChip(status: event.status),
-                  _MetaChip(
-                    icon: Icons.confirmation_number_outlined,
-                    label: 'Terjual ${ticketsSold ?? 0}',
-                  ),
-                  _MetaChip(
-                    icon: Icons.people_outline,
-                    label: 'Peserta ${participants ?? 0}',
-                  ),
-                  if (event.category != null)
-                    _MetaChip(icon: Icons.label_outline, label: event.category!),
-                ],
-              ),
-              if (event.reviewNote != null &&
-                  (event.isRevisionRequested || event.isRejected)) ...<Widget>[
-                const SizedBox(height: 10),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    'Catatan moderator: ${event.reviewNote}',
-                    style: const TextStyle(fontSize: 12, height: 1.35),
-                  ),
-                ),
-              ],
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

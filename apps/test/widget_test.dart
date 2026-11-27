@@ -111,6 +111,13 @@ void main() async {
       // Pengelolaan event tetap mudah ditemukan.
       expect(find.text('Event Milik Saya'), findsOneWidget);
       expect(find.text('Tambah Event'), findsOneWidget);
+      // Kartu event Organizer kini memakai poster seperti kartu "Jelajahi
+      // Event" sehingga daftar perlu digulir untuk menjangkau event kedua.
+      await tester.scrollUntilVisible(
+        find.text('Webinar Produk Digital 2026'),
+        240,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('Webinar Produk Digital 2026'), findsOneWidget);
     },
   );
