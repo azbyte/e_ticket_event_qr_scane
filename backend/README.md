@@ -185,12 +185,17 @@ Menambah endpoint baru: letakkan pada router domain yang sesuai di
 
 - `npm test` menjalankan seluruh `test/*.test.js` dengan `node --test`.
 - `npm run test:sync-config` memvalidasi validator sinkronisasi konfigurasi.
+- `test/ticket_qr_scannability.test.js` memverifikasi ukuran modul, quiet zone, dan
+  alas putih QR secara analitis dari geometri `ticketDesignService`, sehingga
+  kelayakan pindai QR ikut dijaga `npm test` tanpa Python.
 - Alat validasi Python di `tools/` (`render_ticket_pdf.py`,
-  `check_qr_scannability.py`, `decode_ticket_qr.py`) dan `_verify-out/make_artwork.py`
+  `decode_ticket_qr.py`)
   dijalankan manual dengan virtual environment proyek: `py -3.14 -m venv .venv`
   lalu `.\.venv\Scripts\python.exe -m pip install -r tools/requirements.txt`
-  (PyMuPDF, opencv-python-headless, numpy, Pillow). Alat ini bukan dependensi
-  runtime backend.
+  (PyMuPDF, opencv-python-headless, numpy). Alat ini bukan dependensi
+  runtime backend, sehingga `.venv` tidak perlu aktif di terminal; panggil
+  interpreter secara eksplisit, mis.
+  `.\.venv\Scripts\python.exe tools/decode_ticket_qr.py <file.pdf>`.
 - `npm run test:integration` dan `npm run test:e2e` memerlukan database/API uji
   serta `ALLOW_DESTRUCTIVE_TESTS=true`; jangan arahkan ke database produksi.
 - `npm run test:registration-flow` menguji alur nyata (registrasi Organizer →

@@ -163,7 +163,7 @@ These criteria **do not authorize implementation now**; owner/maintainer approva
 | PRD.md | **KEEP** | Sole active product requirement source; currently untracked and must be deliberately included. |
 | `task/PEMBAGIAN_TUGAS_FINAL.md`, `task/FINISHING_AUTHORITY.md`, active TAHAP_1–3 tasks/ownership/contracts/report templates | **KEEP** | Work controller, ownership, gate and authority baseline; not cleanup candidates. |
 | Fase 1B/1C/1D registers, traceability and DB proposal | **KEEP for active authorization/history** | Needed to state gates/decisions/proposals honestly. Owner may later archive once superseded with evidence, not delete now. |
-| `task/AUDIT_PROYEK/`, `AUDIT_REPORT.md`, `AUDIT_PEMBERSIHAN_REPOSITORY.md` | **ARCHIVE or KEEP as audit context; owner decision** | Snapshot/historical claims may be stale. They must not override PRD v2.2. Do not merge into PRD blindly. |
+| `task/AUDIT_PROYEK/`, `task/archive/AUDIT_REPORT.md`, `task/archive/AUDIT_PEMBERSIHAN_REPOSITORY.md` | **ARCHIVE or KEEP as audit context; owner decision** | Snapshot/historical claims may be stale. They must not override PRD v2.2. Do not merge into PRD blindly. |
 | T03 handover/integration reports and prior `task/T03_*` moved copies | **ARCHIVE** | Historical evidence; files presently appear deleted at old tracked paths and untracked at archive paths. Review rename pairs/history; no deletion or staging by this task. |
 | `.env`, `.env.test`, keys/passwords, personal/live DB config/data | **EXCLUDE / must remain ignored** | Not read; ignored patterns verified. Do not publish. |
 | `apps/pubspec.lock`, `backend/package-lock.json` | **KEEP** | Tracked dependency reproducibility files. |

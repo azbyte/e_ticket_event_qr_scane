@@ -5,13 +5,17 @@
   // dan `python.analysis.exclude` ketika berkas ini ada.
   //
   // Skrip validasi e-tiket memakai paket yang TIDAK termasuk dependensi runtime
-  // backend: `pymupdf` (PyMuPDF), `cv2` (opencv-python-headless), `numpy`, dan
-  // `PIL` (Pillow). Semua dipasang di virtual environment `backend/.venv`
-  // sesuai `backend/tools/requirements.txt`.
+  // backend: `pymupdf` (PyMuPDF), `cv2` (opencv-python-headless), dan `numpy`.
+  // Semua dipasang di virtual environment `backend/.venv` sesuai
+  // `backend/tools/requirements.txt`.
+  //
+  // `venvPath`/`venv` di bawah hanya dipakai Pylance untuk analisis (IntelliSense
+  // dan `reportMissingImports`). Ini TIDAK bergantung pada aktivasi terminal:
+  // `python.terminal.activateEnvironment` sengaja `false` agar prompt tidak
+  // berawalan `(.venv)`, sementara analisis tetap menemukan paket venv.
   "venvPath": "backend",
   "venv": ".venv",
-  // `backend` mencakup tools/*.py dan skrip validasi di _verify-out (mis.
-  // make_artwork.py) agar import-nya benar-benar dianalisis.
+  // `backend` mencakup `tools/*.py` agar import-nya benar-benar dianalisis.
   "include": ["backend"],
   "exclude": [
     "**/node_modules",
