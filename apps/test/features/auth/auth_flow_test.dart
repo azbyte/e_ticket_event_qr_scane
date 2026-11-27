@@ -1,8 +1,12 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 
 import 'package:e_ticket_event_qr_scane/core/errors/app_exception.dart';
 import 'package:e_ticket_event_qr_scane/core/services/session_service.dart';
+import 'package:e_ticket_event_qr_scane/core/validators/input_validator.dart';
+import 'package:e_ticket_event_qr_scane/features/auth/screens/register_screen.dart';
 import 'package:e_ticket_event_qr_scane/models/user/user_model.dart';
 import 'package:e_ticket_event_qr_scane/models/user/user_role.dart';
 import 'package:e_ticket_event_qr_scane/providers/auth_provider.dart';
@@ -409,6 +413,113 @@ void main() {
       expect(await session.readToken(), 'token-baru');
       await session.clear();
       expect(await session.readToken(), isNull);
+    });
+  });
+
+  group('RegisterScreen — verifikasi kata sandi', () {
+    test('InputValidator.confirmPassword menolak input kosong atau tidak cocok', () {
+      expect(InputValidator.confirmPassword('', 'rahasia123'), 'Verifikasi kata sandi wajib diisi.');
+      expect(InputValidator.confirmPassword('beda123', 'rahasia123'), 'Verifikasi kata sandi tidak cocok.');
+      expect(InputValidator.confirmPassword('rahasia123', 'rahasia123'), isNull);
+    });
+
+    testWidgets('menolak submit bila verifikasi kata sandi kosong atau tidak cocok', (tester) async {
+      final service = _FakeAuthService(registerResult: _organizerPayload());
+      final auth = AuthProvider(service);
+      addTearDown(auth.dispose);
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<AuthProvider>.value(
+          value: auth,
+          child: const MaterialApp(home: RegisterScreen()),
+        ),
+      );
+
+      expect(find.byKey(const Key('register-confirm-password-field')), findsOneWidget);
+
+      await tester.enterText(find.byKey(const Key('register-name-field')), 'Organizer Uji');
+      await tester.enterText(find.byKey(const Key('register-email-field')), 'organizer@example.test');
+      await tester.enterText(find.byKey(const Key('register-password-field')), 'rahasia123');
+      await tester.enterText(find.byKey(const Key('register-confirm-password-field')), 'berbeda123');
+
+      final submitBtn = find.byKey(const Key('register-submit-button'));
+      await tester.ensureVisible(submitBtn);
+      await tester.tap(submitBtn);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Verifikasi kata sandi tidak cocok.'), findsOneWidget);
+      expect(service.registerRequests, isEmpty);
+    });
+
+    testWidgets('mengirim registrasi saat verifikasi kata sandi cocok', (tester) async {
+      final service = _FakeAuthService(registerResult: _organizerPayload());
+      final auth = AuthProvider(service);
+      addTearDown(auth.dispose);
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<AuthProvider>.value(
+          value: auth,
+          child: MaterialApp(
+            initialRoute: '/register',
+            routes: {
+              '/register': (_) => const RegisterScreen(),
+              '/': (_) => const Scaffold(body: Text('Berhasil')),
+            },
+          ),
+        ),
+      );
+
+      await tester.enterText(find.byKey(const Key('register-name-field')), 'Organizer Uji');
+      await tester.enterText(find.byKey(const Key('register-email-field')), 'organizer@example.test');
+      await tester.enterText(find.byKey(const Key('register-password-field')), 'rahasia123');
+      await tester.enterText(find.byKey(const Key('register-confirm-password-field')), 'rahasia123');
+
+      final submitBtn = find.byKey(const Key('register-submit-button'));
+      await tester.ensureVisible(submitBtn);
+      await tester.tap(submitBtn);
+      await tester.pumpAndSettle();
+
+      expect(service.registerRequests, hasLength(1));
+      expect(service.registerRequests.single['email'], 'organizer@example.test');
+    });
+
+    testWidgets('ikon mata men-toggle visibilitas kata sandi dan verifikasi kata sandi', (tester) async {
+      final service = _FakeAuthService(registerResult: _organizerPayload());
+      final auth = AuthProvider(service);
+      addTearDown(auth.dispose);
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<AuthProvider>.value(
+          value: auth,
+          child: const MaterialApp(home: RegisterScreen()),
+        ),
+      );
+
+      EditableText passwordInput() => tester.widget<EditableText>(
+            find.descendant(
+              of: find.byKey(const Key('register-password-field')),
+              matching: find.byType(EditableText),
+            ),
+          );
+      EditableText confirmInput() => tester.widget<EditableText>(
+            find.descendant(
+              of: find.byKey(const Key('register-confirm-password-field')),
+              matching: find.byType(EditableText),
+            ),
+          );
+
+      expect(passwordInput().obscureText, isTrue);
+      expect(confirmInput().obscureText, isTrue);
+
+      await tester.tap(find.byKey(const Key('register-password-visibility-toggle')));
+      await tester.pump();
+      expect(passwordInput().obscureText, isFalse);
+      expect(confirmInput().obscureText, isTrue);
+
+      await tester.tap(find.byKey(const Key('register-confirm-password-visibility-toggle')));
+      await tester.pump();
+      expect(passwordInput().obscureText, isFalse);
+      expect(confirmInput().obscureText, isFalse);
     });
   });
 }

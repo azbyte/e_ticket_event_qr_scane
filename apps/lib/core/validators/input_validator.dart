@@ -30,6 +30,19 @@ class InputValidator {
     return null;
   }
 
+  static String? confirmPassword(
+    String? value,
+    String password, {
+    String field = 'Verifikasi kata sandi',
+  }) {
+    final requiredError = required(value, field: field);
+    if (requiredError != null) return requiredError;
+    if (value != password) {
+      return 'Verifikasi kata sandi tidak cocok.';
+    }
+    return null;
+  }
+
   static String? positiveInteger(String? value, {String field = 'Jumlah'}) {
     final requiredError = required(value, field: field);
     if (requiredError != null) return requiredError;
