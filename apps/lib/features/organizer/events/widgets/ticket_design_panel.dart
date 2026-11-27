@@ -554,7 +554,7 @@ class _TicketDesignPanelState extends State<TicketDesignPanel> {
                               width: side,
                               height: side,
                               decoration: BoxDecoration(
-                                color: Colors.indigo.withValues(alpha: 0.08),
+                                color: AppTheme.primaryColor.withValues(alpha: 0.08),
                                 border: Border.all(
                                   color: AppTheme.primaryColor,
                                   width: 1.4,

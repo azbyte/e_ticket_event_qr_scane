@@ -387,6 +387,78 @@ void main() {
       );
       expect(types.map((t) => t.id), isNot(contains('tt-2005')));
     });
+
+    test('parseTicketPriceInput menolak pemisah ribuan titik dan koma', () {
+      expect(
+        OrganizerEventValidators.parseTicketPriceInput('50.000').error,
+        isNotNull,
+      );
+      expect(
+        OrganizerEventValidators.parseTicketPriceInput('50,000').error,
+        isNotNull,
+      );
+      final valid = OrganizerEventValidators.parseTicketPriceInput('50000');
+      expect(valid.error, isNull);
+      expect(valid.price, 50000);
+    });
+
+    test('menolak mencampur kategori gratis dan berbayar pada event sama', () async {
+      final repo = MockOrganizerEventRepository(latency: Duration.zero);
+      await expectLater(
+        repo.createTicketType(
+          ownerId: ownerId,
+          eventId: 'evt-1001',
+          draft: const OrganizerTicketTypeDraft(
+            name: 'Gratis Campur',
+            price: 0,
+            quota: 25,
+          ),
+        ),
+        throwsA(isA<OrganizerEventValidationException>()),
+      );
+      final freeEvent = await repo.createEvent(
+        ownerId: ownerId,
+        draft: buildDraft(title: 'Event Gratis Uji'),
+      );
+      await repo.createTicketType(
+        ownerId: ownerId,
+        eventId: freeEvent.id,
+        draft: const OrganizerTicketTypeDraft(
+          name: 'Gratis Awal',
+          price: 0,
+          quota: 25,
+        ),
+      );
+      await expectLater(
+        repo.createTicketType(
+          ownerId: ownerId,
+          eventId: freeEvent.id,
+          draft: const OrganizerTicketTypeDraft(
+            name: 'Berbayar Campur',
+            price: 50000,
+            quota: 25,
+          ),
+        ),
+        throwsA(isA<OrganizerEventValidationException>()),
+      );
+    });
+
+    test('menolak perubahan harga kategori tiket saat edit', () async {
+      final repo = MockOrganizerEventRepository(latency: Duration.zero);
+      await expectLater(
+        repo.updateTicketType(
+          ownerId: ownerId,
+          eventId: 'evt-1001',
+          ticketTypeId: 'tt-2001',
+          draft: const OrganizerTicketTypeDraft(
+            name: 'Regular Pass',
+            price: 400000,
+            quota: 500,
+          ),
+        ),
+        throwsA(isA<OrganizerEventValidationException>()),
+      );
+    });
   });
 
   group('MockOrganizerEventRepository ΓÇö ringkasan', () {

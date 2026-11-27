@@ -217,13 +217,13 @@ class _AssistedRegistrationScreenState
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: const Color(0xFFEAEAEA),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.shade200),
+                border: Border.all(color: const Color(0xFFE2E2E2)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.support_agent, color: Colors.blue),
+                  const Icon(Icons.support_agent, color: Color(0xFFC94426)),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -492,9 +492,9 @@ class _AssistedRegistrationScreenState
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.indigo.shade50,
+              color: const Color(0xFFFDF3F1),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.indigo.shade200),
+              border: Border.all(color: const Color(0xFFE2E2E2)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

@@ -80,7 +80,7 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
         builder: (context, setDialogState) => AlertDialog(
           title: const Row(
             children: [
-              Icon(Icons.person_add, color: Colors.indigo),
+              Icon(Icons.person_add, color: Color(0xFFC94426)),
               SizedBox(width: 8),
               Text('Undang Staf Panitia'),
             ],
@@ -343,12 +343,11 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
         children: [
           // Banner context
           Container(
-            color: Theme.of(context).colorScheme.primaryContainer
-                .withValues(alpha: 0.3),
+            color: const Color(0xFFEAEAEA),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
-                const Icon(Icons.event, color: Colors.indigo),
+                const Icon(Icons.event, color: Color(0xFFC94426)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -480,15 +479,15 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
                                 children: [
                                   CircleAvatar(
                                     backgroundColor: m.isOwner
-                                        ? Colors.purple.shade50
-                                        : Colors.indigo.shade50,
+                                        ? const Color(0xFFFDF3F1)
+                                        : const Color(0xFFEAEAEA),
                                     child: Icon(
                                       m.isOwner
                                           ? Icons.workspace_premium
                                           : Icons.badge,
                                       color: m.isOwner
-                                          ? Colors.purple
-                                          : Colors.indigo,
+                                          ? const Color(0xFFC94426)
+                                          : const Color(0xFF1E1E1E),
                                     ),
                                   ),
                                   const SizedBox(width: 12),
@@ -523,13 +522,12 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
                                 runSpacing: 4,
                                 children: m.isOwner
                                     ? [
-                                        Chip(
-                                          label: const Text(
+                                        const Chip(
+                                          label: Text(
                                             'Full Access (Owner)',
-                                            style: TextStyle(fontSize: 11),
+                                            style: TextStyle(fontSize: 11, color: Color(0xFFC94426)),
                                           ),
-                                          backgroundColor:
-                                              Colors.purple.shade50,
+                                          backgroundColor: Color(0xFFFDF3F1),
                                           padding: EdgeInsets.zero,
                                         ),
                                       ]
@@ -539,9 +537,10 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
                                             p.code,
                                             style: const TextStyle(
                                               fontSize: 10,
+                                              color: Color(0xFF181818),
                                             ),
                                           ),
-                                          backgroundColor: Colors.blue.shade50,
+                                          backgroundColor: const Color(0xFFEAEAEA),
                                           padding: EdgeInsets.zero,
                                         );
                                       }).toList(),
@@ -656,13 +655,13 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.purple.shade50,
+          color: const Color(0xFFFDF3F1),
           borderRadius: BorderRadius.circular(6),
         ),
         child: const Text(
           'Owner',
           style: TextStyle(
-            color: Colors.purple,
+            color: Color(0xFFC94426),
             fontSize: 11,
             fontWeight: FontWeight.bold,
           ),

@@ -34,14 +34,23 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.surfaceColor,
       appBar: AppBar(
+        backgroundColor: AppTheme.pureWhite,
+        foregroundColor: AppTheme.offBlack,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: AppTheme.subtleGray),
+        ),
         title: const Text(
           'E-Ticket Event',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.offBlack),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_outlined),
+            icon: const Icon(Icons.notifications_outlined, color: AppTheme.offBlack),
             tooltip: 'Notifikasi',
             onPressed: () {
               Navigator.of(context).push(
@@ -52,7 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.login),
+            icon: const Icon(Icons.login, color: AppTheme.offBlack),
             tooltip: 'Masuk',
             onPressed: () {
               Navigator.of(context)
@@ -77,19 +86,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 margin: const EdgeInsets.all(16),
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
+                  color: AppTheme.secondaryColor,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.45)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -97,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const Text(
                       'Selamat Datang!',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: AppTheme.pureWhite,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
@@ -105,13 +104,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 8),
                     const Text(
                       'Platform pengelolaan tiket acara dan pemindaian QR Code cerdas. Temukan event favorit Anda atau kelola acara dengan mudah.',
-                      style: TextStyle(color: Colors.white70, fontSize: 14),
+                      style: TextStyle(color: AppTheme.ashGray, fontSize: 14, height: 1.4),
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: AppTheme.primaryColor,
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: AppTheme.pureWhite,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 20,
                           vertical: 12,
@@ -140,25 +139,26 @@ class _HomeScreenState extends State<HomeScreen> {
               // -------------------------------------------------------------
               // 2. ROLE PORTALS (4 ROLES ACCESS)
               // -------------------------------------------------------------
-              Padding(
-                padding: const EdgeInsets.symmetric(
+              const Padding(
+                padding: EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 8,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Pilih Mode Pengguna',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
+                        color: AppTheme.offBlack,
                       ),
                     ),
                     Text(
                       '4 Peran',
                       style: TextStyle(
-                        color: Colors.grey.shade600,
+                        color: AppTheme.slateGray,
                         fontSize: 13,
                       ),
                     ),
@@ -181,7 +181,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       title: 'Peserta',
                       subtitle: 'Beli & Lihat Tiket QR',
                       icon: Icons.confirmation_number_outlined,
-                      color: Colors.indigo,
+                      color: AppTheme.primaryColor,
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
@@ -195,7 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       title: 'Penyelenggara',
                       subtitle: 'Kelola Event & Staf',
                       icon: Icons.business_center_outlined,
-                      color: Colors.blue.shade700,
+                      color: AppTheme.primaryDarkColor,
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
@@ -209,7 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       title: 'Staf Check-in',
                       subtitle: 'Pemindai QR Tiket',
                       icon: Icons.qr_code_scanner,
-                      color: Colors.teal,
+                      color: AppTheme.successColor,
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
@@ -223,7 +223,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       title: 'Admin Platform',
                       subtitle: 'Moderasi & Laporan',
                       icon: Icons.admin_panel_settings_outlined,
-                      color: Colors.purple.shade700,
+                      color: AppTheme.secondaryColor,
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
@@ -333,10 +333,14 @@ class _HomeScreenState extends State<HomeScreen> {
     required VoidCallback onTap,
   }) {
     return Card(
-      elevation: 1.5,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: AppTheme.pureWhite,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: AppTheme.subtleGray, width: 1),
+      ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -355,6 +359,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
+                  color: AppTheme.offBlack,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -362,7 +367,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                style: const TextStyle(color: AppTheme.slateGray, fontSize: 11),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),

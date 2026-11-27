@@ -185,13 +185,13 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
+                      color: const Color(0xFFEAEAEA),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade300),
+                      border: Border.all(color: const Color(0xFFE2E2E2)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.event, color: Colors.indigo),
+                        const Icon(Icons.event, color: Color(0xFFC94426)),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
@@ -386,8 +386,8 @@ class _OrganizerScannerScreenState extends State<OrganizerScannerScreen> {
         break;
       case 'ALREADY_USED':
       case 'ALREADY_CHECKED_IN':
-        cardColor = Colors.blue.shade50;
-        iconColor = Colors.blue.shade700;
+        cardColor = const Color(0xFFFDF3F1);
+        iconColor = const Color(0xFFC94426);
         icon = Icons.warning_amber_rounded;
         break;
       case 'WRONG_EVENT':

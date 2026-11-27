@@ -132,7 +132,7 @@ class _OrganizerSupportScreenState extends State<OrganizerSupportScreen>
       builder: (ctx) => AlertDialog(
         title: Row(
           children: [
-            const Icon(Icons.assignment_outlined, color: Colors.indigo),
+            const Icon(Icons.assignment_outlined, color: Color(0xFFC94426)),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -175,13 +175,11 @@ class _OrganizerSupportScreenState extends State<OrganizerSupportScreen>
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: isAdmin
-                          ? Colors.blue.shade50
-                          : Colors.grey.shade100,
+                          ? const Color(0xFFFDF3F1)
+                          : const Color(0xFFEAEAEA),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: isAdmin
-                            ? Colors.blue.shade200
-                            : Colors.grey.shade300,
+                        color: const Color(0xFFE2E2E2),
                       ),
                     ),
                     child: Column(
@@ -193,8 +191,8 @@ class _OrganizerSupportScreenState extends State<OrganizerSupportScreen>
                             fontWeight: FontWeight.bold,
                             fontSize: 12,
                             color: isAdmin
-                                ? Colors.blue.shade900
-                                : Colors.black87,
+                                ? const Color(0xFFC94426)
+                                : const Color(0xFF181818),
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -264,9 +262,11 @@ class _OrganizerSupportScreenState extends State<OrganizerSupportScreen>
       padding: const EdgeInsets.all(16.0),
       children: [
         Card(
-          color: Colors.blue.shade50,
+          color: const Color(0xFFEAEAEA),
+          elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
+            side: const BorderSide(color: Color(0xFFE2E2E2)),
           ),
           child: const Padding(
             padding: EdgeInsets.all(16.0),
@@ -274,7 +274,7 @@ class _OrganizerSupportScreenState extends State<OrganizerSupportScreen>
               children: [
                 Icon(
                   Icons.headset_mic_outlined,
-                  color: Colors.indigo,
+                  color: Color(0xFFC94426),
                   size: 36,
                 ),
                 SizedBox(width: 14),
@@ -522,15 +522,15 @@ class _OrganizerSupportScreenState extends State<OrganizerSupportScreen>
       case 'open':
         return Colors.orange;
       case 'in_progress':
-        return Colors.blue;
+        return const Color(0xFFC94426);
       case 'waiting_for_user':
-        return Colors.deepPurple;
+        return const Color(0xFFA8351C);
       case 'resolved':
-        return Colors.green;
+        return const Color(0xFF2E8B57);
       case 'closed':
-        return Colors.grey;
+        return const Color(0xFF7A7A7A);
       default:
-        return Colors.grey;
+        return const Color(0xFF7A7A7A);
     }
   }
 

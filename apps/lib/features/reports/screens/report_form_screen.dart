@@ -83,8 +83,9 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: const Color(0xFFFDF3F1),
                 borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE2E2E2)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,18 +139,22 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Card(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                color: const Color(0xFFEAEAEA),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFFE2E2E2)),
+                ),
                 child: const Padding(
                   padding: EdgeInsets.all(16.0),
                   child: Row(
                     children: [
-                      Icon(Icons.help_outline, color: Colors.indigo),
+                      Icon(Icons.help_outline, color: Color(0xFFC94426)),
                       SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'Tim bantuan siap membantu masalah pembayaran, kegagalan check-in tiket, atau koreksi data pendaftaran.',
-                          style: TextStyle(fontSize: 13),
+                          style: TextStyle(fontSize: 13, color: Color(0xFF181818)),
                         ),
                       ),
                     ],

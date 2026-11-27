@@ -185,8 +185,8 @@ class _ReportListScreenState extends State<ReportListScreen> {
                                             ),
                                             const Row(
                                               children: [
-                                                Text('Lacak Status', style: TextStyle(fontSize: 12, color: Colors.indigo)),
-                                                Icon(Icons.chevron_right, size: 16, color: Colors.indigo),
+                                                Text('Lacak Status', style: TextStyle(fontSize: 12, color: Color(0xFFC94426), fontWeight: FontWeight.w600)),
+                                                Icon(Icons.chevron_right, size: 16, color: Color(0xFFC94426)),
                                               ],
                                             ),
                                           ],
@@ -233,8 +233,8 @@ class _ReportListScreenState extends State<ReportListScreen> {
         label = 'Closed';
         break;
       default:
-        bg = Colors.blue.shade50;
-        fg = Colors.blue.shade800;
+        bg = const Color(0xFFEAEAEA);
+        fg = const Color(0xFF181818);
         label = status;
     }
 

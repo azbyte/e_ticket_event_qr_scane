@@ -77,7 +77,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
       builder: (ctx) => AlertDialog(
         title: Row(
           children: [
-            const Icon(Icons.upgrade, color: Colors.indigo),
+            const Icon(Icons.upgrade, color: Color(0xFFC94426)),
             const SizedBox(width: 8),
             Text('Pilih Paket ${plan.name}'),
           ],
@@ -206,18 +206,20 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
           // Current Subscription Banner
           if (_subscription != null)
             Card(
-              color: Colors.indigo.shade50,
+              color: const Color(0xFFFDF3F1),
+              elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
+                side: const BorderSide(color: Color(0xFFE2E2E2)),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Row(
                   children: [
-                    CircleAvatar(
+                    const CircleAvatar(
                       radius: 24,
-                      backgroundColor: Colors.indigo,
-                      child: const Icon(Icons.verified, color: Colors.white),
+                      backgroundColor: Color(0xFFC94426),
+                      child: Icon(Icons.verified, color: Colors.white),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -283,11 +285,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
             final isCurrent = _subscription?.planId == p.id;
             return Card(
               margin: const EdgeInsets.only(bottom: 14),
-              elevation: isCurrent ? 3 : 1,
+              elevation: 0,
+              color: const Color(0xFFFFFFFF),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
                 side: BorderSide(
-                  color: isCurrent ? Colors.indigo : Colors.grey.shade300,
+                  color: isCurrent ? const Color(0xFFC94426) : const Color(0xFFE2E2E2),
                   width: isCurrent ? 2 : 1,
                 ),
               ),
@@ -304,6 +307,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
+                            color: Color(0xFF181818),
                           ),
                         ),
                         Container(
@@ -313,8 +317,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                           ),
                           decoration: BoxDecoration(
                             color: isCurrent
-                                ? Colors.indigo.shade50
-                                : Colors.grey.shade100,
+                                ? const Color(0xFFFDF3F1)
+                                : const Color(0xFFEAEAEA),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -323,8 +327,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                               color: isCurrent
-                                  ? Colors.indigo
-                                  : Colors.grey.shade700,
+                                  ? const Color(0xFFC94426)
+                                  : const Color(0xFF7A7A7A),
                             ),
                           ),
                         ),

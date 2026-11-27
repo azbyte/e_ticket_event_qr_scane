@@ -30,7 +30,7 @@ class ScanResultScreen extends StatelessWidget {
       statusTitle = 'CHECK-IN BERHASIL';
       statusSubtitle = 'Tiket valid dan kehadiran berhasil diverifikasi.';
     } else if (rawStatus == 'queued_offline') {
-      headerColor = Colors.blue;
+      headerColor = const Color(0xFF1E1E1E);
       headerIcon = Icons.cloud_queue;
       statusTitle = 'TERSINKRON OFFLINE';
       statusSubtitle = 'Check-in disimpan secara lokal. Sinkronkan ketika online.';
@@ -226,7 +226,7 @@ class ScanResultScreen extends StatelessWidget {
               fontSize: 14,
               fontWeight: FontWeight.w600,
               fontFamily: isCode ? 'monospace' : null,
-              color: isCode ? Colors.blue.shade900 : null,
+              color: isCode ? const Color(0xFFC94426) : null,
             ),
           ),
         ),

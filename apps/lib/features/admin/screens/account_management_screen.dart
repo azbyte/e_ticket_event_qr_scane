@@ -630,19 +630,25 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
                   children: [
                     CircleAvatar(
                       backgroundColor: item.isDisabled
-                          ? Colors.red.shade100
+                          ? const Color(0xFFFDF2F2)
                           : item.role == 'admin'
-                              ? Colors.indigo.shade100
+                              ? const Color(0xFFFDF3F1)
                               : item.role == 'organizer'
-                                  ? Colors.teal.shade100
-                                  : Colors.blue.shade100,
+                                  ? const Color(0xFFE8F5EE)
+                                  : const Color(0xFFEAEAEA),
                       child: Icon(
                         item.role == 'admin'
                             ? Icons.admin_panel_settings
                             : item.role == 'organizer'
                                 ? Icons.business
                                 : Icons.person,
-                        color: item.isDisabled ? Colors.red : Colors.black87,
+                        color: item.isDisabled
+                            ? const Color(0xFFE03E3E)
+                            : item.role == 'admin'
+                                ? const Color(0xFFC94426)
+                                : item.role == 'organizer'
+                                    ? const Color(0xFF2E8B57)
+                                    : const Color(0xFF181818),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -764,16 +770,16 @@ class _AccountManagementScreenState extends State<AccountManagementScreen>
     Color fg;
     switch (role) {
       case 'admin':
-        bg = Colors.indigo.shade50;
-        fg = Colors.indigo.shade900;
+        bg = const Color(0xFFFDF3F1);
+        fg = const Color(0xFFC94426);
         break;
       case 'organizer':
-        bg = Colors.teal.shade50;
-        fg = Colors.teal.shade900;
+        bg = const Color(0xFFE8F5EE);
+        fg = const Color(0xFF2E8B57);
         break;
       default:
-        bg = Colors.blue.shade50;
-        fg = Colors.blue.shade900;
+        bg = const Color(0xFFEAEAEA);
+        fg = const Color(0xFF181818);
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),

@@ -56,6 +56,18 @@ class _OrganizerTicketTypeFormScreenState
 
   bool get _isEditing => widget.initial != null;
 
+  List<TicketTypeModel> get _siblingTicketTypes {
+    final source = widget.existingTypes.isNotEmpty
+        ? widget.existingTypes
+        : widget.provider.ticketTypes;
+    final editingId = widget.initial?.id;
+    if (editingId == null) return source;
+    return source.where((t) => t.id != editingId).toList(growable: false);
+  }
+
+  bool get _hasFreeExisting => _siblingTicketTypes.any((t) => t.price == 0);
+  bool get _hasPaidExisting => _siblingTicketTypes.any((t) => t.price > 0);
+
   @override
   void initState() {
     super.initState();
@@ -69,6 +81,9 @@ class _OrganizerTicketTypeFormScreenState
       _salesStart = initial.salesStart;
       _salesEnd = initial.salesEnd;
       _isActive = initial.isActive;
+    } else if (_hasFreeExisting && !_hasPaidExisting) {
+      // Samakan nilai awal kategori baru ketika event sudah bertipe gratis.
+      _price.text = '0';
     }
   }
 
@@ -126,7 +141,8 @@ class _OrganizerTicketTypeFormScreenState
       description: _description.text.trim().isEmpty
           ? null
           : _description.text.trim(),
-      price: double.tryParse(_price.text.trim()) ?? 0,
+      price: OrganizerEventValidators.parseTicketPriceInput(_price.text).price ??
+          0,
       quota: int.tryParse(_quota.text.trim()) ?? 0,
       maxPerOrder: _maxPerOrder.text.trim().isEmpty
           ? null
@@ -140,6 +156,8 @@ class _OrganizerTicketTypeFormScreenState
       draft,
       sold: widget.initial?.sold ?? 0,
       held: widget.initial?.held ?? 0,
+      existingSiblingPrices: _siblingTicketTypes.map((t) => t.price),
+      initialPrice: widget.initial?.price,
     );
     if (businessErrors.isNotEmpty) {
       setState(() => _fieldErrors = businessErrors);
@@ -182,27 +200,13 @@ class _OrganizerTicketTypeFormScreenState
   }
 
   String? _validatePrice(String? value) {
-    final text = value?.trim() ?? '';
-    if (text.isEmpty) return 'Harga wajib diisi (isi 0 untuk tiket gratis).';
-    final parsed = double.tryParse(text);
-    if (parsed == null) return 'Harga harus berupa angka.';
-    if (parsed < 0) return 'Harga tidak boleh negatif.';
-    if (!_isEditing) {
-      final existingTypes = widget.existingTypes.isNotEmpty
-          ? widget.existingTypes
-          : widget.provider.ticketTypes;
-      if (existingTypes.isNotEmpty) {
-        final hasFree = existingTypes.any((t) => t.price == 0);
-        final hasPaid = existingTypes.any((t) => t.price > 0);
-        if (hasFree && parsed > 0) {
-          return 'Event gratis tidak boleh memiliki kategori tiket berbayar.';
-        }
-        if (hasPaid && parsed == 0) {
-          return 'Event berbayar tidak boleh memiliki kategori tiket gratis.';
-        }
-      }
-    }
-    return null;
+    final parsed = OrganizerEventValidators.parseTicketPriceInput(value);
+    if (parsed.error != null) return parsed.error;
+    return OrganizerEventValidators.validateTicketPrice(
+      price: parsed.price!,
+      existingSiblingPrices: _siblingTicketTypes.map((t) => t.price),
+      initialPrice: widget.initial?.price,
+    );
   }
 
   String? _validateQuota(String? value) {
@@ -238,6 +242,16 @@ class _OrganizerTicketTypeFormScreenState
                     'kurang dari ${initial.reservedCount}.',
                 color: AppTheme.primaryColor,
               ),
+            if (!_isEditing && _siblingTicketTypes.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: OrganizerInfoBanner(
+                  message: _hasFreeExisting
+                      ? 'Event ini bertipe Gratis (Rp 0). Kategori baru tidak boleh berbayar.'
+                      : 'Event ini bertipe Berbayar (> Rp 0). Kategori baru tidak boleh gratis.',
+                  color: AppTheme.primaryColor,
+                ),
+              ),
             if (initial != null) const SizedBox(height: 16),
             TextFormField(
               key: const Key('ticket-name-field'),
@@ -263,10 +277,21 @@ class _OrganizerTicketTypeFormScreenState
             TextFormField(
               key: const Key('ticket-price-field'),
               controller: _price,
+              readOnly: _isEditing,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
                 labelText: 'Harga (Rp)',
+                helperText: _isEditing
+                    ? 'Harga kategori tiket dikunci setelah dibuat.'
+                    : _hasFreeExisting
+                        ? 'Event gratis: wajib bernilai 0.'
+                        : _hasPaidExisting
+                            ? 'Event berbayar: wajib > 0, angka tanpa titik/koma.'
+                            : 'Isi 0 untuk tiket gratis, atau angka tanpa titik/koma (contoh: 50000).',
+                suffixIcon: _isEditing
+                    ? const Icon(Icons.lock_outline, size: 18)
+                    : null,
                 errorText:
                     _fieldErrors[OrganizerEventValidators.fieldTicketPrice],
               ),
@@ -385,9 +410,9 @@ class _OrganizerTicketTypeFormScreenState
       key: const Key('ticket-type-design-entry'),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.indigo.shade50,
+        color: AppTheme.softTerracottaBg,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.indigo.shade100),
+        border: Border.all(color: AppTheme.subtleGray),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

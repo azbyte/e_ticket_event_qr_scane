@@ -411,19 +411,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             Consumer<AuthProvider>(
               builder: (context, auth, _) => Card(
                 elevation: 0,
-                color: Colors.indigo.shade50,
+                color: const Color(0xFFFFFFFF),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: Colors.indigo.shade100),
+                  side: const BorderSide(color: Color(0xFFE2E2E2)),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Row(
                     children: [
-                      CircleAvatar(
+                      const CircleAvatar(
                         radius: 28,
-                        backgroundColor: Colors.indigo.shade100,
-                        child: const Icon(Icons.admin_panel_settings, size: 32, color: Colors.indigo),
+                        backgroundColor: Color(0xFFFDF3F1),
+                        child: Icon(Icons.admin_panel_settings, size: 32, color: Color(0xFFC94426)),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -432,12 +432,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           children: [
                             Text(
                               'Selamat datang, ${auth.user?.name ?? "Administrator"}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Color(0xFF181818),
+                              ),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               '${auth.user?.email ?? "Administrator"} • Administrator Platform-Wide',
-                              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                              style: const TextStyle(fontSize: 12, color: Color(0xFF7A7A7A)),
                             ),
                           ],
                         ),
@@ -658,21 +662,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           label: 'Total Event',
                           value: '${events.length}',
                           icon: Icons.event,
-                          color: Colors.blue,
+                          color: const Color(0xFFC94426),
                           isLoading: isLoading,
                         ),
                         _StatMetricCard(
                           label: 'Event Aktif (Sedang Berjalan)',
                           value: '$activeCount',
                           icon: Icons.play_circle_outline,
-                          color: Colors.green,
+                          color: const Color(0xFF2E8B57),
                           isLoading: isLoading,
                         ),
                         _StatMetricCard(
                           label: 'Event Mendatang',
                           value: '$upcomingCount',
                           icon: Icons.upcoming_outlined,
-                          color: Colors.purple,
+                          color: const Color(0xFFA8351C),
                           isLoading: isLoading,
                         ),
                         _StatMetricCard(
@@ -712,25 +716,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           label: 'Total Organizer',
                           value: '${_summary.totalOrganizers}',
                           icon: Icons.business,
-                          color: Colors.teal,
+                          color: const Color(0xFF2E8B57),
                         ),
                         _StatMetricCard(
                           label: 'Total Peserta',
                           value: '${_summary.totalParticipants}',
                           icon: Icons.people_outline,
-                          color: Colors.indigo,
+                          color: const Color(0xFFC94426),
                         ),
                         _StatMetricCard(
                           label: 'Total Order Pesanan',
                           value: '${_summary.totalOrders}',
                           icon: Icons.shopping_bag_outlined,
-                          color: Colors.deepOrange,
+                          color: const Color(0xFFA8351C),
                         ),
                         _StatMetricCard(
                           label: 'Tiket Diterbitkan',
                           value: '${_summary.totalTicketsIssued}',
                           icon: Icons.confirmation_number_outlined,
-                          color: Colors.cyan,
+                          color: const Color(0xFF1E1E1E),
                         ),
                       ],
                     ),
@@ -807,13 +811,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               _formatCurrency(
                                 _summary.revenue.ticketCommissionRevenue,
                               ),
-                              color: Colors.indigo,
+                              color: const Color(0xFFC94426),
                             ),
                             const SizedBox(height: 8),
                             _buildRevenueRow(
                               'Pendapatan Paket Layanan Organizer',
                               _formatCurrency(_summary.revenue.packageRevenue),
-                              color: Colors.teal,
+                              color: const Color(0xFF2E8B57),
                             ),
                           ],
                         ),
@@ -973,12 +977,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     if (published > 0)
                       Expanded(
                         flex: published,
-                        child: Container(height: 14, color: Colors.green),
+                        child: Container(height: 14, color: const Color(0xFF2E8B57)),
                       ),
                     if (upcoming > 0)
                       Expanded(
                         flex: upcoming,
-                        child: Container(height: 14, color: Colors.purple),
+                        child: Container(height: 14, color: const Color(0xFFC94426)),
                       ),
                     if (pending > 0)
                       Expanded(
@@ -988,12 +992,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     if (rejected > 0)
                       Expanded(
                         flex: rejected,
-                        child: Container(height: 14, color: Colors.red),
+                        child: Container(height: 14, color: const Color(0xFFE03E3E)),
                       ),
                     if (other > 0)
                       Expanded(
                         flex: other,
-                        child: Container(height: 14, color: Colors.blueGrey),
+                        child: Container(height: 14, color: const Color(0xFF7A7A7A)),
                       ),
                   ],
                 ),
@@ -1003,11 +1007,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               spacing: 16,
               runSpacing: 8,
               children: [
-                _buildLegendItem('Tayang ($published)', Colors.green),
-                _buildLegendItem('Mendatang ($upcoming)', Colors.purple),
+                _buildLegendItem('Tayang ($published)', const Color(0xFF2E8B57)),
+                _buildLegendItem('Mendatang ($upcoming)', const Color(0xFFC94426)),
                 _buildLegendItem('Menunggu Moderasi ($pending)', Colors.orange),
-                _buildLegendItem('Ditolak ($rejected)', Colors.red),
-                _buildLegendItem('Lainnya ($other)', Colors.blueGrey),
+                _buildLegendItem('Ditolak ($rejected)', const Color(0xFFE03E3E)),
+                _buildLegendItem('Lainnya ($other)', const Color(0xFF7A7A7A)),
               ],
             ),
             const Divider(height: 24),
@@ -1077,9 +1081,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         Container(
           width: 28,
           height: 60 * fillPct,
-          decoration: BoxDecoration(
-            color: Colors.indigo.shade400,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+          decoration: const BoxDecoration(
+            color: Color(0xFFC94426),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
           ),
         ),
         const SizedBox(height: 6),

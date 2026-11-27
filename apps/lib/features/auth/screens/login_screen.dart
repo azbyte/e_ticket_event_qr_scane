@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/validators/input_validator.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../routes/app_routes.dart';
@@ -90,50 +91,130 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+        backgroundColor: AppTheme.surfaceColor,
         body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 440),
-                child: Form(
-                  key: _formKey,
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                    const Icon(Icons.confirmation_number, size: 56),
-                    const SizedBox(height: 12),
-                    Text('Masuk ke Event Ticket', textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.headlineSmall),
-                    const SizedBox(height: 28),
-                    TextFormField(controller: _identity, keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(labelText: 'Email atau username', prefixIcon: Icon(Icons.person_outline)),
-                      validator: (value) => InputValidator.required(value, field: 'Email atau username')),
-                    const SizedBox(height: 16),
-                    TextFormField(controller: _password, obscureText: _obscure,
-                      onFieldSubmitted: (_) => _submit(),
-                      decoration: InputDecoration(labelText: 'Kata sandi', prefixIcon: const Icon(Icons.lock_outline),
-                        suffixIcon: IconButton(icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
-                          onPressed: () => setState(() => _obscure = !_obscure))),
-                      validator: (value) => InputValidator.required(value, field: 'Kata sandi')),
-                    const SizedBox(height: 24),
-                    Consumer<AuthProvider>(builder: (_, auth, _) => FilledButton(
-                      onPressed: auth.isLoading ? null : _submit,
-                      child: auth.isLoading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Masuk'),
-                    )),
-                    TextButton(onPressed: () => Navigator.pushNamed(context, AppRoutes.register),
-                      child: const Text('Belum punya akun? Daftar sebagai penyelenggara')),
-                    TextButton.icon(
-                      onPressed: _checkingConnection ? null : _checkConnection,
-                      icon: _checkingConnection
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.wifi_tethering, size: 18),
-                      label: const Text('Cek koneksi server'),
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: AppTheme.pureWhite,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.subtleGray),
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(
+                          child: Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: const BoxDecoration(
+                              color: AppTheme.softTerracottaBg,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.confirmation_number,
+                              size: 40,
+                              color: AppTheme.primaryColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Masuk ke Event Ticket',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.offBlack,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Masuk sebagai Penyelenggara, Staf, atau Admin Platform',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: AppTheme.slateGray, fontSize: 13),
+                        ),
+                        const SizedBox(height: 24),
+                        TextFormField(
+                          controller: _identity,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          decoration: const InputDecoration(
+                            labelText: 'Email atau username',
+                            prefixIcon: Icon(Icons.person_outline, color: AppTheme.primaryColor),
+                          ),
+                          validator: (value) =>
+                              InputValidator.required(value, field: 'Email atau username'),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _password,
+                          obscureText: _obscure,
+                          onFieldSubmitted: (_) => _submit(),
+                          decoration: InputDecoration(
+                            labelText: 'Kata sandi',
+                            prefixIcon: const Icon(Icons.lock_outline, color: AppTheme.primaryColor),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscure ? Icons.visibility : Icons.visibility_off,
+                                color: AppTheme.slateGray,
+                              ),
+                              onPressed: () => setState(() => _obscure = !_obscure),
+                            ),
+                          ),
+                          validator: (value) =>
+                              InputValidator.required(value, field: 'Kata sandi'),
+                        ),
+                        const SizedBox(height: 24),
+                        Consumer<AuthProvider>(
+                          builder: (_, auth, _) => FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppTheme.primaryColor,
+                              foregroundColor: AppTheme.pureWhite,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: auth.isLoading ? null : _submit,
+                            child: auth.isLoading
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppTheme.pureWhite,
+                                    ),
+                                  )
+                                : const Text('Masuk', style: TextStyle(fontWeight: FontWeight.w600)),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          style: TextButton.styleFrom(foregroundColor: AppTheme.primaryColor),
+                          onPressed: () => Navigator.pushNamed(context, AppRoutes.register),
+                          child: const Text('Belum punya akun? Daftar sebagai penyelenggara'),
+                        ),
+                        TextButton.icon(
+                          style: TextButton.styleFrom(foregroundColor: AppTheme.slateGray),
+                          onPressed: _checkingConnection ? null : _checkConnection,
+                          icon: _checkingConnection
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.wifi_tethering, size: 18),
+                          label: const Text('Cek koneksi server'),
+                        ),
+                      ],
                     ),
-                  ]),
+                  ),
                 ),
               ),
             ),

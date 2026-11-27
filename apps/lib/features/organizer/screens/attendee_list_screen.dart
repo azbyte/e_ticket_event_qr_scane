@@ -192,7 +192,7 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: const Color(0xFFEAEAEA),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: const Text(
@@ -200,7 +200,7 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
                   style: TextStyle(
                     fontSize: 11,
                     fontStyle: FontStyle.italic,
-                    color: Colors.blueGrey,
+                    color: Color(0xFF7A7A7A),
                   ),
                 ),
               ),
@@ -499,7 +499,7 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
                         avatar: const Icon(
                           Icons.qr_code_scanner,
                           size: 18,
-                          color: Colors.teal,
+                          color: Color(0xFF2E8B57),
                         ),
                         label: const Text('Pemindai QR / Check-in'),
                         onPressed: _openScanner,
@@ -509,7 +509,7 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
                         avatar: const Icon(
                           Icons.analytics_outlined,
                           size: 18,
-                          color: Colors.purple,
+                          color: Color(0xFFC94426),
                         ),
                         label: const Text('Laporan & Finansial'),
                         onPressed: _openReport,
@@ -717,8 +717,8 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
                                 ),
                                 leading: CircleAvatar(
                                   backgroundColor: isChecked
-                                      ? Colors.green.shade50
-                                      : Colors.blueGrey.shade50,
+                                      ? const Color(0xFFE8F5EE)
+                                      : const Color(0xFFEAEAEA),
                                   child: Icon(
                                     isChecked
                                         ? Icons.check_circle
@@ -726,8 +726,8 @@ class _AttendeeListScreenState extends State<AttendeeListScreen> {
                                               ? Icons.support_agent
                                               : Icons.person),
                                     color: isChecked
-                                        ? Colors.green.shade700
-                                        : Colors.blueGrey.shade700,
+                                        ? const Color(0xFF2E8B57)
+                                        : const Color(0xFFC94426),
                                   ),
                                 ),
                                 title: Row(

@@ -8,6 +8,7 @@ process.env.SIMULATED_PAYMENTS_ENABLED = 'true';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const config = require('../src/config/env');
 const { serializePayment } = require('../src/utils/orderResponse');
 const { simulatePayment } = require('../src/controllers/paymentController');
 
@@ -85,4 +86,110 @@ test('simulatePayment rejects request without order_id', async () => {
       return true;
     }
   );
+});
+
+test('simulatePayment allows non-production simulation even when flag is false', async () => {
+  const originalEnv = config.nodeEnv;
+  const originalFlag = config.simulatedPaymentsEnabled;
+  config.nodeEnv = 'development';
+  config.simulatedPaymentsEnabled = false;
+
+  const req = {
+    body: {
+      order_id: 'ord-123',
+    },
+    get: () => null,
+  };
+  let statusCode = 200;
+  const res = {
+    status: (code) => { statusCode = code; return res; },
+    json: () => res,
+  };
+
+  try {
+    await assert.rejects(
+      async () => {
+        await simulatePayment(req, res);
+      },
+      (err) => {
+        assert.equal(statusCode, 400);
+        assert.match(err.message, /boolean simulation result are required/i);
+        return true;
+      }
+    );
+  } finally {
+    config.nodeEnv = originalEnv;
+    config.simulatedPaymentsEnabled = originalFlag;
+  }
+});
+
+test('simulatePayment blocks production simulation unless explicitly enabled', async () => {
+  const originalEnv = config.nodeEnv;
+  const originalFlag = config.simulatedPaymentsEnabled;
+  config.nodeEnv = 'production';
+  config.simulatedPaymentsEnabled = false;
+
+  const req = {
+    body: {
+      order_id: 'ord-123',
+      simulate_success: true,
+    },
+    get: () => null,
+  };
+  let statusCode = 200;
+  const res = {
+    status: (code) => { statusCode = code; return res; },
+    json: () => res,
+  };
+
+  try {
+    await assert.rejects(
+      async () => {
+        await simulatePayment(req, res);
+      },
+      (err) => {
+        assert.equal(statusCode, 404);
+        assert.match(err.message, /Simulated payments are disabled/i);
+        return true;
+      }
+    );
+  } finally {
+    config.nodeEnv = originalEnv;
+    config.simulatedPaymentsEnabled = originalFlag;
+  }
+});
+
+test('simulatePayment allows production simulation when explicitly enabled', async () => {
+  const originalEnv = config.nodeEnv;
+  const originalFlag = config.simulatedPaymentsEnabled;
+  config.nodeEnv = 'production';
+  config.simulatedPaymentsEnabled = true;
+
+  const req = {
+    body: {
+      simulate_success: true,
+    },
+    get: () => null,
+  };
+  let statusCode = 200;
+  const res = {
+    status: (code) => { statusCode = code; return res; },
+    json: () => res,
+  };
+
+  try {
+    await assert.rejects(
+      async () => {
+        await simulatePayment(req, res);
+      },
+      (err) => {
+        assert.equal(statusCode, 400);
+        assert.match(err.message, /Order ID and a boolean simulation result/i);
+        return true;
+      }
+    );
+  } finally {
+    config.nodeEnv = originalEnv;
+    config.simulatedPaymentsEnabled = originalFlag;
+  }
 });

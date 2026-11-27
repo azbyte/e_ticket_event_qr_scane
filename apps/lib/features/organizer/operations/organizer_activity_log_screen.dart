@@ -65,15 +65,15 @@ class _OrganizerActivityLogScreenState
       return Colors.orange;
     }
     if (action.contains('REGISTRATION')) {
-      return Colors.indigo;
+      return const Color(0xFFC94426);
     }
     if (action.contains('STAFF')) {
-      return Colors.purple;
+      return const Color(0xFFA8351C);
     }
     if (action.contains('EXPORT')) {
-      return Colors.teal;
+      return const Color(0xFF2E8B57);
     }
-    return Colors.blueGrey;
+    return const Color(0xFF7A7A7A);
   }
 
   IconData _getActionIcon(String action) {
@@ -137,10 +137,10 @@ class _OrganizerActivityLogScreenState
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                color: const Color(0xFFEAEAEA),
                 child: Row(
                   children: [
-                    const Icon(Icons.event_note, color: Colors.indigo, size: 20),
+                    const Icon(Icons.event_note, color: Color(0xFFC94426), size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(

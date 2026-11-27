@@ -220,7 +220,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: Colors.indigo.shade50,
+                                  color: AppTheme.softTerracottaBg,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: const Icon(Icons.confirmation_number_outlined, color: AppTheme.primaryColor, size: 20),

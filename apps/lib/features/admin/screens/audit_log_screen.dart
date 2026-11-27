@@ -265,7 +265,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
       color = Colors.orange;
     } else if (action.contains('PACKAGE')) {
       icon = Icons.inventory_2_outlined;
-      color = Colors.blue;
+      color = const Color(0xFFC94426);
     }
 
     return CircleAvatar(
@@ -286,8 +286,8 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
       bg = Colors.orange.shade50;
       fg = Colors.orange.shade800;
     } else if (action.contains('PACKAGE')) {
-      bg = Colors.blue.shade50;
-      fg = Colors.blue.shade800;
+      bg = const Color(0xFFFDF3F1);
+      fg = const Color(0xFFC94426);
     }
 
     return Container(

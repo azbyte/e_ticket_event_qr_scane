@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/check_in_provider.dart';
 import '../../../services/organizer_membership/organizer_membership_service.dart';
@@ -114,12 +115,21 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     final displayName = auth.user?.name ?? widget.staffName ?? 'Staf Event';
 
     return Scaffold(
+      backgroundColor: AppTheme.surfaceColor,
       appBar: AppBar(
+        backgroundColor: AppTheme.pureWhite,
+        foregroundColor: AppTheme.offBlack,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: AppTheme.subtleGray),
+        ),
         title: const Text('Dashboard Staf Event'),
         actions: [
           IconButton(
             tooltip: 'Muat ulang penugasan',
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: AppTheme.offBlack),
             onPressed: _loadStaffAssignments,
           ),
         ],
@@ -134,9 +144,15 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                 children: [
                   if (_error != null)
                     Card(
+                      color: AppTheme.pureWhite,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(color: AppTheme.errorColor),
+                      ),
                       child: ListTile(
-                        leading: const Icon(Icons.error_outline),
-                        title: Text(_error!),
+                        leading: const Icon(Icons.error_outline, color: AppTheme.errorColor),
+                        title: Text(_error!, style: const TextStyle(color: AppTheme.offBlack)),
                         trailing: TextButton(
                           onPressed: _loadStaffAssignments,
                           child: const Text('Coba lagi'),
@@ -144,24 +160,58 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                       ),
                     ),
                   Card(
-                    color: Theme.of(context).colorScheme.primaryContainer,
+                    color: AppTheme.pureWhite,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(color: AppTheme.subtleGray),
+                    ),
                     child: ListTile(
-                      leading: const CircleAvatar(child: Icon(Icons.badge)),
-                      title: Text(displayName),
-                      subtitle: const Text('Penugasan Staf Event'),
+                      leading: const CircleAvatar(
+                        backgroundColor: AppTheme.primaryColor,
+                        child: Icon(Icons.badge, color: AppTheme.pureWhite),
+                      ),
+                      title: Text(
+                        displayName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.offBlack,
+                        ),
+                      ),
+                      subtitle: const Text(
+                        'Penugasan Staf Event',
+                        style: TextStyle(color: AppTheme.slateGray),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
                   if (_assignedEvents.isEmpty)
-                    const Card(
-                      child: Padding(
+                    Card(
+                      color: AppTheme.pureWhite,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(color: AppTheme.subtleGray),
+                      ),
+                      child: const Padding(
                         padding: EdgeInsets.all(24),
                         child: Column(
                           children: [
-                            Icon(Icons.event_busy, size: 48),
+                            Icon(Icons.event_busy, size: 48, color: AppTheme.slateGray),
                             SizedBox(height: 12),
-                            Text('Belum ada penugasan event aktif'),
-                            Text('Hubungi penyelenggara untuk menerima undangan.'),
+                            Text(
+                              'Belum ada penugasan event aktif',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.offBlack,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Hubungi penyelenggara untuk menerima undangan.',
+                              style: TextStyle(color: AppTheme.slateGray),
+                              textAlign: TextAlign.center,
+                            ),
                           ],
                         ),
                       ),

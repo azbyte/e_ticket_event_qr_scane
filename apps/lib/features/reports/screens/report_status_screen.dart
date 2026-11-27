@@ -317,8 +317,8 @@ class _ReportStatusScreenState extends State<ReportStatusScreen> {
         label = 'Closed';
         break;
       default:
-        bg = Colors.blue.shade50;
-        fg = Colors.blue.shade800;
+        bg = const Color(0xFFEAEAEA);
+        fg = const Color(0xFF181818);
         label = status;
     }
 

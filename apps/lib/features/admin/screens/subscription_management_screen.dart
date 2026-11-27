@@ -237,7 +237,7 @@ class _SubscriptionManagementScreenState
                 ...sub.changeHistory.map(
                   (c) => ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.change_circle_outlined, color: Colors.indigo),
+                    leading: const Icon(Icons.change_circle_outlined, color: Color(0xFFC94426)),
                     title: Text('${c.fromPlan} → ${c.toPlan}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                     subtitle: Text('${c.reason}\n${_formatDate(c.changedAt)}', style: const TextStyle(fontSize: 11)),
                   ),
@@ -417,9 +417,9 @@ class _SubscriptionManagementScreenState
                                   Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      CircleAvatar(
-                                        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                                        child: const Icon(Icons.business, color: Colors.indigo),
+                                      const CircleAvatar(
+                                        backgroundColor: Color(0xFFFDF3F1),
+                                        child: Icon(Icons.business, color: Color(0xFFC94426)),
                                       ),
                                       const SizedBox(width: 12),
                                       Expanded(
@@ -446,13 +446,13 @@ class _SubscriptionManagementScreenState
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                         decoration: BoxDecoration(
-                                          color: Colors.indigo.shade50,
+                                          color: const Color(0xFFFDF3F1),
                                           borderRadius: BorderRadius.circular(6),
                                         ),
                                         child: Text(
                                           sub.planName,
-                                          style: TextStyle(
-                                            color: Colors.indigo.shade900,
+                                          style: const TextStyle(
+                                            color: Color(0xFFC94426),
                                             fontWeight: FontWeight.bold,
                                             fontSize: 12,
                                           ),

@@ -334,8 +334,8 @@ class _ReportManagementScreenState extends State<ReportManagementScreen> {
         fg = Colors.orange.shade900;
         break;
       case 'medium':
-        bg = Colors.blue.shade100;
-        fg = Colors.blue.shade900;
+        bg = const Color(0xFFFDF3F1);
+        fg = const Color(0xFFC94426);
         break;
       case 'low':
       default:
@@ -371,8 +371,8 @@ class _ReportManagementScreenState extends State<ReportManagementScreen> {
         label = 'In Progress';
         break;
       case AppConstants.reportStatusWaitingForUser:
-        bg = Colors.purple.shade50;
-        fg = Colors.purple.shade800;
+        bg = const Color(0xFFFDF3F1);
+        fg = const Color(0xFFC94426);
         label = 'Menunggu User';
         break;
       case AppConstants.reportStatusResolved:
@@ -511,7 +511,7 @@ class _ReportDetailSheetState extends State<_ReportDetailSheet> with SingleTicke
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.support_agent, color: Colors.indigo),
+                      const Icon(Icons.support_agent, color: Color(0xFFC94426)),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(
@@ -673,10 +673,10 @@ class _ReportDetailSheetState extends State<_ReportDetailSheet> with SingleTicke
                           maxWidth: MediaQuery.of(context).size.width * 0.75,
                         ),
                         decoration: BoxDecoration(
-                          color: isAdmin ? Colors.indigo.shade50 : Colors.grey.shade100,
+                          color: isAdmin ? const Color(0xFFFDF3F1) : const Color(0xFFEAEAEA),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: isAdmin ? Colors.indigo.shade200 : Colors.grey.shade300,
+                            color: const Color(0xFFE2E2E2),
                           ),
                         ),
                         child: Column(
@@ -687,7 +687,7 @@ class _ReportDetailSheetState extends State<_ReportDetailSheet> with SingleTicke
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
-                                color: isAdmin ? Colors.indigo.shade900 : Colors.black87,
+                                color: isAdmin ? const Color(0xFFC94426) : const Color(0xFF181818),
                               ),
                             ),
                             const SizedBox(height: 4),
