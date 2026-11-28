@@ -765,14 +765,15 @@ Widget _buildRingkasan(EventModel event) {
         ),
       ),
       _sectionCard(
-        'Tautan Undangan Panitia',
+        'Staf Panitia',
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             const Text(
-              'Undangan panitia berbeda dari tautan pendaftaran peserta. '
-              'Tautan dibuat per undangan (email, permission, masa berlaku) dan '
-              'hanya dapat diterima akun dengan email yang cocok.',
+              'Tambahkan staf panitia berdasarkan nama. Backend membuat kode '
+              'akses unik dan tautan undangan untuk event ini; staf memasukkan '
+              'kode tersebut pada tautan untuk membuka scanner. Staf tidak '
+              'perlu memiliki akun.',
               style: TextStyle(fontSize: 12, color: Colors.black54),
             ),
             const SizedBox(height: 12),
@@ -786,7 +787,7 @@ Widget _buildRingkasan(EventModel event) {
                 },
               ),
               icon: const Icon(Icons.group_add_outlined, size: 18),
-              label: const Text('Kelola undangan panitia'),
+              label: const Text('Tambahkan Staf'),
             ),
           ],
         ),

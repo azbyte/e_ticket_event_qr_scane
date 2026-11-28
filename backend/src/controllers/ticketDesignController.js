@@ -27,34 +27,50 @@ const loadTicketType = async (eventId, ticketTypeId) => {
 };
 
 /**
- * Desain efektif = desain tersimpan (bila ada) atau placeholder orientasi.
- * Orientasi selalu dikirim agar Store/UI dapat menampilkan pilihan aktif
- * walau Organizer belum mengunggah file desain.
+ * Data teks nyata untuk menghitung kotak elemen saat memvalidasi tata letak.
+ *
+ * Judul memakai nama event sebenarnya dan ID tiket contoh berformat sama dengan
+ * ID asli (`ETK-XXXXXXX`), sehingga tumpang tindih yang dilaporkan editor sama
+ * dengan yang akan terjadi pada tiket peserta.
+ */
+const layoutValidationTexts = (event) => {
+  const title = design.layoutSpec.ticketTitle(event?.title || 'Nama Event');
+  return {
+    title,
+    ticketId: design.layoutSpec.ticketIdLine('ETK-0000000'),
+    instruction: design.layoutSpec.EXCHANGE_INSTRUCTION,
+  };
+};
+
+/**
+ * Desain efektif = desain tersimpan (bila ada) atau konfigurasi default.
+ * Orientasi & tata letak selalu dikirim agar Store/UI dapat menampilkan posisi
+ * elemen yang BENAR-BENAR dipakai saat tiket dirender, walau Organizer belum
+ * mengunggah berkas desain.
  */
 const presentDesign = (req, raw, orientationFallback) => {
   const normalized = design.normalizeDesign(raw);
   const orientation = design.orientationOrDefault(
     normalized?.orientation || orientationFallback,
   );
-  if (!normalized) {
-    return {
-      file_path: null,
-      content_type: null,
-      source: 'none',
-      template: 'default',
-      orientation,
-      width: null,
-      height: null,
-      qr: design.DEFAULT_QR_BY_ORIENTATION[orientation],
-      info: design.DEFAULT_INFO_BY_ORIENTATION[orientation],
-      url: null,
-    };
-  }
-  return {
-    ...normalized,
+  const layout = normalized?.layout
+    || design.layoutSpec.defaultLayoutFor(orientation);
+  const base = {
+    file_path: normalized?.file_path ?? null,
+    content_type: normalized?.content_type ?? null,
+    source: normalized ? normalized.source : 'none',
+    template: normalized ? normalized.template : 'default',
     orientation,
-    url: absoluteUrl(req, normalized.file_path),
+    width: normalized?.width ?? null,
+    height: normalized?.height ?? null,
+    layout,
+    qr: { ...layout.qr },
+    updated_at: normalized?.updated_at ?? null,
+    url: normalized?.file_path ? absoluteUrl(req, normalized.file_path) : null,
+    // True bila konfigurasi berasal dari unggahan Organizer (bukan default).
+    is_custom: Boolean(normalized?.file_path),
   };
+  return base;
 };
 
 const getEventTicketDesign = asyncHandler(async (req, res) => {
@@ -93,12 +109,18 @@ const getEventTicketDesign = asyncHandler(async (req, res) => {
     orientations: design.ORIENTATIONS,
     default_orientation: design.DEFAULT_ORIENTATION,
     default_layout: {
+      layout: design.layoutSpec.DEFAULT_LAYOUT_BY_ORIENTATION[eventOrientation],
       qr: design.DEFAULT_QR_BY_ORIENTATION[eventOrientation],
-      info: design.DEFAULT_INFO_BY_ORIENTATION[eventOrientation],
+      layout_by_orientation: design.layoutSpec.DEFAULT_LAYOUT_BY_ORIENTATION,
       qr_by_orientation: design.DEFAULT_QR_BY_ORIENTATION,
-      info_by_orientation: design.DEFAULT_INFO_BY_ORIENTATION,
       spec: design.ORIENTATION_SPEC,
+      canvas: design.layoutSpec.CANVAS,
+      limits: design.layoutSpec.LIMITS,
+      colors: design.layoutSpec.DEFAULT_COLORS,
     },
+    // Teks contoh dipakai editor untuk pratinjau (bukan data peserta nyata).
+    preview_texts: layoutValidationTexts(event),
+    fonts: design.ticketFonts.resolveFontFiles(),
   });
 });
 
@@ -130,7 +152,8 @@ const saveTicketDesign = asyncHandler(async (req, res) => {
   // Simpan orientasi saja (tanpa mengunggah file) diperbolehkan: Organizer
   // memilih orientasi sebelum mengunggah desain.
   const onlyOrientation = req.body?.orientation_only === true
-    || (typeof req.body?.image_base64 !== 'string' && req.body?.orientation != null);
+    || (typeof req.body?.image_base64 !== 'string' && req.body?.orientation != null
+      && req.body?.layout == null && req.body?.qr == null);
 
   if (onlyOrientation) {
     const orientation = design.normalizeOrientation(req.body?.orientation);
@@ -147,8 +170,9 @@ const saveTicketDesign = asyncHandler(async (req, res) => {
       template: keepFile ? previous.template : 'default',
       ...(keepFile ? { file_path: previous.file_path, content_type: previous.content_type } : {}),
       orientation,
-      qr: design.DEFAULT_QR_BY_ORIENTATION[orientation],
-      info: design.DEFAULT_INFO_BY_ORIENTATION[orientation],
+      // Tata letak kembali ke default orientasi baru; nilai default dijamin
+      // valid sehingga tidak perlu validasi tumpang tindih.
+      layout: design.layoutSpec.defaultLayoutFor(orientation),
       updated_at: new Date().toISOString(),
     };
     const removedFile = previous?.file_path && !keepFile ? previous.file_path : null;
@@ -180,36 +204,32 @@ const saveTicketDesign = asyncHandler(async (req, res) => {
       ticket_type_id: ticketType?.id ?? null,
       design: {
         ...stored,
+        qr: { ...stored.layout.qr },
         url: stored.file_path ? absoluteUrl(req, stored.file_path) : null,
       },
     });
   }
 
-  // Simpan pengaturan QR saja (tanpa mengunggah ulang file desain). Organizer
-  // cukup menggeser posisi/ukuran QR pada pratinjau, lalu menekan "Simpan
-  // pengaturan QR"; file desain dan orientasinya tidak berubah.
-  const qrOnly = req.body?.qr_only === true
+  // Simpan KONFIGURASI TATA LETAK saja (tanpa mengunggah ulang file desain):
+  // posisi/ukuran judul, ID tiket, instruksi, dan QR. Berlaku juga saat belum
+  // ada berkas desain (Organizer mengatur tata letak pada desain default).
+  const layoutOnly = req.body?.layout_only === true || req.body?.qr_only === true
     || (typeof req.body?.image_base64 !== 'string'
       && req.body?.orientation_only !== true
       && req.body?.orientation == null
-      && req.body?.qr != null);
+      && (req.body?.layout != null || req.body?.qr != null));
 
-  if (qrOnly) {
-    if (!previous) {
+  if (layoutOnly) {
+    const orientation = previousOrientation;
+    const { errors, value: layout } = design.validateLayoutPayload(
+      req.body?.layout ?? req.body,
+      { ...layoutValidationTexts(event), orientation },
+    );
+    if (errors.length > 0) {
       res.status(400);
-      throw new Error('Unggah desain tiket lebih dulu sebelum mengatur posisi QR.');
+      throw new Error(errors.join(' '));
     }
-    const { errors: qrErrors, value: qr } = design.validateQrPlacement(req.body?.qr, {
-      orientation: previousOrientation,
-    });
-    if (qrErrors.length > 0) {
-      res.status(400);
-      throw new Error(qrErrors.join(' '));
-    }
-    const stored = design.applyQrPlacement(previous, {
-      qr,
-      info: req.body?.info && typeof req.body.info === 'object' ? req.body.info : undefined,
-    });
+    const stored = design.applyLayoutPlacement(previous, { layout });
     if (scope === 'event') {
       await query(
         'UPDATE events SET ticket_design = $1::jsonb WHERE id = $2',
@@ -221,21 +241,31 @@ const saveTicketDesign = asyncHandler(async (req, res) => {
         [JSON.stringify(stored), ticketType.id],
       );
     }
-    logger.info('ticket_design_qr_saved', {
+    logger.info('ticket_design_layout_saved', {
       eventId: event.id,
       scope,
       ticketTypeId: ticketType?.id ?? null,
-      qr,
+      qr: stored.layout.qr,
+      title_size: stored.layout.title.font_size,
     });
     return res.json({
       success: true,
       scope,
       ticket_type_id: ticketType?.id ?? null,
-      design: { ...stored, url: absoluteUrl(req, stored.file_path) },
+      design: {
+        ...stored,
+        qr: { ...stored.layout.qr },
+        url: absoluteUrl(req, stored.file_path),
+      },
     });
   }
 
-  const { errors, value } = design.validateUploadPayload(req.body);
+  const { errors, value } = design.validateUploadPayload({
+    ...req.body,
+    title_text: layoutValidationTexts(event).title,
+    ticket_id_text: layoutValidationTexts(event).ticketId,
+    instruction_text: layoutValidationTexts(event).instruction,
+  });
   if (errors.length > 0) {
     res.status(400);
     throw new Error(errors.join(' '));
@@ -258,8 +288,7 @@ const saveTicketDesign = asyncHandler(async (req, res) => {
     orientation: value.orientation,
     width: value.width,
     height: value.height,
-    qr: value.qr,
-    info: value.info,
+    layout: value.layout,
     updated_at: new Date().toISOString(),
   };
 
@@ -296,7 +325,11 @@ const saveTicketDesign = asyncHandler(async (req, res) => {
     success: true,
     scope,
     ticket_type_id: ticketType?.id ?? null,
-    design: { ...stored, url: absoluteUrl(req, stored.file_path) },
+    design: {
+      ...stored,
+      qr: { ...stored.layout.qr },
+      url: absoluteUrl(req, stored.file_path),
+    },
   });
 });
 

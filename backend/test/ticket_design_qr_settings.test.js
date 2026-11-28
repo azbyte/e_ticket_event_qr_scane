@@ -1,5 +1,6 @@
 /**
- * Penyimpanan pengaturan QR Code (mode `qr_only`) pada controller desain tiket.
+ * Penyimpanan konfigurasi tata letak tiket (mode `layout_only`) pada controller
+ * desain tiket.
  *
  * Menguji jalur nyata `PUT /api/events/:id/ticket-design` tanpa database: lapisan
  * `config/db` dan `eventController.getEventForOwner` diganti stub di
@@ -92,18 +93,28 @@ const previousDesign = {
   orientation: 'landscape',
   width: 1684,
   height: 1188,
-  qr: { x: 0.1, y: 0.2, size: 0.3 },
-  info: { x: 0.06, y: 0.08, width: 0.4, height: 0.3, color: '#1A1A1A' },
+  layout: {
+    version: 2,
+    panel_split: 0.558,
+    text_width: 0.6,
+    title: { x: 0.0445, y: 0.0286, font_size: 50, bold: true },
+    ticket_id: { x: 0.0445, y: 0.147, font_size: 30, bold: false },
+    instruction: { x: 0.0445, y: 0.2165, font_size: 30, bold: false },
+    qr: { x: 0.0595, y: 0.326, size: 0.4231 },
+  },
 };
 
-test('qr_only menyimpan posisi & ukuran QR tanpa mengunggah ulang desain', async () => {
+test('layout_only menyimpan tata letak tanpa mengunggah ulang desain', async () => {
   resetState({
     event: { id: 'evt-1', ticket_design: previousDesign, ticket_design_orientation: 'landscape' },
   });
   const { res, error } = await callSave({
     scope: 'event',
-    qr_only: true,
-    qr: { x: 0.55, y: 0.4, size: 0.25 },
+    layout_only: true,
+    layout: {
+      ...previousDesign.layout,
+      qr: { x: 0.55, y: 0.55, size: 0.25 },
+    },
   });
   assert.equal(error, null);
   assert.equal(res.statusCode, 200);
@@ -113,57 +124,86 @@ test('qr_only menyimpan posisi & ukuran QR tanpa mengunggah ulang desain', async
   const updates = state.calls.filter((call) => /UPDATE events/.test(call.sql));
   assert.equal(updates.length, 1);
   assert.ok(!/ticket_design_orientation/.test(updates[0].sql),
-    'orientasi tidak ikut ditulis pada mode qr_only');
+    'orientasi tidak ikut ditulis pada mode layout_only');
   const stored = JSON.parse(updates[0].params[0]);
-  assert.deepEqual(stored.qr, { x: 0.55, y: 0.4, size: 0.25 });
+  assert.deepEqual(stored.layout.qr, { x: 0.55, y: 0.55, size: 0.25 });
   assert.equal(stored.file_path, previousDesign.file_path, 'file desain dipertahankan');
   assert.equal(stored.orientation, 'landscape');
-  assert.deepEqual(stored.info, previousDesign.info, 'area teks dipertahankan');
-  assert.deepEqual(res.body.design.qr, { x: 0.55, y: 0.4, size: 0.25 });
+  assert.equal(stored.layout.title.font_size, 50, 'ukuran judul dipertahankan');
+  // `qr` cermin pada respons tetap sinkron dengan `layout.qr`.
+  assert.deepEqual(res.body.design.qr, { x: 0.55, y: 0.55, size: 0.25 });
 });
 
-test('qr_only tanpa desain tersimpan ditolak dengan pesan jelas', async () => {
+test('layout_only tetap dapat disimpan walau belum ada desain tersimpan', async () => {
   resetState({ event: { id: 'evt-1', ticket_design: null, ticket_design_orientation: null } });
   const { res, error } = await callSave({
     scope: 'event',
-    qr_only: true,
-    qr: { x: 0.2, y: 0.2, size: 0.3 },
-  });
-  assert.equal(res.statusCode, 400);
-  assert.match(error.message, /Unggah desain tiket lebih dulu/);
-});
-
-test('qr_only dengan nilai di luar rentang ditolak validasi', async () => {
-  resetState({
-    event: { id: 'evt-1', ticket_design: previousDesign, ticket_design_orientation: 'landscape' },
-  });
-  const { res, error } = await callSave({
-    scope: 'event',
-    qr_only: true,
-    qr: { x: 0.2, y: 0.2, size: 0.95 },
-  });
-  assert.equal(res.statusCode, 400);
-  assert.match(error.message, /Ukuran QR/);
-  assert.equal(state.calls.filter((call) => /UPDATE events/.test(call.sql)).length, 0,
-    'tidak ada penulisan saat validasi gagal');
-});
-
-test('qr_only memakai default orientasi bila sebagian nilai tidak dikirim', async () => {
-  resetState({
-    event: { id: 'evt-1', ticket_design: previousDesign, ticket_design_orientation: 'landscape' },
-  });
-  const { res, error } = await callSave({
-    scope: 'event',
-    qr_only: true,
-    qr: { x: 0.3 },
+    layout_only: true,
+    layout: {
+      qr: { x: 0.3, y: 0.45, size: 0.3 },
+      title: { x: 0.06, y: 0.06, font_size: 40, bold: true },
+    },
   });
   assert.equal(error, null);
   assert.equal(res.statusCode, 200);
   const stored = JSON.parse(
     state.calls.find((call) => /UPDATE events/.test(call.sql)).params[0],
   );
-  // Nilai yang tidak dikirim memakai default orientasi aktif (bukan nilai lama).
-  assert.equal(stored.qr.x, 0.3);
-  assert.ok(stored.qr.y > 0 && stored.qr.y < 1);
-  assert.ok(stored.qr.size >= 0.15 && stored.qr.size <= 0.6);
+  // Tiket default sistem memakai tata letak yang sama, jadi konfigurasi tetap
+  // tersimpan tanpa berkas gambar.
+  assert.equal(stored.file_path, null);
+  assert.equal(stored.layout.qr.x, 0.3);
+  assert.equal(stored.layout.title.font_size, 40);
+  // Elemen yang tidak dikirim memakai default orientasi sistem.
+  assert.equal(stored.layout.instruction.font_size, 30);
+});
+
+test('layout_only dengan QR yang menutupi tulisan ditolak', async () => {
+  resetState({
+    event: { id: 'evt-1', ticket_design: previousDesign, ticket_design_orientation: 'landscape' },
+  });
+  const { res, error } = await callSave({
+    scope: 'event',
+    layout_only: true,
+    layout: {
+      ...previousDesign.layout,
+      qr: { x: 0.05, y: 0.15, size: 0.55 },
+    },
+  });
+  assert.equal(res.statusCode, 400);
+  assert.match(error.message, /QR Code menutupi/);
+  assert.equal(state.calls.filter((call) => /UPDATE events/.test(call.sql)).length, 0,
+    'tidak ada penulisan saat validasi gagal');
+});
+
+test('layout_only dengan ukuran QR di luar rentang ditolak', async () => {
+  resetState({
+    event: { id: 'evt-1', ticket_design: previousDesign, ticket_design_orientation: 'landscape' },
+  });
+  const { res, error } = await callSave({
+    scope: 'event',
+    layout_only: true,
+    layout: { ...previousDesign.layout, qr: { x: 0.2, y: 0.2, size: 0.95 } },
+  });
+  assert.equal(res.statusCode, 400);
+  assert.match(error.message, /Ukuran QR/);
+});
+
+test('layout_only memakai default untuk nilai yang tidak dikirim', async () => {
+  resetState({
+    event: { id: 'evt-1', ticket_design: previousDesign, ticket_design_orientation: 'landscape' },
+  });
+  const { res, error } = await callSave({
+    scope: 'event',
+    layout_only: true,
+    layout: { qr: { x: 0.3 } },
+  });
+  assert.equal(error, null);
+  assert.equal(res.statusCode, 200);
+  const stored = JSON.parse(
+    state.calls.find((call) => /UPDATE events/.test(call.sql)).params[0],
+  );
+  assert.equal(stored.layout.qr.x, 0.3);
+  assert.ok(stored.layout.qr.y > 0 && stored.layout.qr.y < 1);
+  assert.ok(stored.layout.qr.size >= 0.15 && stored.layout.qr.size <= 0.6);
 });

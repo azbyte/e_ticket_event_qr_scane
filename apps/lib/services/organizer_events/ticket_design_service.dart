@@ -99,6 +99,10 @@ class TicketDesignService {
   }
 
   /// Unggah desain. [scope] `event` (default event) atau `ticket_type`.
+  ///
+  /// [layout] adalah konfigurasi tata letak yang sedang diatur Organizer,
+  /// sehingga desain baru langsung memakai posisi/ukuran yang terlihat di
+  /// pratinjau (bukan default sistem).
   Future<TicketDesignModel> upload({
     required String eventId,
     required Uint8List bytes,
@@ -106,8 +110,7 @@ class TicketDesignService {
     String scope = 'event',
     String? ticketTypeId,
     TicketOrientation orientation = TicketOrientation.landscape,
-    TicketQrPlacement? qr,
-    TicketInfoPlacement? info,
+    TicketLayoutModel? layout,
   }) async {
     if (!allowedContentTypes.contains(contentType)) {
       throw const TicketDesignException('Format desain harus PNG atau JPEG.');
@@ -125,6 +128,7 @@ class TicketDesignService {
       );
     }
 
+    final effectiveLayout = layout ?? TicketLayoutModel.defaultsFor(orientation);
     try {
       final response = await _api.put(
         '/events/$eventId/ticket-design',
@@ -134,9 +138,7 @@ class TicketDesignService {
           'content_type': contentType,
           'image_base64': base64Encode(bytes),
           'orientation': orientation.value,
-          'qr': (qr ?? TicketDesignModel.defaultQrFor(orientation)).toJson(),
-          'info':
-              (info ?? TicketDesignModel.defaultInfoFor(orientation)).toJson(),
+          'layout': effectiveLayout.toJson(),
         },
       );
       final design = response['design'];
@@ -149,12 +151,16 @@ class TicketDesignService {
     }
   }
 
-  /// Simpan pengaturan posisi & ukuran QR saja, tanpa mengunggah ulang file
-  /// desain. Backend memperbarui `ticket_design.qr` pada desain yang tersimpan
-  /// sehingga tiket berikutnya memakai pengaturan ini.
-  Future<TicketDesignModel> saveQrPlacement({
+  /// Simpan KONFIGURASI TATA LETAK (posisi & ukuran judul, ID tiket, instruksi,
+  /// serta QR Code) tanpa mengunggah ulang berkas desain.
+  ///
+  /// Berlaku juga bila belum ada berkas desain: tiket default sistem memakai
+  /// tata letak yang sama, sehingga Organizer dapat mengatur posisi elemen
+  /// tanpa harus mengunggah gambar. Backend memvalidasi tumpang tindih dan
+  /// menolak konfigurasi yang menutupi tulisan.
+  Future<TicketDesignModel> saveLayout({
     required String eventId,
-    required TicketQrPlacement qr,
+    required TicketLayoutModel layout,
     String scope = 'event',
     String? ticketTypeId,
   }) async {
@@ -170,8 +176,8 @@ class TicketDesignService {
         body: <String, dynamic>{
           'scope': scope,
           'ticket_type_id': ?ticketTypeId,
-          'qr_only': true,
-          'qr': qr.toJson(),
+          'layout_only': true,
+          'layout': layout.toJson(),
         },
       );
       final design = response['design'];
@@ -183,6 +189,23 @@ class TicketDesignService {
       throw TicketDesignException(error.message);
     }
   }
+
+  /// Simpan pengaturan posisi & ukuran QR saja (kompatibilitas).
+  ///
+  /// Delegasi ke [saveLayout]: QR adalah bagian dari konfigurasi tata letak,
+  /// sehingga hanya ada satu jalur penyimpanan.
+  Future<TicketDesignModel> saveQrPlacement({
+    required String eventId,
+    required TicketQrPlacement qr,
+    String scope = 'event',
+    String? ticketTypeId,
+    TicketLayoutModel? layout,
+  }) => saveLayout(
+    eventId: eventId,
+    layout: (layout ?? TicketLayoutModel.defaultLandscape).copyWith(qr: qr),
+    scope: scope,
+    ticketTypeId: ticketTypeId,
+  );
 
   /// Hapus desain sehingga tiket kembali memakai desain default sistem.
   Future<void> remove({

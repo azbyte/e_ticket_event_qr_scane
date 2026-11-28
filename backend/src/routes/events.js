@@ -34,6 +34,9 @@ const {
   getInvitationPreview,
 } = require('../controllers/eventInvitationController');
 const ticketDesign = require('../controllers/ticketDesignController');
+const staffInvitations = require('../controllers/staffInvitationController');
+const { staffAuthMiddleware, staffOrUserAuth } = require('../middleware/staffAuthMiddleware');
+const { authLimiter } = require('../middleware/rateLimitMiddleware');
 
 /**
  * Domain event: event, kategori tiket, peserta, dan undangan staf.
@@ -56,11 +59,19 @@ eventRouter.get('/:eventId/ticket-design', authMiddleware, allowRoles('organizer
 eventRouter.put('/:eventId/ticket-design', authMiddleware, allowRoles('organizer', 'admin'), ticketDesign.saveTicketDesign);
 eventRouter.delete('/:eventId/ticket-design', authMiddleware, allowRoles('organizer', 'admin'), ticketDesign.deleteTicketDesign);
 // Daftar peserta: `staff` harus lolos gate route, sedangkan otorisasi sebenarnya
-// berbasis permission `VIEW_PARTICIPANTS` di controller (D3-1 K4).
-eventRouter.get('/:eventId/attendees', authMiddleware, allowRoles('organizer', 'admin', 'staff'), listEventAttendees);
+// berbasis permission `VIEW_PARTICIPANTS` di controller (D3-1 K4). Sesi staf
+// undangan (kode akses) juga diterima agar scanner web dapat memuat ringkasan
+// peserta event undangannya saja.
+eventRouter.get('/:eventId/attendees', staffOrUserAuth, allowRoles('organizer', 'admin', 'staff'), listEventAttendees);
 eventRouter.get('/:eventId/invitations', authMiddleware, allowRoles('organizer', 'admin'), listInvitations);
 eventRouter.post('/:eventId/invitations', authMiddleware, allowRoles('organizer', 'admin'), createInvitation);
 eventRouter.delete('/:eventId/invitations/:invitationId', authMiddleware, allowRoles('organizer', 'admin'), revokeInvitation);
+// Undangan staf berbasis nama + kode akses (menggantikan alur undangan email).
+// Hanya Organizer pemilik event/Admin; tautan & kode akses dibuat backend.
+eventRouter.get('/:eventId/staff-invitations', authMiddleware, allowRoles('organizer', 'admin'), staffInvitations.listStaffInvitations);
+eventRouter.post('/:eventId/staff-invitations', authMiddleware, allowRoles('organizer', 'admin'), staffInvitations.createStaffInvitation);
+eventRouter.post('/:eventId/staff-invitations/:invitationId/regenerate', authMiddleware, allowRoles('organizer', 'admin'), staffInvitations.regenerateStaffAccessCode);
+eventRouter.delete('/:eventId/staff-invitations/:invitationId', authMiddleware, allowRoles('organizer', 'admin'), staffInvitations.revokeStaffInvitation);
 eventRouter.post('/:eventId/ticket-types', authMiddleware, allowRoles('organizer'), ticketTypes.createTicketType);
 eventRouter.put('/:eventId/ticket-types/:ticketTypeId', authMiddleware, allowRoles('organizer'), ticketTypes.updateTicketType);
 eventRouter.delete('/:eventId/ticket-types/:ticketTypeId', authMiddleware, allowRoles('organizer'), ticketTypes.deleteTicketType);
@@ -88,6 +99,18 @@ invitationRouter.post('/:token/accept', authMiddleware, acceptInvitation);
 // Pratinjau undangan publik (tanpa auth). Data minimal, tanpa PII lengkap.
 invitationRouter.get('/:token', getInvitationPreview);
 
+// Undangan staf berbasis kode akses.
+//  - `/staff-invitations/:invitationId` pratinjau publik (tanpa kode akses);
+//  - `/staff-access/validate` memvalidasi kode akses dan menerbitkan sesi;
+//  - `/staff-access/session` & `/logout` memakai sesi staf itu sendiri.
+const staffInvitationRouter = express.Router();
+staffInvitationRouter.get('/:invitationId', staffInvitations.getStaffInvitationPreview);
+
+const staffAccessRouter = express.Router();
+staffAccessRouter.post('/validate', authLimiter, staffInvitations.validateStaffAccess);
+staffAccessRouter.get('/session', staffAuthMiddleware, staffInvitations.getStaffSession);
+staffAccessRouter.post('/logout', staffAuthMiddleware, staffInvitations.logoutStaffSession);
+
 // Ekspor peserta & daftar order per event didaftarkan SEBELUM router `/events`
 // agar tidak tertangkap pola `/:id`. Urutan ini sama dengan konfigurasi lama
 // pada `app.js`.
@@ -99,5 +122,7 @@ router.get('/ticket-design-template', ticketDesign.downloadTemplate);
 router.use('/events', eventRouter);
 router.use('/ticket-types', ticketTypeRouter);
 router.use('/invitations', invitationRouter);
+router.use('/staff-invitations', staffInvitationRouter);
+router.use('/staff-access', staffAccessRouter);
 
 module.exports = router;

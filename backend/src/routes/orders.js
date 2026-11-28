@@ -17,6 +17,7 @@ const {
   syncCheckIns,
 } = require('../controllers/checkInController');
 const { authMiddleware, optionalAuth } = require('../middleware/authMiddleware');
+const { staffOrUserAuth } = require('../middleware/staffAuthMiddleware');
 const { validationMiddleware } = require('../middleware/validationMiddleware');
 const { verifyTicketValidator } = require('../validators');
 const { scanLimiter, writeLimiter } = require('../middleware/rateLimitMiddleware');
@@ -48,13 +49,13 @@ ticketRouter.get('/my-tickets', optionalAuth, getMyTickets);
 ticketRouter.get('/:id/pdf', optionalAuth, getTicketPdf);
 ticketRouter.get('/:id', optionalAuth, getTicketById);
 ticketRouter.post('/:id/email', optionalAuth, resendTicketEmail);
-ticketRouter.post('/validate', authMiddleware, scanLimiter, [...verifyTicketValidator, validationMiddleware], validateTicket);
-ticketRouter.post('/verify', authMiddleware, scanLimiter, [...verifyTicketValidator, validationMiddleware], verifyTicket);
+ticketRouter.post('/validate', staffOrUserAuth, scanLimiter, [...verifyTicketValidator, validationMiddleware], validateTicket);
+ticketRouter.post('/verify', staffOrUserAuth, scanLimiter, [...verifyTicketValidator, validationMiddleware], verifyTicket);
 
 const checkInRouter = express.Router();
-checkInRouter.post('/', authMiddleware, recordCheckIn);
-checkInRouter.get('/events/:eventId/check-ins', authMiddleware, listEventCheckIns);
-checkInRouter.post('/sync', authMiddleware, syncCheckIns);
+checkInRouter.post('/', staffOrUserAuth, recordCheckIn);
+checkInRouter.get('/events/:eventId/check-ins', staffOrUserAuth, listEventCheckIns);
+checkInRouter.post('/sync', staffOrUserAuth, syncCheckIns);
 
 router.use('/orders', writeLimiter, orderRouter);
 router.use('/payments', writeLimiter, paymentRouter);

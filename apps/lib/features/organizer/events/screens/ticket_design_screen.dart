@@ -45,6 +45,7 @@ class TicketDesignScreen extends StatelessWidget {
         const SizedBox(height: 12),
         TicketDesignPanel(
           eventId: eventId,
+          eventTitle: eventTitle,
           ticketTypes: ticketTypes,
           initialTicketTypeId: initialTicketTypeId,
         ),

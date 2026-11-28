@@ -322,25 +322,34 @@ model EventMemberPermission {
 }
 
 model EventInvitation {
-  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  eventId      String           @map("event_id") @db.Uuid
-  invitedById  String           @map("invited_by_id") @db.Uuid
-  acceptedById String?          @map("accepted_by_id") @db.Uuid
-  email        String           @db.VarChar(320)
-  tokenHash    String           @unique @map("token_hash") @db.Text
-  status       InvitationStatus @default(PENDING)
-  expiresAt    DateTime         @map("expires_at") @db.Timestamptz(6)
-  acceptedAt   DateTime?        @map("accepted_at") @db.Timestamptz(6)
-  revokedAt    DateTime?        @map("revoked_at") @db.Timestamptz(6)
-  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventId            String           @map("event_id") @db.Uuid
+  invitedById        String           @map("invited_by_id") @db.Uuid
+  acceptedById       String?          @map("accepted_by_id") @db.Uuid
+  email              String?          @db.VarChar(320)
+  tokenHash          String           @unique @map("token_hash") @db.Text
+  // Undangan staf berbasis nama + kode akses (lihat migration
+  // 20261201000000_staff_access_codes). Kode akses TIDAK disimpan plaintext.
+  staffName          String?          @map("staff_name")
+  accessCodeHash     String?          @unique @map("access_code_hash") @db.Text
+  accessCodeCipher   String?          @map("access_code_cipher") @db.Text
+  accessCodeIssuedAt DateTime?        @map("access_code_issued_at") @db.Timestamptz(6)
+  status             InvitationStatus @default(PENDING)
+  expiresAt          DateTime         @map("expires_at") @db.Timestamptz(6)
+  acceptedAt         DateTime?        @map("accepted_at") @db.Timestamptz(6)
+  revokedAt          DateTime?        @map("revoked_at") @db.Timestamptz(6)
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
 
   event       Event                       @relation(fields: [eventId], references: [id], onDelete: Cascade)
   inviter     User                        @relation("InvitationInviter", fields: [invitedById], references: [id], onDelete: Restrict)
   accepter    User?                       @relation("InvitationAccepter", fields: [acceptedById], references: [id], onDelete: SetNull)
   permissions EventInvitationPermission[]
+  checkIns    CheckIn[]                   @relation("CheckInStaffInvitation")
+  scanLogs    ScanLog[]                   @relation("ScanLogStaffInvitation")
 
   @@index([eventId, status, expiresAt])
   @@index([email, status])
+  @@index([eventId, staffName])
   @@map("event_invitations")
 }
 
@@ -516,6 +525,9 @@ model ScanLog {
   ticketId         String?    @map("ticket_id") @db.Uuid
   scannedByUserId  String?    @map("scanned_by_user_id") @db.Uuid
   eventMemberId    String?    @map("event_member_id") @db.Uuid
+  // Staf undangan (nama + kode akses) tidak punya akun; jejak audit memakai
+  // undangan yang dipakai saat memindai.
+  staffInvitationId String?   @map("staff_invitation_id") @db.Uuid
   clientScanId     String?    @map("client_scan_id") @db.Text
   scannedTokenHash String?    @map("scanned_token_hash") @db.Text
   result           ScanResult
@@ -526,6 +538,7 @@ model ScanLog {
   ticket Ticket?      @relation(fields: [ticketId], references: [id], onDelete: SetNull)
   actor  User?        @relation("ScanActor", fields: [scannedByUserId], references: [id], onDelete: SetNull)
   member EventMember? @relation(fields: [eventMemberId], references: [id], onDelete: SetNull)
+  staffInvitation EventInvitation? @relation("ScanLogStaffInvitation", fields: [staffInvitationId], references: [id], onDelete: SetNull)
 
   @@unique([eventId, clientScanId])
   @@index([eventId, scannedAt])
@@ -538,8 +551,11 @@ model CheckIn {
   id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ticketId      String        @unique @map("ticket_id") @db.Uuid
   eventId       String        @map("event_id") @db.Uuid
-  actorUserId   String        @map("actor_user_id") @db.Uuid
+  // Boleh NULL untuk staf undangan (tanpa akun). Salah satu dari
+  // `actor_user_id` atau `staff_invitation_id` selalu terisi.
+  actorUserId   String?       @map("actor_user_id") @db.Uuid
   eventMemberId String?       @map("event_member_id") @db.Uuid
+  staffInvitationId String?   @map("staff_invitation_id") @db.Uuid
   source        CheckInSource @default(ONLINE)
   checkedInAt   DateTime      @default(now()) @map("checked_in_at") @db.Timestamptz(6)
   syncedAt      DateTime?     @map("synced_at") @db.Timestamptz(6)
@@ -547,8 +563,9 @@ model CheckIn {
 
   ticket Ticket       @relation(fields: [ticketId], references: [id], onDelete: Restrict)
   event  Event        @relation(fields: [eventId], references: [id], onDelete: Restrict)
-  actor  User         @relation("CheckInActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  actor  User?        @relation("CheckInActor", fields: [actorUserId], references: [id], onDelete: Restrict)
   member EventMember? @relation(fields: [eventMemberId], references: [id], onDelete: SetNull)
+  staffInvitation EventInvitation? @relation("CheckInStaffInvitation", fields: [staffInvitationId], references: [id], onDelete: SetNull)
 
   @@unique([eventId, clientScanId])
   @@index([eventId, checkedInAt])

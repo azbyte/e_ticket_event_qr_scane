@@ -35,11 +35,25 @@ module.exports = {
   // tetap berjalan, tetapi produksi wajib memakai nilai terpisah.
   ticketTokenSecret: process.env.TICKET_TOKEN_SECRET || process.env.JWT_SECRET,
   ticketTokenSecretIsDedicated: Boolean(process.env.TICKET_TOKEN_SECRET),
+  // Kunci enkripsi kode akses staf (AES-256-GCM). Kode akses TIDAK disimpan
+  // sebagai plaintext: database hanya memuat hash (verifikasi) dan ciphertext
+  // (agar Organizer dapat menampilkan kembali kode milik event-nya). Fallback
+  // ke JWT_SECRET supaya deployment lama tetap berjalan, tetapi produksi
+  // sebaiknya memakai nilai terpisah.
+  staffAccessSecret: process.env.STAFF_ACCESS_SECRET || process.env.JWT_SECRET,
+  staffAccessSecretIsDedicated: Boolean(process.env.STAFF_ACCESS_SECRET),
+  // Masa berlaku sesi staf (akses lewat kode undangan). Dipakai sebagai
+  // `expiresIn` JWT sesi staf, mis. `12h`, `1d`.
+  staffSessionTtl: process.env.STAFF_SESSION_TTL || '12h',
   corsOrigin: corsOrigins.length === 0 ? '*' : (corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins),
   simulatedPaymentsEnabled: process.env.SIMULATED_PAYMENTS_ENABLED === 'true',
   seedDemoAccounts: process.env.SEED_DEMO_ACCOUNTS === 'true',
-  // URL publik aplikasi, dipakai untuk tautan e-ticket di email.
-  appPublicUrl: (process.env.APP_PUBLIC_URL || 'http://localhost:5000').replace(/\/$/, ''),
+  // URL publik aplikasi (Flutter web), dipakai untuk tautan e-ticket di email,
+  // `public_url` event, dan tautan undangan staf (`/staff-access/...`).
+  // Default harus menunjuk ke aplikasi, BUKAN port backend (5000): backend tidak
+  // menyajikan halaman Flutter, sehingga tautan ke port backend akan gagal
+  // dibuka. Samakan dengan `.env.example`/README (`--web-port=3000`).
+  appPublicUrl: (process.env.APP_PUBLIC_URL || 'http://localhost:3000').replace(/\/$/, ''),
   // Konfigurasi email TIDAK dibaca di sini: `src/services/emailService.js`
   // membacanya langsung dari environment setiap kali dipakai, sehingga
   // perubahan .env tidak "nyangkut" dan tidak ada alamat pengirim default

@@ -1,41 +1,16 @@
-/// Orientasi kanvas desain tiket (PRD §5).
-///
-/// Nilai string mengikuti kontrak backend (`landscape` / `portrait`) dan
-/// disimpan di kolom `ticket_design_orientation` sehingga tetap ada walau
-/// Organizer belum mengunggah file desain.
-enum TicketOrientation {
-  // Kanvas landscape 842 x 594 pt (rasio ~1.42:1, setara A4 landscape).
-  landscape('landscape', 'Landscape (horizontal)', 842 / 594),
-  // Kanvas portrait 440 x 704 pt (rasio 1:1.6).
-  portrait('portrait', 'Portrait (vertikal)', 440 / 704);
-
-  const TicketOrientation(this.value, this.label, this.widthToHeightRatio);
-
-  /// Nilai yang dikirim ke/diterima dari API.
-  final String value;
-
-  /// Label yang ditampilkan pada formulir Organizer.
-  final String label;
-
-  /// Rasio lebar:tinggi kanvas; dipakai untuk memvalidasi unggahan.
-  final double widthToHeightRatio;
-
-  bool get isPortrait => this == TicketOrientation.portrait;
-
-  static TicketOrientation fromValue(Object? raw) {
-    final value = raw?.toString().trim().toLowerCase();
-    return TicketOrientation.values.firstWhere(
-      (item) => item.value == value,
-      orElse: () => TicketOrientation.landscape,
-    );
-  }
-}
-
 /// Model desain tiket (PRD §5).
 ///
-/// Satu desain terdiri dari file gambar yang diunggah Organizer plus penanda
-/// posisi QR dan area teks informasi. Posisi disimpan sebagai fraksi 0..1 dari
-/// kanvas tiket sehingga tidak bergantung pada resolusi file.
+/// Satu desain terdiri dari konfigurasi tata letak (posisi/ukuran judul, ID
+/// tiket, instruksi, dan QR — lihat `ticket_layout_model.dart`) plus OPSIONAL
+/// berkas gambar yang diunggah Organizer. Konfigurasi tata letak tetap dapat
+/// disimpan walau belum ada berkas gambar, karena tiket default sistem juga
+/// memakai tata letak yang sama.
+library;
+
+import 'ticket_layout_model.dart';
+
+export 'ticket_layout_model.dart';
+
 class TicketDesignModel {
   const TicketDesignModel({
     required this.filePath,
@@ -46,55 +21,57 @@ class TicketDesignModel {
     this.orientation = TicketOrientation.landscape,
     this.width,
     this.height,
-    this.qr = defaultQr,
-    this.info = defaultInfo,
+    this.layout = TicketLayoutModel.defaultLandscape,
     this.updatedAt,
   });
 
-  /// Posisi QR default landscape: kiri 6.65%, atas 47.81%, sisi 37.04% tinggi
-  /// kanvas (sisi QR 220 pt) — nilai HARUS sama dengan
-  /// `DEFAULT_QR_BY_ORIENTATION.landscape` di backend agar penanda QR pada
-  /// pratinjau jatuh tepat di area QR tiket final.
+  /// Posisi QR default landscape (x 5,95%, y 32,60%, sisi 42,31% tinggi
+  /// kanvas) — nilai HARUS sama dengan `DEFAULT_LAYOUT_BY_ORIENTATION` di
+  /// backend agar penanda QR pada pratinjau jatuh tepat di area QR tiket final.
   static const TicketQrPlacement defaultQr = TicketQrPlacement(
-    x: 56 / 842,
-    y: 284 / 594,
-    size: 220 / 594,
+    x: 0.0595,
+    y: 0.326,
+    size: 0.4231,
   );
 
-  /// Area teks default landscape untuk desain kustom tanpa `info`: blok
-  /// informasi di kiri atas (tanpa panel/latar). Tinggi 0.350 x 594 = 208 pt,
-  /// cukup untuk tujuh baris informasi (judul 34 pt, peserta 23 pt, dst.).
+  /// Area teks default landscape (judul/ID/instruksi di kiri atas).
   static const TicketInfoPlacement defaultInfo = TicketInfoPlacement(
-    x: 56 / 842,
-    y: 52 / 594,
-    width: 392 / 842,
-    height: 208 / 594,
+    x: 0.0445,
+    y: 0.0286,
+    width: 0.6,
+    height: 0.2165,
     color: '#1A1A1A',
   );
 
-  /// Posisi QR default portrait: kiri 8.18%, atas 37.78%, sisi 35.51% tinggi.
+  /// Posisi QR default portrait.
   static const TicketQrPlacement defaultPortraitQr = TicketQrPlacement(
-    x: 36 / 440,
-    y: 266 / 704,
-    size: 250 / 704,
+    x: 0.07,
+    y: 0.46,
+    size: 0.36,
   );
 
-  /// Area teks default portrait (kiri atas header, tanpa panel/latar).
+  /// Area teks default portrait.
   static const TicketInfoPlacement defaultPortraitInfo = TicketInfoPlacement(
-    x: 36 / 440,
-    y: 40 / 704,
-    width: 344 / 440,
-    height: 200 / 704,
+    x: 0.07,
+    y: 0.042,
+    width: 0.86,
+    height: 0.152,
     color: '#1A1A1A',
   );
 
   static TicketQrPlacement defaultQrFor(TicketOrientation orientation) =>
-      orientation.isPortrait ? defaultPortraitQr : defaultQr;
+      TicketLayoutModel.defaultsFor(orientation).qr;
 
   static TicketInfoPlacement defaultInfoFor(TicketOrientation orientation) =>
       orientation.isPortrait ? defaultPortraitInfo : defaultInfo;
 
+  /// Tata letak default sistem untuk orientasi ini.
+  static TicketLayoutModel defaultLayoutFor(TicketOrientation orientation) =>
+      TicketLayoutModel.defaultsFor(orientation);
+
   /// Path relatif di server, mis. `/media/ticket-designs/{eventId}/{file}.png`.
+  /// String kosong berarti belum ada berkas gambar (tiket memakai desain
+  /// default sistem dengan tata letak yang tersimpan).
   final String filePath;
 
   /// `image/png` atau `image/jpeg`.
@@ -109,17 +86,31 @@ class TicketDesignModel {
   /// Dimensi file desain (px) bila sudah diunggah.
   final int? width;
   final int? height;
-  /// Posisi & ukuran QR tersimpan (fraksi 0..1), termasuk penanda apakah
-  /// Organizer pernah mengubahnya dari default sistem.
-  final TicketQrPlacement qr;
-  final TicketInfoPlacement info;
+
+  /// Konfigurasi tata letak (posisi & ukuran seluruh elemen, termasuk QR).
+  final TicketLayoutModel layout;
   final DateTime? updatedAt;
 
-  /// True bila file desain benar-benar tersimpan (bukan hanya konfigurasi).
+  /// Posisi & ukuran QR (cermin `layout.qr`, dipakai UI lama/ringkas).
+  TicketQrPlacement get qr => layout.qr;
+
+  /// Area teks (cermin `layout` untuk kompatibilitas tampilan ringkas).
+  TicketInfoPlacement get info => TicketInfoPlacement(
+    x: layout.title.x,
+    y: layout.title.y,
+    width: layout.textWidth,
+    height: layout.instruction.y - layout.title.y,
+    color: '#1A1A1A',
+  );
+
+  /// True bila file desain benar-benar tersimpan.
   bool get hasUploadedFile => filePath.isNotEmpty;
 
   /// True bila posisi/ukuran QR berbeda dari default orientasi ini.
-  bool get hasCustomQr => qr != defaultQrFor(orientation);
+  bool get hasCustomQr => layout.qr != defaultLayoutFor(orientation).qr;
+
+  /// True bila tata letak berbeda dari default orientasi ini.
+  bool get hasCustomLayout => layout != defaultLayoutFor(orientation);
 
   /// Rasio file desain, null bila dimensi belum diketahui.
   double? get aspectRatio {
@@ -130,9 +121,26 @@ class TicketDesignModel {
   }
 
   factory TicketDesignModel.fromJson(Map<String, dynamic> json) {
-    final qrRaw = json['qr'];
-    final infoRaw = json['info'];
     final orientation = TicketOrientation.fromValue(json['orientation']);
+    final layoutRaw = json['layout'];
+    final fallback = TicketLayoutModel.defaultsFor(orientation);
+    final TicketLayoutModel layout;
+    if (layoutRaw is Map) {
+      layout = TicketLayoutModel.fromJson(
+        Map<String, dynamic>.from(layoutRaw),
+        orientation: orientation,
+      );
+    } else if (json['qr'] is Map) {
+      // Desain lama: hanya menyimpan posisi QR (dan mungkin area `info`).
+      layout = fallback.copyWith(
+        qr: TicketQrPlacement.fromJson(
+          Map<String, dynamic>.from(json['qr'] as Map),
+          fallback: fallback.qr,
+        ),
+      );
+    } else {
+      layout = fallback;
+    }
     return TicketDesignModel(
       filePath: json['file_path']?.toString() ?? '',
       contentType: json['content_type']?.toString() ?? 'image/png',
@@ -142,12 +150,7 @@ class TicketDesignModel {
       orientation: orientation,
       width: (json['width'] as num?)?.toInt(),
       height: (json['height'] as num?)?.toInt(),
-      qr: qrRaw is Map
-          ? TicketQrPlacement.fromJson(Map<String, dynamic>.from(qrRaw))
-          : defaultQrFor(orientation),
-      info: infoRaw is Map
-          ? TicketInfoPlacement.fromJson(Map<String, dynamic>.from(infoRaw))
-          : defaultInfoFor(orientation),
+      layout: layout,
       updatedAt: DateTime.tryParse(json['updated_at']?.toString() ?? ''),
     );
   }
@@ -160,112 +163,18 @@ class TicketDesignModel {
     'orientation': orientation.value,
     if (width != null) 'width': width,
     if (height != null) 'height': height,
-    'qr': qr.toJson(),
-    'info': info.toJson(),
+    'layout': layout.toJson(),
+    'qr': layout.qr.toJson(),
     if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
   };
 }
 
-/// Posisi & ukuran QR pada kanvas tiket (fraksi 0..1).
-class TicketQrPlacement {
-  const TicketQrPlacement({
-    required this.x,
-    required this.y,
-    required this.size,
-  });
-
-  /// Batas yang sama dengan backend (`QR_PLACEMENT_LIMITS`): posisi 0-95%,
-  /// ukuran 15%-60% tinggi kanvas.
-  static const double minPosition = 0;
-  static const double maxPosition = 0.95;
-  static const double minSize = 0.15;
-  static const double maxSize = 0.6;
-
-  final double x;
-  final double y;
-  final double size;
-
-  /// Nilai yang dijamin berada di dalam batas slider/validasi backend.
-  ///
-  /// Dipakai saat memuat pengaturan tersimpan: desain lama dapat menyimpan
-  /// ukuran hingga 90%, sedangkan slider hanya menerima 15%-60%.
-  TicketQrPlacement clamped() => TicketQrPlacement(
-        x: x.clamp(minPosition, maxPosition),
-        y: y.clamp(minPosition, maxPosition),
-        size: size.clamp(minSize, maxSize),
-      );
-
-  TicketQrPlacement copyWith({double? x, double? y, double? size}) =>
-      TicketQrPlacement(
-        x: x ?? this.x,
-        y: y ?? this.y,
-        size: size ?? this.size,
-      );
-
-  /// Perbandingan nilai: dipakai untuk mendeteksi perubahan pengaturan QR
-  /// sebelum disimpan (bukan perbandingan identitas objek).
-  @override
-  bool operator ==(Object other) =>
-      other is TicketQrPlacement &&
-      other.x == x &&
-      other.y == y &&
-      other.size == size;
-
-  @override
-  int get hashCode => Object.hash(x, y, size);
-
-  factory TicketQrPlacement.fromJson(Map<String, dynamic> json) =>
-      TicketQrPlacement(
-        x: (json['x'] as num? ?? TicketDesignModel.defaultQr.x).toDouble(),
-        y: (json['y'] as num? ?? TicketDesignModel.defaultQr.y).toDouble(),
-        size: (json['size'] as num? ?? TicketDesignModel.defaultQr.size)
-            .toDouble(),
-      );
-
-  Map<String, dynamic> toJson() => <String, dynamic>{
-    'x': x,
-    'y': y,
-    'size': size,
-  };
-}
-
-/// Area teks informasi peserta pada kanvas tiket (fraksi 0..1).
-class TicketInfoPlacement {
-  const TicketInfoPlacement({
-    required this.x,
-    required this.y,
-    required this.width,
-    required this.height,
-    required this.color,
-  });
-
-  final double x;
-  final double y;
-  final double width;
-  final double height;
-  final String color;
-
-  factory TicketInfoPlacement.fromJson(Map<String, dynamic> json) =>
-      TicketInfoPlacement(
-        x: (json['x'] as num? ?? TicketDesignModel.defaultInfo.x).toDouble(),
-        y: (json['y'] as num? ?? TicketDesignModel.defaultInfo.y).toDouble(),
-        width: (json['width'] as num? ?? TicketDesignModel.defaultInfo.width)
-            .toDouble(),
-        height: (json['height'] as num? ?? TicketDesignModel.defaultInfo.height)
-            .toDouble(),
-        color: json['color']?.toString() ?? TicketDesignModel.defaultInfo.color,
-      );
-
-  Map<String, dynamic> toJson() => <String, dynamic>{
-    'x': x,
-    'y': y,
-    'width': width,
-    'height': height,
-    'color': color,
-  };
-}
-
 /// Hasil pemuatan desain untuk satu event (default + per kategori).
+///
+/// `eventDesign` SELALU terisi setelah respons API: bila Organizer belum
+/// mengunggah desain, nilainya adalah konfigurasi default sistem
+/// (`filePath` kosong), sehingga editor dapat menampilkan dan mengubah tata
+/// letak tiket default tanpa meminta unggahan.
 class TicketDesignState {
   const TicketDesignState({
     this.eventDesign,
@@ -297,6 +206,15 @@ class TicketDesignState {
     }
     if (eventDesign?.hasUploadedFile == true) return eventDesign!.orientation;
     return eventOrientation;
+  }
+
+  /// Tata letak efektif untuk scope terpilih: kategori -> event -> default.
+  TicketLayoutModel layoutFor(String? ticketTypeId) {
+    final design = ticketTypeId == null
+        ? eventDesign
+        : ticketTypeDesigns[ticketTypeId];
+    if (design != null) return design.layout;
+    return TicketLayoutModel.defaultsFor(orientationFor(ticketTypeId));
   }
 
   factory TicketDesignState.fromJson(Map<String, dynamic> json) {
@@ -333,3 +251,4 @@ class TicketDesignState {
     );
   }
 }
+

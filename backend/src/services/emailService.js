@@ -1417,6 +1417,9 @@ module.exports = {
   loadTicketContext,
   markQueued,
   claimDelivery,
+  // Diekspor agar dapat diuji tanpa SMTP: membuktikan lampiran email memakai
+  // renderer & tata letak yang sama dengan PDF unduhan peserta.
+  buildPdfAttachment,
   sendTicketEmail,
   sendOrderTicketEmails,
   retryPendingDeliveries,

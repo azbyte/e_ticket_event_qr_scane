@@ -34,6 +34,30 @@ const assertScanPermission = async (eventId, user) => {
   if (user.role === 'admin') return null;
   if (event.created_by === user.id) return null;
 
+  // Sesi staf dari undangan (nama + kode akses) tidak memakai `event_members`.
+  // Otorisasinya: event harus sama dengan event undangan (tidak ada akses
+  // lintas event) dan undangan harus memberi permission scan/check-in.
+  if (user.staffInvitationId) {
+    if (String(user.staffEventId) !== String(eventId)) {
+      const err = new Error('Sesi staf hanya berlaku untuk event undangan Anda');
+      err.statusCode = 403;
+      throw err;
+    }
+    const invitationPerms = await query(
+      'SELECT permission FROM event_invitation_permissions WHERE event_invitation_id = $1',
+      [user.staffInvitationId]
+    );
+    const allowed = (invitationPerms || []).some(
+      (p) => p.permission === 'CHECK_IN_TICKET' || p.permission === 'SCAN_TICKET'
+    );
+    if (!allowed) {
+      const err = new Error('Undangan staf Anda tidak memiliki izin memindai tiket event ini');
+      err.statusCode = 403;
+      throw err;
+    }
+    return `staff-invitation:${user.staffInvitationId}`;
+  }
+
   // Tabel `event_members` tidak menyimpan kolom status: keberadaan baris
   // membership berarti staf aktif (lihat `docs/DATABASE.md`). Sebelumnya query
   // ini memilih `status` yang tidak ada sehingga seluruh scan/check-in gagal 500.
@@ -69,6 +93,30 @@ const assertMemberPermission = async (eventId, user, requiredPermissions = []) =
   }
   if (user.role === 'admin') return null;
   if (event.created_by === user.id) return null;
+
+  // Sesi staf undangan: hanya event undangannya, dan hanya permission yang
+  // benar-benar diberikan pada undangan (MANAGE_EVENT tidak pernah diberikan).
+  if (user.staffInvitationId) {
+    if (String(user.staffEventId) !== String(eventId)) {
+      const err = new Error('Sesi staf hanya berlaku untuk event undangan Anda');
+      err.statusCode = 403;
+      throw err;
+    }
+    const invitationPerms = await query(
+      'SELECT permission FROM event_invitation_permissions WHERE event_invitation_id = $1',
+      [user.staffInvitationId]
+    );
+    const granted = (invitationPerms || []).map((p) => p.permission);
+    const allowed = requiredPermissions.length === 0
+      ? granted.length > 0
+      : requiredPermissions.some((permission) => granted.includes(permission));
+    if (!allowed) {
+      const err = new Error('Undangan staf Anda tidak memiliki izin untuk aksi ini');
+      err.statusCode = 403;
+      throw err;
+    }
+    return `staff-invitation:${user.staffInvitationId}`;
+  }
 
   const member = await getOne(
     'SELECT id FROM event_members WHERE event_id = $1 AND user_id = $2',
@@ -286,6 +334,11 @@ const validateTicket = asyncHandler(async (req, res) => {
  * @returns {Promise<{checkIn: object, checkedInAt: string}>}
  */
 const commitCheckIn = async ({ ticket, user, memberId, now = new Date().toISOString() }) => {
+  // Staf undangan (kode akses) tidak punya baris `profiles`; identitas pelaku
+  // dicatat lewat `staff_invitation_id`, sedangkan `actor_user_id` dibiarkan
+  // NULL (lihat migration 20261201000000_staff_access_codes).
+  const actorUserId = user.staffInvitationId ? null : user.id;
+  const staffInvitationId = user.staffInvitationId || null;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -296,11 +349,12 @@ const commitCheckIn = async ({ ticket, user, memberId, now = new Date().toISOStr
       throw err;
     }
     const inserted = await client.query(
-      `INSERT INTO check_ins (id, ticket_id, event_id, actor_user_id, event_member_id, source, checked_in_at)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, 'ONLINE', $5)
+      `INSERT INTO check_ins
+         (id, ticket_id, event_id, actor_user_id, event_member_id, staff_invitation_id, source, checked_in_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'ONLINE', $6)
        ON CONFLICT (ticket_id) DO NOTHING
        RETURNING *`,
-      [ticket.id, ticket.event_id, user.id, memberId, now]
+      [ticket.id, ticket.event_id, actorUserId, memberId, staffInvitationId, now]
     );
     if (!inserted.rows[0]) {
       const err = new Error('Tiket sudah di-check-in');
@@ -309,9 +363,10 @@ const commitCheckIn = async ({ ticket, user, memberId, now = new Date().toISOStr
     }
     await client.query('UPDATE tickets SET status = $1, used_at = $2 WHERE id = $3', ['used', now, ticket.id]);
     await client.query(
-      `INSERT INTO scan_logs (id, event_id, ticket_id, scanned_by_user_id, event_member_id, result, is_offline, scanned_at)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, 'VALID', false, $5)`,
-      [ticket.event_id, ticket.id, user.id, memberId, now]
+      `INSERT INTO scan_logs
+         (id, event_id, ticket_id, scanned_by_user_id, event_member_id, staff_invitation_id, result, is_offline, scanned_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'VALID', false, $6)`,
+      [ticket.event_id, ticket.id, actorUserId, memberId, staffInvitationId, now]
     );
     await client.query('COMMIT');
     return { checkIn: inserted.rows[0], checkedInAt: now };
@@ -839,10 +894,14 @@ const listEventCheckIns = asyncHandler(async (req, res) => {
   const rows = await query(
     `SELECT ci.*,
             t.ticket_code, t.status AS ticket_status,
-            a.id AS actor_id, a.name AS actor_name, a.email AS actor_email
+            COALESCE(a.id, si.id) AS actor_id,
+            COALESCE(a.name, si.staff_name) AS actor_name,
+            a.email AS actor_email,
+            si.staff_name AS staff_name
      FROM check_ins ci
      LEFT JOIN tickets t ON t.id = ci.ticket_id
      LEFT JOIN profiles a ON a.id = ci.actor_user_id
+     LEFT JOIN event_invitations si ON si.id = ci.staff_invitation_id
      WHERE ci.event_id = $1
      ORDER BY ci.checked_in_at DESC`,
     [eventId]
@@ -911,11 +970,20 @@ const syncCheckIns = asyncHandler(async (req, res) => {
         }
         const inserted = await client.query(
           `INSERT INTO check_ins
-             (id, ticket_id, event_id, actor_user_id, event_member_id, source, checked_in_at, synced_at, client_scan_id)
-           VALUES (gen_random_uuid(), $1, $2, $3, $4, 'OFFLINE_SYNC', $5, NOW(), $6)
+             (id, ticket_id, event_id, actor_user_id, event_member_id, staff_invitation_id,
+              source, checked_in_at, synced_at, client_scan_id)
+           VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'OFFLINE_SYNC', $6, NOW(), $7)
            ON CONFLICT (ticket_id) DO NOTHING
            RETURNING *`,
-          [ticketId, eventId, user.id, memberId, checkedInAt, clientScanId]
+          [
+            ticketId,
+            eventId,
+            user.staffInvitationId ? null : user.id,
+            memberId,
+            user.staffInvitationId || null,
+            checkedInAt,
+            clientScanId,
+          ]
         );
         if (!inserted.rows[0]) {
           const err = new Error('Tiket sudah di-check-in'); err.statusCode = 409; throw err;
@@ -926,10 +994,19 @@ const syncCheckIns = asyncHandler(async (req, res) => {
         );
         await client.query(
           `INSERT INTO scan_logs
-             (id, event_id, ticket_id, scanned_by_user_id, event_member_id, client_scan_id, result, is_offline, scanned_at)
-           VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'VALID', true, $6)
+             (id, event_id, ticket_id, scanned_by_user_id, event_member_id, staff_invitation_id,
+              client_scan_id, result, is_offline, scanned_at)
+           VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, 'VALID', true, $7)
            ON CONFLICT (event_id, client_scan_id) DO NOTHING`,
-          [eventId, ticketId, user.id, memberId, clientScanId, checkedInAt]
+          [
+            eventId,
+            ticketId,
+            user.staffInvitationId ? null : user.id,
+            memberId,
+            user.staffInvitationId || null,
+            clientScanId,
+            checkedInAt,
+          ]
         );
         await client.query('COMMIT');
         synced += 1;

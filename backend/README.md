@@ -202,7 +202,10 @@ Menambah endpoint baru: letakkan pada router domain yang sesuai di
   event → kategori → publikasi → link/QR publik → desain tiket → pendaftaran
   guest → pembayaran simulasi → tiket PDF) terhadap backend yang sedang
   berjalan. `npm run verify:ticket-pdf` memverifikasi rendering template/tiket
-  untuk kedua orientasi (landscape/portrait).
+  untuk kedua orientasi (landscape/portrait), termasuk ukuran huruf referensi
+  (judul 50 pt, ID & instruksi 30 pt) dan QR yang tidak menutupi tulisan.
+  `npm run render:ticket-samples` menulis PDF contoh + `manifest.json` untuk
+  pemeriksaan visual dan pemindaian QR (lihat bagian Desain tiket di bawah).
 - `npm run verify:ticket-flow` menguji alur tiket lewat HTTP API + database nyata
   (nama event pada tiket, penerbitan tiket gratis/berbayar, status email jujur,
   kirim ulang tanpa duplikasi, orientasi tersimpan & dipakai PDF). Data uji
@@ -413,9 +416,31 @@ tidak ada jalur rendering kedua untuk event gratis/berbayar.
   tiket dibuka/dikirim, atau sekaligus dengan `npm run tickets:backfill-codes`;
   kode lama `TKT-<uuid>` tetap dapat divalidasi lewat `tickets.qr_code_data`.
 - **Template desain** (`GET /api/ticket-design-template`) berisi latar/ornamen +
-  penanda tipis area QR (garis putus-putus tanpa alas putih dan tanpa teks
-  contoh) agar teks/alas putih dinamis tidak tercetak dua kali. Regenerasi:
-  `powershell -ExecutionPolicy Bypass -File scripts/generate-ticket-template.ps1`.
+  penanda tipis area judul/ID/instruksi/QR (garis putus-putus tanpa teks contoh)
+  agar teks/alas putih dinamis tidak tercetak dua kali. Template PDF dan PNG
+  dibuat dari renderer yang sama (`buildTemplatePdf`), jadi keduanya tidak dapat
+  berbeda. Regenerasi PNG setelah mengubah tata letak:
+  `npm run render:ticket-samples` lalu `py tools/export_ticket_templates.py`.
+- **Tata letak tiket** disimpan sebagai `ticket_design.layout`
+  (`ticketDesignLayout`): fraksi kanvas + ukuran huruf pt untuk `title`,
+  `ticket_id`, `instruction`, dan `qr`. Default diukur dari
+  `docs/references/desain_tiket_referensi.png` (judul 50 pt bold, ID & instruksi
+  30 pt, QR 42,3% tinggi kanvas, panel 55,8%). Simpan perubahan lewat
+  `PUT /api/events/:id/ticket-design` dengan `layout_only: true`; konfigurasi yang
+  membuat elemen bertumpuk atau keluar kanvas DITOLAK.
+- **Font tiket**: `ticketFontService` mencari TTF Times New Roman
+  (`TICKET_FONT_REGULAR`/`TICKET_FONT_BOLD`, `backend/assets/fonts/`, atau font
+  sistem) lalu menanamkannya di PDF; tanpa TTF dipakai base-14
+  `Times-Roman`/`Times-Bold` yang metriknya identik. Berkas TTF tidak di-commit
+  (lisensi Microsoft).
+- **Pemeriksaan visual PDF**: `npm run render:ticket-samples` menulis 9 PDF contoh
+  (default landscape/portrait, judul panjang, artwork kustom, tata letak kustom,
+  dua peserta berbeda, template, konfigurasi tanpa berkas) ke
+  `backend/_verify-out/ticket-samples/` beserta `manifest.json` (token QR).
+  `py tools/compare_ticket_render.py --all` mengukur posisi elemen terhadap
+  gambar referensi dan menulis PNG bersebelahan; `py tools/decode_ticket_qr.py
+  "--manifest=backend/_verify-out/ticket-samples/manifest.json"` memindai QR dan
+  membandingkan isinya dengan token tiket yang diharapkan.
 
 ### Events
 | Method | Endpoint | Deskripsi | Akses |
@@ -433,7 +458,7 @@ tidak ada jalur rendering kedua untuk event gratis/berbayar.
 | PUT/DELETE | `/api/events/:id/ticket-types/:ticketTypeId` | Ubah/hapus kategori tiket | Organizer |
 | GET | `/api/ticket-types/:id` | Detail kategori tiket | Public |
 | GET | `/api/events/:id/ticket-design` | Desain tiket event + per kategori (posisi QR, orientasi) | Owner/Admin |
-| PUT | `/api/events/:id/ticket-design` | Unggah desain / simpan orientasi (`scope=event` atau `scope=ticket_type`); `qr_only: true` untuk menyimpan posisi & ukuran QR saja | Owner/Admin |
+| PUT | `/api/events/:id/ticket-design` | Unggah desain / simpan orientasi (`scope=event` atau `scope=ticket_type`); `layout_only: true` untuk menyimpan tata letak (posisi & ukuran judul/ID/instruksi/QR) tanpa unggah ulang berkas | Owner/Admin |
 | DELETE | `/api/events/:id/ticket-design?scope=` | Hapus desain & orientasi (kembali ke default) | Owner/Admin |
 | GET | `/api/ticket-design-template?format=pdf\|png&orientation=landscape\|portrait` | Unduh template desain tiket (ukuran + penanda QR) | Public |
 | GET | `/api/events/:id/summary` | Ringkasan operasional event | Organizer/Admin |
@@ -441,8 +466,20 @@ tidak ada jalur rendering kedua untuk event gratis/berbayar.
 | GET/POST | `/api/events/:id/members` | Daftar/tambah staf event + izin | Owner |
 | PUT | `/api/events/:id/members/:userId/permissions` | Ganti izin staf | Owner |
 | DELETE | `/api/events/:id/members/:userId` | Hapus staf | Owner |
-| GET/POST | `/api/events/:id/invitations` | Daftar/buat undangan staf | Owner/Admin |
+| GET/POST | `/api/events/:id/invitations` | Daftar/buat undangan staf (alur email lama) | Owner/Admin |
 | DELETE | `/api/events/:id/invitations/:invitationId` | Cabut undangan | Owner/Admin |
+| GET/POST | `/api/events/:id/staff-invitations` | Daftar/buat undangan staf **berbasis nama** (kode akses dibuat backend) | Owner/Admin |
+| POST | `/api/events/:id/staff-invitations/:invitationId/regenerate` | Terbitkan kode akses baru (kode lama tidak berlaku) | Owner/Admin |
+| DELETE | `/api/events/:id/staff-invitations/:invitationId` | Cabut undangan staf (sesi aktif langsung ditolak) | Owner/Admin |
+| GET | `/api/staff-invitations/:invitationId` | Pratinjau undangan untuk halaman kode akses (tanpa kode) | Public |
+| POST | `/api/staff-access/validate` | Validasi kode akses → sesi staf terikat undangan + event | Public (rate limited) |
+| GET | `/api/staff-access/session` | Info sesi staf aktif (`X-Staff-Session`) | Staff session |
+| POST | `/api/staff-access/logout` | Akhiri sesi staf (token dicabut) | Staff session |
+
+> **Catatan skema:** endpoint `staff-invitations` dan `staff-access` membutuhkan
+> migration `20261201000000_staff_access_codes`. Bila migration belum diterapkan,
+> endpoint membalas `424` dengan pesan bahwa skema database belum dimigrasikan
+> (bukan error 500 generik). Lihat `docs/DATABASE.md` bagian migration tertunda.
 | POST | `/api/invitations/:token/accept` | Terima undangan (email harus cocok) | Private |
 | GET | `/api/invitations/:token` | Pratinjau undangan publik (email disamarkan) | Public |
 | GET | `/api/invitations/me` | Undangan pending milik pengguna | Private |

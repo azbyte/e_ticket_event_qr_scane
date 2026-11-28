@@ -44,6 +44,8 @@ const check = (condition, message) => {
   }
 };
 
+const { extractPdfLines } = require('../tools/pdf-text');
+
 /** Dekompresi semua content stream PDF lalu gabungkan sebagai teks latin1. */
 const inflateStreams = (buffer) => {
   const zlib = require('node:zlib');
@@ -62,55 +64,20 @@ const inflateStreams = (buffer) => {
   return parts.join('\n');
 };
 
-/** Teks yang dapat dibaca dari PDF (string hex di dalam blok BT..ET). */
-const extractPdfText = (buffer) => {
-  const content = inflateStreams(buffer);
-  const texts = [];
-  for (const block of content.match(/BT[\s\S]*?ET/g) || []) {
-    let line = '';
-    for (const hex of block.match(/<([0-9A-Fa-f\s]+)>/g) || []) {
-      const clean = hex.slice(1, -1).replace(/\s+/g, '');
-      if (clean.length % 2 !== 0) continue;
-      line += Buffer.from(clean, 'hex').toString('latin1');
-    }
-    if (line) texts.push(line);
-  }
-  return texts.join(' ');
-};
-
-/** Posisi semua matriks teks `1 0 0 1 x y Tm` (y dari bawah halaman). */
-const textPositions = (buffer) => {
-  const content = inflateStreams(buffer);
-  const positions = [];
-  for (const match of content.matchAll(/1 0 0 1 ([\d.]+) ([\d.]+) Tm/g)) {
-    positions.push({ x: Number(match[1]), y: Number(match[2]) });
-  }
-  return positions;
-};
-
-/** Ukuran font tiap baris teks: pasangan `Tm` lalu `Tf` (pt). */
-const textRows = (buffer) => {
-  const content = inflateStreams(buffer);
-  return [...content.matchAll(/1 0 0 1 ([\d.]+) ([\d.]+) Tm\s*\/\w+ ([\d.]+) Tf/g)]
-    .map((match) => ({
-      x: Number(match[1]),
-      y: Number(match[2]),
-      size: Number(match[3]),
-    }));
-};
-
 /**
- * Verifikasi tata letak tiket pada satu PDF:
- * teks hanya di kiri atas, QR medium tepat di bawah teks, tujuh baris informasi
- * dengan tipografi besar & hierarkis, dan tidak ada informasi administratif
- * berulang.
+ * Verifikasi tata letak tiket pada satu PDF.
+ *
+ * Desain referensi (Canva) hanya mencetak TIGA teks dinamis:
+ *   1. `E-TIKET [NAMA ACARA]` (Times New Roman Bold),
+ *   2. `ID TIKET: [ID]`,
+ *   3. instruksi penukaran.
+ * QR Code berada di kiri bawah, tepat di bawah blok teks.
  */
 const checkReferenceLayout = (buffer, {
-  label, width, height, qr, minTitle = 29,
+  label, width, height, qr, minTitle = 29, titleSize = 50, bodySize = 30,
 }) => {
-  const text = extractPdfText(buffer);
-  const positions = textPositions(buffer);
-  const rows = textRows(buffer);
+  const lines = extractPdfLines(buffer);
+  const positions = lines.map((line) => ({ x: line.x, y: line.y }));
   check(positions.length > 0, `${label}: PDF memuat teks informasi`);
   check(
     positions.every((pos) => pos.x < width * 0.35),
@@ -122,55 +89,48 @@ const checkReferenceLayout = (buffer, {
     `${label}: semua teks berada di atas area QR (y min `
     + `${Math.min(...positions.map((p) => p.y)).toFixed(1)} pt dari bawah)`,
   );
+  const text = lines.map((line) => line.text).join(' ');
   check(
-    /E-TIKET\s*Tech Fest 2026/.test(text) && /ID TIKET:\s*ETK-7K4P9Q/.test(text),
-    `${label}: baris "E-TIKET [NAMA EVENT]" dan "ID TIKET: ..." tercetak`,
+    /E-TIKET\s*TECH FEST 2026/.test(text) && /ID TIKET:\s*ETK-7K4P9Q/.test(text),
+    `${label}: baris "E-TIKET [NAMA ACARA]" dan "ID TIKET: ..." tercetak`,
   );
   check(
-    /Peserta:\s*Aziz Azman Faza/.test(text) && /Kategori:\s*VIP/.test(text)
-    && /Jadwal:\s*\w+/.test(text) && /Lokasi:\s*Jakarta/.test(text),
-    `${label}: peserta, kategori, jadwal, dan lokasi tercetak`,
+    !/Peserta:|Kategori:|Jadwal:|Lokasi:/.test(text),
+    `${label}: hanya tiga teks dinamis (tanpa nama peserta/kategori/jadwal/lokasi)`,
   );
   check(
-    (text.match(/Silakan tukarkan tiket/gi) ?? []).length === 1,
+    (text.match(/Silahkan tukarkan tiket/gi) ?? []).length === 1,
     `${label}: hanya satu instruksi penukaran tiket`,
   );
   check(
     !/No\. registrasi|ORD-20261126-0001|Diterbitkan|Berlaku untuk/i.test(text),
     `${label}: tanpa nomor registrasi / tanggal terbit / kartu informasi`,
   );
-  // Tipografi: hierarki 34/23/16/16/16/16/14 pt (naik dari 31/17,5/15,5/13,5).
-  check(rows.length === 7, `${label}: tujuh baris informasi (${rows.length})`);
-  if (rows.length === 7) {
-    const [title, attendee, id, category, schedule, location, instruction] =
-      rows.map((row) => row.size);
-    check(title >= minTitle, `${label}: judul ${title.toFixed(1)} pt (>= ${minTitle} pt)`);
-    check(attendee >= 21, `${label}: nama peserta ${attendee.toFixed(1)} pt (>= 21 pt)`);
-    check(id >= 16, `${label}: ID tiket ${id.toFixed(1)} pt (>= 16 pt)`);
-    check(category >= 16, `${label}: kategori ${category.toFixed(1)} pt (>= 16 pt)`);
-    check(schedule >= 16, `${label}: jadwal ${schedule.toFixed(1)} pt (>= 16 pt)`);
-    check(location >= 16, `${label}: lokasi ${location.toFixed(1)} pt (>= 16 pt)`);
-    check(instruction >= 13.5,
-      `${label}: instruksi ${instruction.toFixed(1)} pt (>= 13,5 pt)`);
-    check(title > attendee && attendee > id && id > instruction,
-      `${label}: hierarki ${title.toFixed(1)} > ${attendee.toFixed(1)} > `
-      + `${id.toFixed(1)} > ${instruction.toFixed(1)} pt`);
+  check(lines.length === 3, `${label}: tiga baris informasi (${lines.length})`);
+  if (lines.length === 3) {
+    const [title, id, instruction] = lines;
+    check(title.size >= minTitle,
+      `${label}: judul ${title.size.toFixed(1)} pt (>= ${minTitle} pt)`);
+    check(title.size <= titleSize,
+      `${label}: judul ${title.size.toFixed(1)} pt (maks referensi ${titleSize} pt)`);
+    check(id.size === bodySize && instruction.size === bodySize,
+      `${label}: ID tiket & instruksi ${id.size.toFixed(1)} pt `
+      + `(referensi ${bodySize} pt)`);
+    check(id.text.startsWith('ID TIKET: '), `${label}: baris kedua ID tiket`);
     // Blok teks berakhir sebelum QR: baris terakhir + tinggi baris < QR top.
-    const lastRow = rows[rows.length - 1];
-    check(height - lastRow.y < qr.y,
-      `${label}: blok teks berakhir ${(height - lastRow.y).toFixed(1)} pt, `
+    check(height - instruction.y < qr.y,
+      `${label}: blok teks berakhir ${(height - instruction.y).toFixed(1)} pt, `
       + `QR mulai ${qr.y.toFixed(1)} pt (tidak bertumpuk)`);
   }
-  // QR ukuran medium: 200-240 pt (landscape) / 220-260 pt (portrait).
+  // QR mengikuti referensi: sisi ± 42% tinggi kanvas.
   check(qr.size >= 200 && qr.size <= 260, `${label}: QR medium (${qr.size.toFixed(0)} pt)`);
   check(
     qr.y >= 150 && qr.y < height * 0.65,
     `${label}: QR tepat di bawah blok teks (y=${qr.y.toFixed(0)} pt)`,
   );
   check(
-    qr.x + qr.size + svc.QR_BACKING_PAD <= width
-    && qr.y + qr.size + svc.QR_BACKING_PAD <= height,
-    `${label}: QR dan alas putihnya tidak keluar halaman`,
+    qr.x + qr.size <= width && qr.y + qr.size <= height,
+    `${label}: QR tidak keluar halaman`,
   );
 };
 
@@ -196,8 +156,7 @@ const saveDesign = async (eventId, buffer, orientation) => {
     orientation,
     width: size.width,
     height: size.height,
-    qr: svc.DEFAULT_QR_BY_ORIENTATION[orientation],
-    info: svc.DEFAULT_INFO_BY_ORIENTATION[orientation],
+    layout: svc.layoutSpec.DEFAULT_LAYOUT_BY_ORIENTATION[orientation],
   };
 };
 
@@ -280,15 +239,32 @@ const solidPng = (width, height) => {
     label: 'default portrait',
     width: 440,
     height: 704,
-    // Kanvas portrait lebih sempit (344 pt), sehingga judul memakai ukuran
-    // terbesar yang masih muat satu baris utuh (±28 pt).
-    minTitle: 27,
+    // Kanvas portrait lebih sempit; default portrait memakai judul 26 pt dan
+    // teks isi 16 pt (lihat `DEFAULT_LAYOUT_BY_ORIENTATION.portrait`).
+    minTitle: 20,
+    titleSize: 26,
+    bodySize: 16,
     qr: {
       x: svc.DEFAULT_QR_BY_ORIENTATION.portrait.x * 440,
       y: svc.DEFAULT_QR_BY_ORIENTATION.portrait.y * 704,
       size: svc.DEFAULT_QR_BY_ORIENTATION.portrait.size * 704,
     },
   });
+
+  // 2b. Nama acara pendek: tipografi referensi dipakai apa adanya (50/30/30).
+  {
+    const shortPdf = await svc.buildTicketPdf({ ...ticket, event_title: 'Konser' });
+    fs.writeFileSync(path.join(outDir, 'ticket-landscape-short-title.pdf'), shortPdf);
+    const lines = extractPdfLines(shortPdf);
+    check(lines.length === 3, `nama acara pendek: tiga baris (${lines.length})`);
+    check(lines[0]?.text === 'E-TIKET KONSER',
+      `nama acara pendek: judul "E-TIKET KONSER" (${lines[0]?.text})`);
+    check(lines[0]?.size === 50,
+      `nama acara pendek: judul tepat 50 pt (${lines[0]?.size})`);
+    check(lines[1]?.size === 30 && lines[2]?.size === 30,
+      `nama acara pendek: ID & instruksi tepat 30 pt `
+      + `(${lines[1]?.size}/${lines[2]?.size})`);
+  }
 
   // 3. Desain kustom: kanvas tetap, gambar tidak distorsi.
   for (const orientation of svc.ORIENTATIONS) {
@@ -331,8 +307,7 @@ const solidPng = (width, height) => {
           file_path: saved.filePath,
           content_type: 'image/png',
           orientation: 'landscape',
-          qr: customQr,
-          info: svc.DEFAULT_INFO_BY_ORIENTATION.landscape,
+          layout: { ...svc.layoutSpec.DEFAULT_LAYOUT_BY_ORIENTATION.landscape, qr: customQr },
         },
       });
       fs.writeFileSync(path.join(outDir, 'ticket-landscape-custom-qr.pdf'), pdf);
@@ -361,8 +336,7 @@ const solidPng = (width, height) => {
           file_path: saved.filePath,
           content_type: 'image/png',
           orientation: 'landscape',
-          qr: svc.DEFAULT_QR_BY_ORIENTATION.landscape,
-          info: svc.DEFAULT_INFO_BY_ORIENTATION.landscape,
+          layout: svc.layoutSpec.DEFAULT_LAYOUT_BY_ORIENTATION.landscape,
         },
         ticket_type_design: { file_path: '/media/ticket-designs/hilang/x.png' },
       });

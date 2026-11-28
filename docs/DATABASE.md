@@ -31,7 +31,8 @@
 - Prisma initial migration dan 8 migration lanjutan **sudah diterapkan** dan
   tercatat di `_prisma_migrations` (9 migration, terakhir
   `20261118000400_restore_payment_status_enum_cast`). `prisma migrate status`
-  menyatakan schema up to date. Verifikasi read-only 23 November 2026:
+  menyatakan schema up to date **pada verifikasi 23 November 2026** (lihat
+  catatan migration tertunda di bawah). Verifikasi read-only 23 November 2026:
   - 32 tabel aplikasi + `_prisma_migrations`, 19 enum, 54 foreign key,
     105 index aplikasi.
   - `npx prisma migrate diff --from-schema-datasource prisma/schema.prisma
@@ -47,6 +48,18 @@
     diperlukan. Satu-satunya objek yang belum tercakup migration Prisma adalah
     unique index `lower(username)` (`profiles_username_lower_unique`); lihat
     proposal DP-05 pada `../task/DB_CHANGE_PROPOSAL.md` (arsip).
+- **MIGRATION TERTUNDA (verifikasi read-only 28 November 2026):** migration
+  `20261201000000_staff_access_codes` sudah ada di
+  `backend/prisma/migrations/` tetapi **belum diterapkan** ke database.
+  Pemeriksaan `information_schema`/`_prisma_migrations` menunjukkan
+  `event_invitations` belum memiliki kolom `staff_name`, `access_code_hash`,
+  `access_code_cipher`, dan `access_code_issued_at`, dan `email` masih
+  `NOT NULL`. Selama kondisi ini, "Tambahkan Staf" dan penerbitan kode akses
+  tidak dapat berhasil: backend membalas `424` dengan pesan bahwa skema
+  database belum dimigrasikan (bukan error 500 generik). Penerapan migration
+  adalah kewenangan penanggung jawab FINISHING setelah gate dibuka, dengan
+  `npx prisma migrate deploy` lalu `npx prisma migrate status`. Jangan memakai
+  `prisma migrate reset` atau `db push` pada database berisi data.
 - Kredensial DB dan `JWT_SECRET` telah dikonfirmasi dirotasi. Jangan menyalin
   nilainya ke log, issue, atau dokumentasi. Status RLS/grants aktual (verifikasi
   read-only 23 November 2026, lihat arsip `../task/DATABASE_AUDIT_FINAL.md`):
@@ -130,11 +143,11 @@ mengelola `password_hash` dan JWT sendiri. Schema dan migration Prisma berada di
 | `organizer_profiles` | Ekstensi profil Organizer (1:1 ke `profiles`). |
 | `event_categories`, `events` | Kategori (1:N event); event menunjuk pembuat, kategori dan menampung status moderasi/tampilan. Field jadwal awal dipetakan ke kolom lama `event_date`. |
 | `event_moderations` | Riwayat keputusan Admin (N:1 event dan Admin). |
-| `event_members`, `event_member_permissions`, `event_invitations`, `event_invitation_permissions` | Staff per event, izin granular (N:M melalui tabel junction), izin yang menunggu penerimaan undangan, dan token undangan; owner tetap direpresentasikan `events.created_by`. |
+| `event_members`, `event_member_permissions`, `event_invitations`, `event_invitation_permissions` | Staff per event, izin granular (N:M melalui tabel junction), izin yang menunggu penerimaan undangan, dan token undangan; owner tetap direpresentasikan `events.created_by`. Sejak migration `20261201000000_staff_access_codes`, `event_invitations` juga menyimpan `staff_name`, `access_code_hash` (SHA-256, indeks **unik global**), `access_code_cipher` (AES-256-GCM), dan `access_code_issued_at`; `email` boleh `NULL` karena undangan baru berbasis nama. |
 | `ticket_types` | Kategori/kuota/harga event; disimpan terpisah dari event dan di-snapshot ke order item. |
 | `event_orders`, `order_items`, `attendees` | Order boleh guest (`purchaser_id` null); tiap order punya item tiket, tiap item dapat memiliki banyak attendee. `assisted_by_member_id` merekam anggota yang membantu. |
 | `order_payments` | Pembayaran order terpisah dari status order; MVP hanya menamai metode sebagai simulasi VA. |
-| `tickets`, `scan_logs`, `check_ins`, `ticket_email_deliveries` | Tiket terkait event dan opsional attendee untuk transisi dari API lama; scan log menyimpan percobaan, check-in sukses unik per tiket, dan delivery menyimpan retry email. |
+| `tickets`, `scan_logs`, `check_ins`, `ticket_email_deliveries` | Tiket terkait event dan opsional attendee untuk transisi dari API lama; scan log menyimpan percobaan, check-in sukses unik per tiket, dan delivery menyimpan retry email. `check_ins.actor_user_id` boleh `NULL` untuk staf undangan tanpa akun; identitasnya dicatat pada `staff_invitation_id` (juga ada di `scan_logs`). |
 | `plans`, `plan_features`, `subscriptions`, `subscription_history`, `subscription_payments` | Paket, fitur/batas, langganan dan histori/pembayaran. Tidak menetapkan tarif atau durasi final. |
 | `platform_transactions` | Satu sumber payment order atau payment subscription; nilai gross, fee, komisi, revenue dan net merupakan snapshot. Constraint tepat-satu-sumber memerlukan `CHECK` SQL pada migration setelah rekonsiliasi. |
 | `support_reports`, `support_report_activities` | Laporan dengan pelapor guest atau akun, referensi order opsional (termasuk input teks guest), token status disimpan sebagai hash, dan aktivitas publik/internal yang dibedakan oleh visibility. |

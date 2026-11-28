@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../errors/app_exception.dart';
 import '../services/session_service.dart';
+import '../services/staff_session_store.dart';
 import '../config/app_config.dart';
 
 class ApiClient {
@@ -13,6 +14,7 @@ class ApiClient {
 
   final http.Client _http = http.Client();
   final SessionService _session = SessionService.instance;
+  final StaffSessionStore _staffSession = StaffSessionStore.instance;
 
   Future<Map<String, dynamic>> get(
     String path, {
@@ -49,7 +51,20 @@ class ApiClient {
         .replace(
           queryParameters: query?.map((key, value) => MapEntry(key, '$value')),
         );
-    return _sendUri(method, uri, body: body, headers: headers);
+    // Endpoint akses staf memakai kode akses, bukan sesi akun. Kegagalan kode
+    // (401) TIDAK boleh mengakhiri sesi Organizer yang mungkin aktif di browser
+    // yang sama.
+    final normalizedPath = path.startsWith('/') ? path : '/$path';
+    final staffChannel =
+        normalizedPath.startsWith('/staff-access') ||
+        normalizedPath.startsWith('/staff-invitations');
+    return _sendUri(
+      method,
+      uri,
+      body: body,
+      headers: headers,
+      invalidateSessionOn401: !staffChannel,
+    );
   }
 
   Future<Map<String, dynamic>> _sendUri(
@@ -57,6 +72,7 @@ class ApiClient {
     Uri uri, {
     dynamic body,
     Map<String, String>? headers,
+    bool invalidateSessionOn401 = true,
   }) async {
     final requestHeaders = <String, String>{
       'Accept': 'application/json',
@@ -64,7 +80,16 @@ class ApiClient {
     };
     if (body != null) requestHeaders['Content-Type'] = 'application/json';
     final token = await _session.readToken();
-    if (token != null) requestHeaders['Authorization'] = 'Bearer $token';
+    if (token != null) {
+      requestHeaders['Authorization'] = 'Bearer $token';
+    } else {
+      // Sesi staf (undangan kode akses) hanya dipakai bila tidak ada sesi akun.
+      // Endpoint scanner menerima header ini; endpoint akun lain mengabaikannya.
+      final staffToken = await _staffSession.readToken();
+      if (staffToken != null && staffToken.isNotEmpty) {
+        requestHeaders['X-Staff-Session'] = staffToken;
+      }
+    }
 
     try {
       final request = http.Request(method, uri)..headers.addAll(requestHeaders);
@@ -83,7 +108,7 @@ class ApiClient {
         return data.containsKey('success') ? data : {'data': decoded};
       }
       final message = _errorMessage(data, response.statusCode);
-      if (response.statusCode == 401) {
+      if (response.statusCode == 401 && invalidateSessionOn401) {
         await _session.clear();
         _session.notifySessionInvalidated();
       }

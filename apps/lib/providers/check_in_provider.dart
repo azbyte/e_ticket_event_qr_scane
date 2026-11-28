@@ -12,7 +12,8 @@ import '../services/scanner/scanner_service.dart';
 
 class CheckInProvider extends ChangeNotifier {
   CheckInProvider(this._checkInService, {ScannerService? scannerService})
-      : _scannerService = scannerService ?? ScannerService(checkInService: _checkInService);
+    : _scannerService =
+          scannerService ?? ScannerService(checkInService: _checkInService);
 
   final CheckInService _checkInService;
   final ScannerService _scannerService;
@@ -97,7 +98,8 @@ class CheckInProvider extends ChangeNotifier {
 
       if (validation['valid'] == true && validation['ticket'] != null) {
         final ticketData = validation['ticket'] as Map<String, dynamic>;
-        final ticketId = ticketData['id'] as String? ?? ticketData['token'] as String;
+        final ticketId =
+            ticketData['id'] as String? ?? ticketData['token'] as String;
 
         // Record check-in
         final recordResult = await _scannerService.recordCheckIn(
@@ -118,8 +120,13 @@ class CheckInProvider extends ChangeNotifier {
         };
         _lastScanResult = result;
         if (eventId.isNotEmpty) {
+          // Ringkasan peserta & riwayat bersifat tambahan. Staf undangan
+          // (kode akses) hanya memiliki izin scanner, sehingga permintaan daftar
+          // peserta dapat ditolak; kegagalan itu tidak boleh membuat hasil scan
+          // yang valid terlihat gagal.
           await loadCheckIns(eventId: eventId);
           await loadAttendees(eventId: eventId);
+          _error = null;
         }
         notifyListeners();
         return result;

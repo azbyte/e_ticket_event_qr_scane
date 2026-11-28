@@ -73,9 +73,11 @@ Dibuat untuk event Published dan dibagikan ke Participant. Menampilkan informasi
 
 ### 6.2 Invitation/link Staff
 
-Organizer membuat invitation untuk email dan satu event, menetapkan permission, expiry dan kemampuan revoke. Invitation bukan link scanner publik dan bukan pengganti autentikasi. Acceptance memerlukan akun login dengan email yang cocok, token valid belum dipakai/expired/revoked, lalu membuat membership Staff pada event tersebut. Sesudah autentikasi serta otorisasi server berhasil, Staff dengan permission scanner diarahkan langsung ke scanner event itu. Invitation invalid/expired/revoked, user/email tidak cocok, membership dicabut atau permission kurang harus ditolak.
+**CONFIRMED (revisi mekanisme):** Organizer mengundang staf dengan **nama staf** pada satu event. Backend membuat **kode akses unik global** (berbeda antar staf dan antar event) serta tautan undangan `/staff-access/{invitationId}`. Organizer melihat nama, kode akses, dan tautan pada halaman pengelolaan staf, dapat menyalinnya, menerbitkan kode baru, dan mencabut undangan.
 
-**TECHNICAL GAP:** route acceptance ada di backend, tetapi deep-link Flutter dan redirect langsung scanner belum terverifikasi (G-04).
+Tautan undangan **bukan** link scanner publik dan **bukan** pengganti autentikasi: membuka tautan hanya menampilkan halaman yang meminta kode akses, tidak pernah langsung mengarahkan ke scanner. Validasi kode dilakukan backend dan memastikan kode terdaftar, undangan masih aktif (belum dicabut/kedaluwarsa), dan terhubung dengan event pada tautan. Kode benar menerbitkan sesi staf yang terikat pada identitas staf + ID event; sesi hanya berlaku untuk event undangan tersebut. Kode salah/tidak valid, undangan dicabut/kedaluwarsa, sesi tidak ada, atau percobaan membuka URL scanner tanpa sesi harus ditolak dan tidak boleh memberi akses scanner.
+
+Kode akses tidak disimpan plaintext: database menyimpan hash untuk verifikasi dan ciphertext terenkripsi agar Organizer dapat menampilkan kembali kode milik event-nya. Undangan email lama tetap tersimpan dan dapat dipakai setelah Organizer menerbitkan kode akses baru.
 
 ## 7. Registrasi, order, dan daftar peserta
 
@@ -202,7 +204,7 @@ Schema Prisma aktual memiliki `OrderItem.quantity`, assisted fields/permission s
 | AC-02 Role | Cross-owner/event dan unauthorized operation ditolak backend. |
 | AC-03 Order | Order tepat satu kategori, attendee dan ticket; quantity selain 1 ditolak; guest dapat mengulang order selama registrasi terbuka; harga dari server dikunci pada order; retry idempotent tidak menduplikasi. |
 | AC-04 Participant | Registrasi publik tanpa akun; tidak ada dashboard/assisted flow. |
-| AC-05 Staff | Invitation email/event scoped; invalid/expired/revoked/wrong account ditolak; permission per request; scanner langsung setelah authorized. |
+| AC-05 Staff | Undangan staf berbasis nama + kode akses unik global, event-scoped; tautan undangan tidak memberi akses tanpa kode; kode salah/undangan dicabut/kedaluwarsa/sesi tidak valid ditolak; permission per request; scanner langsung setelah kode divalidasi dan hanya untuk event undangan. | 
 | AC-06 Payment | Client tidak mengubah status; pembayaran berbayar hanya simulasi backend; status dibedakan; non-PAID tidak menerbitkan ticket berbayar; guest access sesuai C-02. Order gratis tidak memerlukan payment dan tidak mencampur kategori berbayar pada event yang sama. |
 | AC-07 Ticket | PAID menghasilkan paling banyak satu ticket/QR terkait event/order/attendee; order gratis langsung menerbitkan paling banyak satu ticket setelah validasi; non-delivery tidak diklaim sent. |
 | AC-08 Scanner | Token/event/payment/status/permission validasi server; satu scan sukses; duplicate/wrong-event/unpaid/unauthorized ditolak; offline tidak sukses. |

@@ -51,7 +51,8 @@ void main() {
     await pumpDetail(tester, 'evt-1004');
 
     expect(find.text('Tautan Pendaftaran Peserta'), findsOneWidget);
-    expect(find.text('Tautan Undangan Panitia'), findsOneWidget);
+    expect(find.text('Staf Panitia'), findsOneWidget);
+    expect(find.text('Tambahkan Staf'), findsOneWidget);
     expect(
       find.text('Belum tersedia — terbitkan event terlebih dahulu.'),
       findsOneWidget,
@@ -78,13 +79,14 @@ void main() {
     );
     expect(copyButton.onPressed, isNotNull);
 
-    // Tautan undangan panitia tetap panel terpisah (bukan URL yang sama).
-    expect(find.text('Tautan Undangan Panitia'), findsOneWidget);
+    // Panel staf tetap terpisah (bukan URL yang sama).
+    expect(find.text('Staf Panitia'), findsOneWidget);
     expect(
       find.text(
-        'Undangan panitia berbeda dari tautan pendaftaran peserta. '
-        'Tautan dibuat per undangan (email, permission, masa berlaku) dan '
-        'hanya dapat diterima akun dengan email yang cocok.',
+        'Tambahkan staf panitia berdasarkan nama. Backend membuat kode '
+        'akses unik dan tautan undangan untuk event ini; staf memasukkan '
+        'kode tersebut pada tautan untuk membuka scanner. Staf tidak '
+        'perlu memiliki akun.',
       ),
       findsOneWidget,
     );

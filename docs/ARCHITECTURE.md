@@ -40,9 +40,16 @@ sebagai fallback.
   `is_public = true`; `APP_PUBLIC_URL` menjadi basis tautan `/e/{eventId}`.
 - Undangan panitia memakai `invite_url = {APP_PUBLIC_URL}/invite/{rawToken}`,
   terpisah dari tautan pendaftaran publik.
+- Undangan staf berbasis **nama + kode akses** (mekanisme aktif) memakai
+  `invite_url = {APP_PUBLIC_URL}/staff-access/{invitationId}`. Tautan hanya
+  mengidentifikasi undangan dan **tidak** memberi akses scanner; kode akses
+  wajib dimasukkan pada halaman tersebut dan divalidasi backend.
 - Route Flutter `/e/:eventId`, `/e/:eventId/register`, `/e/:eventId/payment/:orderId`,
   `/e/:eventId/ticket/:ticketId`, dan `/registration/:eventId` dapat dibuka guest;
-  `/invite/:token` memaksa login lalu kembali ke halaman undangan.
+  `/invite/:token` memaksa login lalu kembali ke halaman undangan (alur email
+  lama). `/staff-access/:invitationId` dan `/staff-access/scanner` publik di
+  router, tetapi halaman scanner menolak tanpa sesi staf yang valid dan backend
+  menolak setiap request tanpa sesi.
 - `attendee_fields` event berbentuk array objek
   `{ key, label, type, required, options }` (kompatibel array string legacy) dan
   jawaban peserta disimpan pada `attendees.custom_fields` dalam transaksi order
@@ -164,7 +171,7 @@ terhadap API + PostgreSQL nyata (`cd backend; npm run test:e2e`, 80 pemeriksaan)
 |---|---|
 | Organizer | register/login → event → kategori tiket → publish otomatis → tautan publik/QR → peserta → export CSV → order per event → revenue → staff/membership |
 | Guest | `/e/:eventId` → daftar (field dinamis) → order 1 tiket → bayar simulasi/gratis → tiket + QR |
-| Staff | undang oleh Organizer → login email cocok → terima undangan → scanner → check-in → riwayat |
+| Staff | undang oleh Organizer (nama) → kode akses unik → buka tautan undangan → masukkan kode akses → scanner event itu → check-in → riwayat |
 | Admin | login hasil provisioning → akun/suspend + audit → settings + history → overview/revenue/paket/langganan → moderasi event |
 
 **QR, check-in, dan token**
@@ -177,26 +184,87 @@ transaksi; percobaan kedua tidak menambah baris.
 
 **E-tiket PDF**
 
-Satu renderer (`ticketDesignService.buildTicketPdf`) melayani unduhan manual dan
-lampiran email, untuk event gratis maupun berbayar. Kanvas tetap per orientasi
-(`landscape` 842 × 594 pt, `portrait` 440 × 704 pt). Prinsip desainnya: gambar
-desain Organizer adalah elemen utama, sistem hanya menambahkan tujuh baris
-informasi dinamis di kiri atas (`E-TIKET [NAMA EVENT]` 34 pt auto-fit, `Peserta`
-23 pt, `ID TIKET` 16 pt, `Kategori` 16 pt, `Jadwal` 16 pt, `Lokasi` 16 pt,
-instruksi penukaran 14 pt) dan QR Code default 220/250 pt di bawahnya dengan alas
-putih selebar QR + quiet zone + margin kecil. Nomor registrasi, nomor order,
-tanggal terbit, dan kartu informasi tidak dicetak.
-Posisi X/Y dan ukuran QR dapat diatur Organizer (fraksi kanvas, disimpan di
-`ticket_design.qr` lewat `PUT /api/events/:id/ticket-design` dengan `qr_only:
-true`) dan dipakai apa adanya saat render; QR hanya digeser bila akan keluar
-halaman. Desain dipilih dengan urutan kategori → event → default sistem, dan
-kandidat yang filenya hilang dilewati agar desain unggahan tidak tergantikan
-desain default.
-Desain kustom digambar `contain` sehingga rasio asli terjaga. ID publik tiket
-`ETK-XXXXXX` disimpan pada `tickets.ticket_code` (kolom unik yang sudah ada)
-sementara `tickets.id` tetap primary key, sehingga tidak ada perubahan schema;
-kode lama `TKT-<uuid>` tetap dapat divalidasi lewat `tickets.qr_code_data`. Nama
-lampiran/unduhan mengikuti `E-TIKET Nama Peserta.pdf` dari `attendees.name`.
+Satu renderer (`ticketDesignService.buildTicketPdf` → `ticketPdfRenderer`) melayani
+unduhan manual (`GET /api/tickets/:id/pdf`) dan lampiran email
+(`emailService.buildPdfAttachment`), untuk event gratis maupun berbayar. Kanvas
+tetap per orientasi (`landscape` 842 × 594 pt, `portrait` 440 × 704 pt) sehingga
+satu sistem koordinat dipakai editor, pratinjau, template, dan PDF.
+
+Sumber kebenaran geometri adalah `ticketDesignLayout`:
+
+- setiap elemen (`title`, `ticket_id`, `instruction`, `qr`) disimpan sebagai
+  fraksi kanvas 0..1 + ukuran huruf **pt kanvas** di `ticket_design.layout`;
+- `resolveLayout()` menghitung bounding box tiap elemen (pembungkusan teks,
+  penurunan ukuran huruf proporsional, dan pemotongan elipsis sebagai upaya
+  terakhir) sehingga editor dan renderer memakai perhitungan yang sama;
+- `findOverlaps()`/`validateLayout()` mendeteksi elemen bertumpuk dan elemen di
+  luar kanvas; endpoint simpan **menolak** konfigurasi yang bertabrakan sehingga
+  PDF tidak pernah memuat tulisan yang tertutup QR Code.
+
+Nilai default (diukur dari `docs/references/desain_tiket_referensi.png`):
+judul `E-TIKET [NAMA ACARA]` Times New Roman Bold 50 pt di kiri 4,45%/atas
+2,86%; `ID TIKET: ...` 30 pt regular di atas 14,70%; instruksi penukaran 30 pt
+regular di atas 21,65%; QR Code x 5,95%, y 32,60%, sisi 42,31% tinggi kanvas;
+pembagian panel pink/krem 55,8% lebar kanvas. Hanya tiga teks dinamis itu yang
+dicetak (nama peserta, kategori, jadwal, dan lokasi tidak dicetak) agar tata
+letak sesuai referensi.
+
+Font ditangani `ticketFontService`: berkas TTF Times New Roman (env
+`TICKET_FONT_REGULAR`/`TICKET_FONT_BOLD`, aset `backend/assets/fonts/`, atau font
+sistem) didaftarkan ke PDFKit sehingga **tertanam** di PDF; bila tidak tersedia,
+dipakai base-14 `Times-Roman`/`Times-Bold` yang metriknya identik agar tata letak
+tidak bergeser. Berkas TTF tidak di-commit karena berlisensi Microsoft.
+
+Posisi & ukuran elemen diatur Organizer lewat
+`PUT /api/events/:id/ticket-design` dengan `layout_only: true` (tanpa unggah
+ulang berkas; juga berlaku saat belum ada berkas desain). Desain dipilih dengan
+urutan kategori → event → default sistem; kandidat yang filenya hilang dilewati
+agar desain unggahan tidak tergantikan desain default. Desain kustom digambar
+`contain` sehingga rasio asli terjaga. ID publik tiket `ETK-XXXXXX` disimpan pada
+`tickets.ticket_code` (kolom unik yang sudah ada) sementara `tickets.id` tetap
+primary key, sehingga tidak ada perubahan schema; kode lama `TKT-<uuid>` tetap
+dapat divalidasi lewat `tickets.qr_code_data`. Nama lampiran/unduhan mengikuti
+`E-TIKET Nama Peserta.pdf` dari `attendees.name`.
+
+Editor Flutter (`TicketDesignPanel` + `TicketCanvasPreview`) memakai cermin
+perhitungan yang sama (`apps/lib/models/ticket_layout_model.dart`): pratinjau
+menggambar teks pada ukuran pt, QR pada kotak hasil `resolve()`, bounding box
+setiap elemen, penanda merah untuk elemen bertabrakan, slider posisi, input
+angka untuk ukuran huruf (pt), dan tombol reset ke default. Validasi klien dan server identik, sehingga konfigurasi
+yang terlihat benar di editor juga benar di PDF.
+
+**Undangan staf berbasis nama + kode akses**
+
+- Organizer hanya memasukkan **nama staf**. Backend (`staffInvitationController`)
+  membuat kode akses 8 karakter dari alfabet tanpa karakter ambigu
+  (`0/O/1/I/L`), lalu menyimpannya sebagai:
+  - `event_invitations.access_code_hash` — SHA-256 untuk verifikasi
+    constant-time, dengan **indeks unik global** sehingga dua staf (pada event
+    yang sama maupun berbeda) tidak mungkin berbagi kode;
+  - `event_invitations.access_code_cipher` — ciphertext AES-256-GCM
+    (`STAFF_ACCESS_SECRET`) agar Organizer dapat menampilkan kembali kode milik
+    event-nya tanpa menyimpan plaintext.
+- `event_invitations.staff_name` menyimpan nama staf; `email` menjadi nullable
+  karena staf tidak wajib punya akun. Undangan lama (email-based) tetap valid,
+  dan dapat dimigrasikan dengan menekan "Buat Kode Baru" (regenerate).
+- Tautan `/staff-access/{invitationId}` hanya membuka halaman autentikasi.
+  `POST /api/staff-access/validate` memeriksa hash kode, status undangan
+  (`PENDING`/`ACCEPTED`, bukan `REVOKED`), masa berlaku, dan event undangan,
+  lalu menerbitkan JWT sesi staf (`typ: staff_access`, `sid`, `event_id`) dengan
+  masa berlaku `STAFF_SESSION_TTL`.
+- `staffAuthMiddleware` memverifikasi token dan **memuat ulang undangan** pada
+  setiap request, sehingga pencabutan/kedaluwarsa langsung berlaku. Token dikirim
+  lewat header `X-Staff-Session` (dipisah dari `Authorization` akun) dan dapat
+  dicabut melalui `revoked_tokens` saat logout.
+- `assertScanPermission`/`assertMemberPermission` menerima sesi staf hanya bila
+  `event_id` token sama dengan event yang diakses (tidak ada akses lintas event)
+  dan undangan memiliki permission yang diminta (`SCAN_TICKET`,
+  `CHECK_IN_TICKET`, dst.). Endpoint `/api/tickets/validate`, `/api/tickets/verify`,
+  `/api/check-ins*`, dan daftar peserta memakai `staffOrUserAuth` sehingga JWT
+  Organizer/Admin tetap berjalan seperti sebelumnya.
+- Check-in oleh staf tanpa akun dicatat pada `check_ins.staff_invitation_id`
+  (kolom baru) sementara `actor_user_id` boleh `NULL`; riwayat menampilkan nama
+  staf dari undangan.
 
 **Keputusan produk yang ditegakkan**
 

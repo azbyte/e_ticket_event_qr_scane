@@ -54,7 +54,8 @@ class AppRoutes {
 
   // Organizer extensions (FR-60-65, FR-76-79, FR-95-96)
   static const String organizerPlans = '/organizer/plans';
-  static const String organizerPlanTransactions = '/organizer/plans/transactions';
+  static const String organizerPlanTransactions =
+      '/organizer/plans/transactions';
   static const String organizerSupport = '/organizer/support';
   static const String organizerSupportNew = '/organizer/support/new';
   static const String organizerTeam = '/organizer/team';
@@ -73,6 +74,11 @@ class AppRoutes {
   /// Penerimaan undangan panitia: login lalu kembali ke halaman ini.
   static const String invitationAccept = '/invite/:token';
 
+  /// Akses staf berbasis kode akses: tautan undangan (publik) dan scanner
+  /// ber-sesi staf. Keduanya tidak memerlukan akun Organizer/Admin.
+  static const String staffAccess = '/staff-access/:invitationId';
+  static const String staffScannerAccess = '/staff-access/scanner';
+
   /// Workspace staf untuk satu event.
   static const String staffWorkspace = '/staff/:eventId';
 
@@ -88,6 +94,9 @@ class AppRoutes {
       '/e/$eventId/ticket/$ticketId';
 
   static String invitationAcceptPath(String token) => '/invite/$token';
+
+  static String staffAccessPath(String invitationId) =>
+      '/staff-access/$invitationId';
 
   static String staffWorkspacePath(String eventId) => '/staff/$eventId';
 

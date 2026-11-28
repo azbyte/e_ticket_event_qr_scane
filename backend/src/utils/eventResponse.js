@@ -20,6 +20,18 @@ const buildPublicUrl = (eventId) => `${appPublicUrl()}/e/${eventId}`;
 /** Tautan undangan panitia: `{APP_PUBLIC_URL}/invite/{rawToken}`. */
 const buildInviteUrl = (rawToken) => `${appPublicUrl()}/invite/${rawToken}`;
 
+/**
+ * Tautan undangan staf berbasis kode akses:
+ * `{APP_PUBLIC_URL}/staff-access/{invitationId}`.
+ *
+ * Tautan ini hanya mengidentifikasi undangan; tautan TIDAK memberi akses ke
+ * scanner. Staf tetap harus memasukkan kode akses yang divalidasi backend.
+ * Identifier yang dipakai adalah id undangan (bukan kode akses), sehingga kode
+ * rahasia tidak pernah muncul di URL, riwayat browser, atau log server.
+ */
+const buildStaffAccessUrl = (invitationId) =>
+  `${appPublicUrl()}/staff-access/${invitationId}`;
+
 const isPubliclyVisible = (event) =>
   Boolean(event && event.is_public) &&
   PUBLIC_EVENT_STATUSES.includes(String(event.status || '').toUpperCase());
@@ -89,6 +101,7 @@ module.exports = {
   appPublicUrl,
   buildPublicUrl,
   buildInviteUrl,
+  buildStaffAccessUrl,
   publicUrlFor,
   isPubliclyVisible,
   PUBLIC_EVENT_STATUSES,

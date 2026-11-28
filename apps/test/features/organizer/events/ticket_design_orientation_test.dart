@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:e_ticket_event_qr_scane/features/organizer/events/widgets/ticket_design_panel.dart';
 import 'package:e_ticket_event_qr_scane/models/event/ticket_design_model.dart';
 import 'package:e_ticket_event_qr_scane/models/event/ticket_type_model.dart';
-import 'package:e_ticket_event_qr_scane/models/ticket/ticket_model.dart';
 import 'package:e_ticket_event_qr_scane/services/organizer_events/ticket_design_service.dart';
 
 /// Fake service agar panel diuji tanpa HTTP.
@@ -13,7 +12,7 @@ class _FakeTicketDesignService extends TicketDesignService {
   final TicketDesignState _state;
   final List<TicketOrientation> savedOrientations = <TicketOrientation>[];
   final List<String> openedScopes = <String>[];
-  final List<TicketQrPlacement> savedQrPlacements = <TicketQrPlacement>[];
+  final List<TicketLayoutModel> savedLayouts = <TicketLayoutModel>[];
 
   @override
   Future<TicketDesignState> load(String eventId) async => _state;
@@ -31,23 +30,24 @@ class _FakeTicketDesignService extends TicketDesignService {
       filePath: '',
       contentType: 'image/png',
       orientation: orientation,
+      layout: TicketLayoutModel.defaultsFor(orientation),
     );
   }
 
   @override
-  Future<TicketDesignModel> saveQrPlacement({
+  Future<TicketDesignModel> saveLayout({
     required String eventId,
-    required TicketQrPlacement qr,
+    required TicketLayoutModel layout,
     String scope = 'event',
     String? ticketTypeId,
   }) async {
-    savedQrPlacements.add(qr);
+    savedLayouts.add(layout);
     openedScopes.add(scope);
     return TicketDesignModel(
-      filePath: '/media/ticket-designs/evt-1/desain.png',
+      filePath: _state.eventDesign?.filePath ?? '',
       contentType: 'image/png',
       orientation: TicketOrientation.landscape,
-      qr: qr,
+      layout: layout,
     );
   }
 }
@@ -56,13 +56,45 @@ Widget _wrap(Widget child) => MaterialApp(
   home: Scaffold(body: SingleChildScrollView(child: child)),
 );
 
+/// Panel desain dengan service palsu.
+Widget _panel(_FakeTicketDesignService service) => _wrap(
+  TicketDesignPanel(
+    eventId: 'evt-1',
+    eventTitle: 'Konser',
+    ticketTypes: const <TicketTypeModel>[],
+    service: service,
+  ),
+);
+
+_FakeTicketDesignService _serviceWithLayout(TicketLayoutModel layout) =>
+    _FakeTicketDesignService(
+      TicketDesignState(
+        eventOrientation: TicketOrientation.landscape,
+        eventDesign: TicketDesignModel(
+          filePath: '/media/ticket-designs/evt-1/desain.png',
+          contentType: 'image/png',
+          orientation: TicketOrientation.landscape,
+          layout: layout,
+        ),
+      ),
+    );
+
 void main() {
   group('Orientasi desain tiket', () {
     test('TicketOrientation.fromValue memetakan nilai API dengan aman', () {
-      expect(TicketOrientation.fromValue('portrait'), TicketOrientation.portrait);
-      expect(TicketOrientation.fromValue('LANDSCAPE'), TicketOrientation.landscape);
+      expect(
+        TicketOrientation.fromValue('portrait'),
+        TicketOrientation.portrait,
+      );
+      expect(
+        TicketOrientation.fromValue('LANDSCAPE'),
+        TicketOrientation.landscape,
+      );
       expect(TicketOrientation.fromValue(null), TicketOrientation.landscape);
-      expect(TicketOrientation.fromValue('diagonal'), TicketOrientation.landscape);
+      expect(
+        TicketOrientation.fromValue('diagonal'),
+        TicketOrientation.landscape,
+      );
     });
 
     test('rasio kanvas landscape horizontal dan portrait vertikal', () {
@@ -70,15 +102,18 @@ void main() {
       expect(TicketOrientation.portrait.widthToHeightRatio, lessThan(1));
     });
 
-    test('default QR & area info mengikuti orientasi', () {
-      final portraitQr = TicketDesignModel.defaultQrFor(TicketOrientation.portrait);
-      final landscapeQr =
-          TicketDesignModel.defaultQrFor(TicketOrientation.landscape);
+    test('default tata letak mengikuti orientasi', () {
+      final portraitQr = TicketDesignModel.defaultQrFor(
+        TicketOrientation.portrait,
+      );
+      final landscapeQr = TicketDesignModel.defaultQrFor(
+        TicketOrientation.landscape,
+      );
       expect(portraitQr.y, isNot(landscapeQr.y));
-      final portraitInfo =
-          TicketDesignModel.defaultInfoFor(TicketOrientation.portrait);
-      expect(portraitInfo.width,
-        greaterThan(TicketDesignModel.defaultInfo.width));
+      expect(
+        TicketLayoutModel.defaultPortrait.textWidth,
+        greaterThan(TicketLayoutModel.defaultLandscape.textWidth),
+      );
     });
 
     test('TicketDesignState mewarisi orientasi event untuk kategori', () {
@@ -98,6 +133,8 @@ void main() {
       expect(state.orientationFor('tt-1'), TicketOrientation.portrait);
       expect(state.orientationFor(null), TicketOrientation.portrait);
       expect(state.orientationFor('tidak-ada'), TicketOrientation.portrait);
+      // Tata letak kategori tanpa konfigurasi memakai default portrait.
+      expect(state.layoutFor('tt-1'), TicketLayoutModel.defaultPortrait);
     });
 
     test('template URL membawa orientasi yang dipilih', () {
@@ -120,32 +157,31 @@ void main() {
       final service = _FakeTicketDesignService(
         const TicketDesignState(eventOrientation: TicketOrientation.landscape),
       );
-      await tester.pumpWidget(_wrap(TicketDesignPanel(
-        eventId: 'evt-1',
-        ticketTypes: const <TicketTypeModel>[],
-        service: service,
-      )));
+      await tester.pumpWidget(_panel(service));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('ticket-design-orientation')), findsOneWidget);
-      expect(find.byKey(const Key('ticket-design-orientation-landscape')),
-        findsOneWidget);
-      expect(find.byKey(const Key('ticket-design-orientation-portrait')),
-        findsOneWidget);
-      // Penanda area QR tampil pada kanvas pratinjau.
-      expect(find.byKey(const Key('ticket-design-qr-marker')), findsOneWidget);
+      expect(
+        find.byKey(const Key('ticket-design-orientation')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('ticket-design-orientation-landscape')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('ticket-design-orientation-portrait')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('ticket-design-canvas')), findsOneWidget);
     });
 
-    testWidgets('memilih portrait lalu menyimpan mengirim orientasi ke API',
-        (tester) async {
+    testWidgets('memilih portrait lalu menyimpan mengirim orientasi ke API', (
+      tester,
+    ) async {
       final service = _FakeTicketDesignService(
         const TicketDesignState(eventOrientation: TicketOrientation.landscape),
       );
-      await tester.pumpWidget(_wrap(TicketDesignPanel(
-        eventId: 'evt-1',
-        ticketTypes: const <TicketTypeModel>[],
-        service: service,
-      )));
+      await tester.pumpWidget(_panel(service));
       await tester.pumpAndSettle();
 
       await tester.tap(
@@ -153,251 +189,229 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('ticket-design-orientation-save')),
-        findsOneWidget);
+      expect(
+        find.byKey(const Key('ticket-design-orientation-save')),
+        findsOneWidget,
+      );
       await tester.tap(find.byKey(const Key('ticket-design-orientation-save')));
       await tester.pumpAndSettle();
 
-      expect(service.savedOrientations,
-        <TicketOrientation>[TicketOrientation.portrait]);
+      expect(service.savedOrientations, <TicketOrientation>[
+        TicketOrientation.portrait,
+      ]);
       expect(service.openedScopes, <String>['event']);
     });
 
-    testWidgets('tanpa perubahan tidak menampilkan tombol simpan',
-        (tester) async {
+    testWidgets('tanpa perubahan tidak menampilkan tombol simpan orientasi', (
+      tester,
+    ) async {
       final service = _FakeTicketDesignService(
         const TicketDesignState(eventOrientation: TicketOrientation.portrait),
       );
-      await tester.pumpWidget(_wrap(TicketDesignPanel(
-        eventId: 'evt-1',
-        ticketTypes: const <TicketTypeModel>[],
-        service: service,
-      )));
+      await tester.pumpWidget(_panel(service));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('ticket-design-orientation-save')),
-        findsNothing);
-      expect(find.byKey(const Key('ticket-design-orientation-saved')),
-        findsOneWidget);
-    });
-  });
-
-  group('Pengaturan QR Code', () {
-    test('clamped() membatasi nilai ke rentang slider/backend', () {
-      const legacy = TicketQrPlacement(x: 1.4, y: -0.2, size: 0.9);
-      final clamped = legacy.clamped();
-      expect(clamped.x, TicketQrPlacement.maxPosition);
-      expect(clamped.y, TicketQrPlacement.minPosition);
-      expect(clamped.size, TicketQrPlacement.maxSize);
-      // Nilai default sistem tidak berubah karena sudah di dalam rentang.
-      expect(TicketDesignModel.defaultQr.clamped(), TicketDesignModel.defaultQr);
       expect(
-        TicketDesignModel.defaultPortraitQr.clamped(),
-        TicketDesignModel.defaultPortraitQr,
+        find.byKey(const Key('ticket-design-orientation-save')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('ticket-design-orientation-saved')),
+        findsOneWidget,
       );
     });
 
-    testWidgets('desain lama dengan ukuran QR 90% tetap tampil tanpa error',
-        (tester) async {
-      final service = _FakeTicketDesignService(
-        TicketDesignState(
-          eventOrientation: TicketOrientation.landscape,
-          eventDesign: const TicketDesignModel(
-            filePath: '/media/ticket-designs/evt-1/desain.png',
-            contentType: 'image/png',
-            orientation: TicketOrientation.landscape,
-            qr: TicketQrPlacement(x: 0.5, y: 0.5, size: 0.9),
-          ),
-        ),
-      );
-      await tester.pumpWidget(_wrap(TicketDesignPanel(
-        eventId: 'evt-1',
-        ticketTypes: const <TicketTypeModel>[],
-        service: service,
-      )));
+    testWidgets('editor menyediakan kontrol untuk setiap elemen', (
+      tester,
+    ) async {
+      final service = _serviceWithLayout(TicketLayoutModel.defaultLandscape);
+      await tester.pumpWidget(_panel(service));
       await tester.pumpAndSettle();
 
-      final sizeSlider =
-          tester.widget<Slider>(find.byKey(const Key('ticket-design-qr-size')));
-      expect(sizeSlider.value, TicketQrPlacement.maxSize);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('panel menyediakan slider X, Y, ukuran dan tombol simpan',
-        (tester) async {
-      final service = _FakeTicketDesignService(
-        const TicketDesignState(eventOrientation: TicketOrientation.landscape),
-      );
-      await tester.pumpWidget(_wrap(TicketDesignPanel(
-        eventId: 'evt-1',
-        ticketTypes: const <TicketTypeModel>[],
-        service: service,
-      )));
-      await tester.pumpAndSettle();
-
+      for (final key in <String>[
+        TicketElementKey.title,
+        TicketElementKey.ticketId,
+        TicketElementKey.instruction,
+        TicketElementKey.qr,
+      ]) {
+        expect(
+          find.byKey(Key('ticket-design-element-$key')),
+          findsOneWidget,
+          reason: 'chip elemen $key tersedia',
+        );
+      }
+      // Elemen default terpilih adalah QR Code.
       expect(find.byKey(const Key('ticket-design-qr-x')), findsOneWidget);
       expect(find.byKey(const Key('ticket-design-qr-y')), findsOneWidget);
       expect(find.byKey(const Key('ticket-design-qr-size')), findsOneWidget);
-      expect(find.byKey(const Key('ticket-design-qr-save')), findsOneWidget);
-      expect(find.byKey(const Key('ticket-design-qr-reset')), findsOneWidget);
-      // Tanpa desain unggahan, pengaturan QR belum dapat disimpan.
-      expect(find.byKey(const Key('ticket-design-qr-status')), findsOneWidget);
-    });
-
-    testWidgets('tanpa desain unggahan tombol simpan QR tidak mengirim API',
-        (tester) async {
-      final service = _FakeTicketDesignService(
-        const TicketDesignState(eventOrientation: TicketOrientation.landscape),
-      );
-      await tester.pumpWidget(_wrap(TicketDesignPanel(
-        eventId: 'evt-1',
-        ticketTypes: const <TicketTypeModel>[],
-        service: service,
-      )));
-      await tester.pumpAndSettle();
-
-      final saveButton = tester.widget<FilledButton>(
-        find.byKey(const Key('ticket-design-qr-save')),
-      );
-      expect(saveButton.onPressed, isNull);
-      expect(service.savedQrPlacements, isEmpty);
-    });
-
-    testWidgets('menggeser slider vertikal lalu menyimpan mengirim posisi QR',
-        (tester) async {
-      const savedQr = TicketQrPlacement(x: 0.2, y: 0.3, size: 0.35);
-      final service = _FakeTicketDesignService(
-        TicketDesignState(
-          eventOrientation: TicketOrientation.landscape,
-          eventDesign: const TicketDesignModel(
-            filePath: '/media/ticket-designs/evt-1/desain.png',
-            contentType: 'image/png',
-            orientation: TicketOrientation.landscape,
-            qr: savedQr,
-          ),
-        ),
-      );
-      await tester.pumpWidget(_wrap(TicketDesignPanel(
-        eventId: 'evt-1',
-        ticketTypes: const <TicketTypeModel>[],
-        service: service,
-      )));
-      await tester.pumpAndSettle();
-
-      // Pengaturan tersimpan dimuat ke slider (bukan default sistem).
-      final ySlider = find.byKey(const Key('ticket-design-qr-y'));
-      await tester.ensureVisible(ySlider);
-      await tester.pumpAndSettle();
-      expect(tester.widget<Slider>(ySlider).value, closeTo(savedQr.y, 0.001));
-
-      await tester.drag(ySlider, const Offset(120, 0));
-      await tester.pumpAndSettle();
-      final draggedY = tester.widget<Slider>(ySlider).value;
-      expect(draggedY, greaterThan(savedQr.y));
-
-      final saveButtonFinder = find.byKey(const Key('ticket-design-qr-save'));
-      await tester.ensureVisible(saveButtonFinder);
-      await tester.pumpAndSettle();
-      final saveButton = tester.widget<FilledButton>(saveButtonFinder);
-      expect(saveButton.onPressed, isNotNull, reason: 'perubahan QR terdeteksi');
-
-      await tester.tap(saveButtonFinder);
-      await tester.pumpAndSettle();
-
-      expect(service.savedQrPlacements, hasLength(1));
-      expect(service.savedQrPlacements.single.y, closeTo(draggedY, 0.001));
-      expect(service.openedScopes, contains('event'));
-    });
-
-    testWidgets('tombol atur ulang default mengembalikan QR default sistem',
-        (tester) async {
-      final service = _FakeTicketDesignService(
-        TicketDesignState(
-          eventOrientation: TicketOrientation.landscape,
-          eventDesign: const TicketDesignModel(
-            filePath: '/media/ticket-designs/evt-1/desain.png',
-            contentType: 'image/png',
-            orientation: TicketOrientation.landscape,
-            qr: TicketQrPlacement(x: 0.6, y: 0.6, size: 0.5),
-          ),
-        ),
-      );
-      await tester.pumpWidget(_wrap(TicketDesignPanel(
-        eventId: 'evt-1',
-        ticketTypes: const <TicketTypeModel>[],
-        service: service,
-      )));
-      await tester.pumpAndSettle();
-
-      final resetButton = find.byKey(const Key('ticket-design-qr-reset'));
-      await tester.ensureVisible(resetButton);
-      await tester.pumpAndSettle();
-      await tester.tap(resetButton);
-      await tester.pumpAndSettle();
-
-      final defaultQr = TicketDesignModel.defaultQr;
+      expect(find.byKey(const Key('ticket-design-qr-larger')), findsOneWidget);
+      expect(find.byKey(const Key('ticket-design-qr-smaller')), findsOneWidget);
+      // Konfigurasi default valid: tidak ada peringatan tumpang tindih.
+      expect(find.byKey(const Key('ticket-design-conflicts')), findsOneWidget);
       expect(
-        tester.widget<Slider>(find.byKey(const Key('ticket-design-qr-x'))).value,
-        closeTo(defaultQr.x, 0.001),
+        find.text('Semua elemen terlihat dan tidak bertumpuk.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('memilih elemen teks menampilkan input angka ukuran huruf', (
+      tester,
+    ) async {
+      final service = _serviceWithLayout(TicketLayoutModel.defaultLandscape);
+      await tester.pumpWidget(_panel(service));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(
+        find.byKey(const Key('ticket-design-element-title')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('ticket-design-element-title')));
+      await tester.pumpAndSettle();
+
+      final fieldFinder = find.byKey(
+        const Key('ticket-design-title-font-size'),
+      );
+      await tester.ensureVisible(fieldFinder);
+      await tester.pumpAndSettle();
+      final field = tester.widget<TextField>(fieldFinder);
+      expect(field.controller?.text, '50', reason: 'judul default 50 pt');
+      expect(
+        field.keyboardType,
+        const TextInputType.numberWithOptions(decimal: true),
+      );
+      // Ukuran huruf diatur lewat angka + tombol langkah, bukan slider.
+      expect(
+        find.byKey(const Key('ticket-design-title-font-size-increase')),
+        findsOneWidget,
       );
       expect(
-        tester.widget<Slider>(find.byKey(const Key('ticket-design-qr-y'))).value,
-        closeTo(defaultQr.y, 0.001),
+        find.byKey(const Key('ticket-design-title-font-size-decrease')),
+        findsOneWidget,
       );
       expect(
-        tester.widget<Slider>(find.byKey(const Key('ticket-design-qr-size'))).value,
-        closeTo(defaultQr.size, 0.001),
+        find.byKey(const Key('ticket-design-title-font-size-preset-30')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('ticket-design-title-x')), findsOneWidget);
+      expect(find.byKey(const Key('ticket-design-title-y')), findsOneWidget);
+
+      // Nilai input mengikuti elemen yang dipilih (instruksi default 30 pt).
+      final instructionChip = find.byKey(
+        const Key('ticket-design-element-instruction'),
+      );
+      await tester.ensureVisible(instructionChip);
+      await tester.pumpAndSettle();
+      await tester.tap(instructionChip);
+      await tester.pumpAndSettle();
+      final instructionField = tester.widget<TextField>(
+        find.byKey(const Key('ticket-design-instruction-font-size')),
+      );
+      expect(instructionField.controller?.text, '30');
+    });
+
+    testWidgets('mengetik ukuran huruf langsung mengubah tata letak', (
+      tester,
+    ) async {
+      final service = _serviceWithLayout(TicketLayoutModel.defaultLandscape);
+      await tester.pumpWidget(_panel(service));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(
+        find.byKey(const Key('ticket-design-element-title')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('ticket-design-element-title')));
+      await tester.pumpAndSettle();
+
+      final fieldFinder = find.byKey(
+        const Key('ticket-design-title-font-size'),
+      );
+      await tester.enterText(fieldFinder, '64');
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('ukuran huruf 64.0 pt'), findsOneWidget);
+      expect(
+        find.text('Ada perubahan tata letak yang belum disimpan.'),
+        findsOneWidget,
       );
     });
-  });
 
-  group('Nama event pada tiket', () {
-    test('TicketModel memakai event_title dari API', () {
-      final ticket = TicketModel.fromJson(<String, dynamic>{
-        'id': 'tkt-1',
-        'order_id': 'ord-1',
-        'event_id': 'evt-1',
-        'ticket_type_id': 'tt-1',
-        'attendee_name': 'Peserta',
-        'token': 'token',
-        'status': 'valid',
-        'event_title': 'Konser Nama Asli',
-        'ticket_type_name': 'Reguler',
-        'ticket_code': 'TKT-1',
-        'event_location': 'Jakarta',
-      });
-      expect(ticket.displayEventTitle, 'Konser Nama Asli');
-      expect(ticket.displayTicketType, 'Reguler');
-      expect(ticket.displayLocation, 'Jakarta');
+    testWidgets('tombol +/- dan pilihan cepat menyesuaikan ukuran huruf', (
+      tester,
+    ) async {
+      final service = _serviceWithLayout(TicketLayoutModel.defaultLandscape);
+      await tester.pumpWidget(_panel(service));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(
+        find.byKey(const Key('ticket-design-element-title')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('ticket-design-element-title')));
+      await tester.pumpAndSettle();
+
+      final increase = find.byKey(
+        const Key('ticket-design-title-font-size-increase'),
+      );
+      await tester.ensureVisible(increase);
+      await tester.pumpAndSettle();
+      await tester.tap(increase);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('ukuran huruf 51.0 pt'), findsOneWidget);
+
+      final decrease = find.byKey(
+        const Key('ticket-design-title-font-size-decrease'),
+      );
+      await tester.tap(decrease);
+      await tester.pump();
+      await tester.tap(decrease);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('ukuran huruf 49.0 pt'), findsOneWidget);
+
+      final preset = find.byKey(
+        const Key('ticket-design-title-font-size-preset-30'),
+      );
+      await tester.ensureVisible(preset);
+      await tester.pumpAndSettle();
+      await tester.tap(preset);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('ukuran huruf 30.0 pt'), findsOneWidget);
     });
 
-    test('TicketModel memakai objek events bila field datar tidak ada', () {
-      final ticket = TicketModel.fromJson(<String, dynamic>{
-        'id': 'tkt-2',
-        'order_id': 'ord-2',
-        'event_id': 'evt-2',
-        'ticket_type_id': 'tt-2',
-        'attendee_name': 'Peserta',
-        'token': 'token',
-        'status': 'valid',
-        'events': <String, dynamic>{'title': 'Event Dari Relasi'},
-      });
-      expect(ticket.displayEventTitle, 'Event Dari Relasi');
-    });
+    testWidgets('angka di luar batas dipotong ke 8-120 pt saat dikonfirmasi', (
+      tester,
+    ) async {
+      final service = _serviceWithLayout(TicketLayoutModel.defaultLandscape);
+      await tester.pumpWidget(_panel(service));
+      await tester.pumpAndSettle();
 
-    test('nama event kosong tidak menampilkan null atau UUID', () {
-      final ticket = TicketModel.fromJson(<String, dynamic>{
-        'id': 'tkt-3',
-        'event_id': 'evt-3',
-        'ticket_type_id': 'tt-3',
-        'attendee_name': 'Peserta',
-        'token': 'token',
-        'status': 'valid',
-      });
-      expect(ticket.displayEventTitle, 'Nama event tidak tersedia');
-      expect(ticket.displayEventTitle, isNot(contains('null')));
-      expect(ticket.displayEventTitle, isNot(contains('evt-3')));
+      await tester.ensureVisible(
+        find.byKey(const Key('ticket-design-element-title')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('ticket-design-element-title')));
+      await tester.pumpAndSettle();
+
+      final fieldFinder = find.byKey(
+        const Key('ticket-design-title-font-size'),
+      );
+      await tester.enterText(fieldFinder, '500');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('ukuran huruf 120.0 pt'), findsOneWidget);
+      expect(
+        find.text('Ukuran disesuaikan ke batas 8–120 pt.'),
+        findsOneWidget,
+      );
+      final field = tester.widget<TextField>(fieldFinder);
+      expect(field.controller?.text, '120');
+
+      // Nilai kosong dikembalikan ke ukuran terakhir yang valid.
+      await tester.enterText(fieldFinder, '');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(field.controller?.text, '120');
     });
   });
 }
-

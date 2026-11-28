@@ -38,6 +38,8 @@ import 'features/organizer/shell/access_denied_screen.dart';
 import 'features/organizer/support/organizer_support_screen.dart';
 import 'services/organizer_operations/organizer_permission.dart';
 import 'features/staff/screens/staff_dashboard_screen.dart';
+import 'features/staff/screens/staff_access_screen.dart';
+import 'features/staff/screens/staff_scanner_session_screen.dart';
 import 'features/tickets/screens/ticket_detail_screen.dart';
 import 'features/tickets/screens/ticket_list_screen.dart';
 import 'providers/auth_provider.dart';
@@ -139,9 +141,7 @@ class AppRouter {
       case AppRoutes.checkInHistory:
         page = args['eventId'] == null
             ? const StaffDashboardScreen()
-            : CheckInHistoryScreen(
-                eventId: args['eventId']?.toString() ?? '',
-              );
+            : CheckInHistoryScreen(eventId: args['eventId']?.toString() ?? '');
         break;
       case AppRoutes.adminDashboard:
         page = const AdminTabController();
@@ -201,6 +201,18 @@ class AppRouter {
           page = TicketDetailScreen(ticketId: parts[3]);
         } else if (parts.length == 2 && parts[0] == 'invite') {
           page = InvitationEntryScreen(token: parts[1]);
+        } else if (parts.length == 2 &&
+            parts[0] == 'staff-access' &&
+            parts[1] == 'scanner') {
+          // Scanner staf berbasis sesi kode akses. Layar memverifikasi sesi ke
+          // backend; tanpa sesi valid halaman menolak akses (tidak ada scanner).
+          page = StaffScannerSessionScreen(
+            eventId: args['eventId']?.toString(),
+          );
+        } else if (parts.length == 2 && parts[0] == 'staff-access') {
+          // Tautan undangan staf: selalu meminta kode akses, tidak pernah
+          // langsung membuka scanner.
+          page = StaffAccessScreen(invitationId: parts[1]);
         } else if (parts.length == 2 && parts[0] == 'registration') {
           // Alur pendaftaran guest melalui tautan pendaftaran (PRD §7).
           // Wajib memakai layar guest: peserta tidak perlu login, dan formulir
@@ -238,7 +250,8 @@ class AppRouter {
             eventId: parts[2],
             eventName: args['eventName']?.toString() ?? 'Event',
             contextScope:
-                _organizerContextFor(parts[2], args) ?? _ownerFallback(parts[2]),
+                _organizerContextFor(parts[2], args) ??
+                _ownerFallback(parts[2]),
           );
         } else if (parts.length == 4 &&
             parts[0] == 'organizer' &&
@@ -248,7 +261,8 @@ class AppRouter {
             eventId: parts[2],
             eventName: args['eventName']?.toString() ?? 'Event',
             contextScope:
-                _organizerContextFor(parts[2], args) ?? _ownerFallback(parts[2]),
+                _organizerContextFor(parts[2], args) ??
+                _ownerFallback(parts[2]),
           );
         } else if (parts.length >= 2 && parts.first == 'admin') {
           page = const RoleGuard(admin: true);
@@ -320,10 +334,7 @@ class AppRouter {
       );
     }
 
-    return MaterialPageRoute<void>(
-      settings: settings,
-      builder: guardedBuilder,
-    );
+    return MaterialPageRoute<void>(settings: settings, builder: guardedBuilder);
   }
 
   /// Konteks membership untuk layar Organizer yang membutuhkan permission.
@@ -347,7 +358,8 @@ class AppRouter {
     return OrganizerMembershipContext.owner(
       eventId: eventId,
       userId: userId,
-      userName: args['userName']?.toString() ?? _authUserName ?? 'Penyelenggara',
+      userName:
+          args['userName']?.toString() ?? _authUserName ?? 'Penyelenggara',
     );
   }
 
@@ -386,6 +398,10 @@ class AppRouter {
     if (path == '/e' || path == '/registration') return true;
     return path.startsWith('/e/') ||
         path.startsWith('/invite/') ||
+        // Akses staf memakai kode akses (tanpa akun). Halaman scanner staf
+        // tetap menolak tanpa sesi valid, dan backend menolak setiap request
+        // tanpa sesi staf.
+        path.startsWith('/staff-access') ||
         path.startsWith('/registration/');
   }
 
@@ -408,8 +424,7 @@ class AppRouter {
       final path = uri.path.isEmpty ? '/' : uri.path;
       return uri.hasQuery ? '$path?${uri.query}' : path;
     }
-    if ((uri.path.isEmpty || uri.path == '/') &&
-        uri.fragment.startsWith('/')) {
+    if ((uri.path.isEmpty || uri.path == '/') && uri.fragment.startsWith('/')) {
       return uri.fragment;
     }
     return name;
